@@ -119,3 +119,32 @@
 code, kbd, samp, pre {
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
 }
+
+/* Math Preview Styles */
+.math-preview-container {
+  pointer-events: none;
+}
+
+.math-preview-content {
+  background: hsl(var(--background)) !important;
+  border: 1px solid hsl(var(--border)) !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;
+  border-radius: 6px;
+  padding: 12px;
+}
+
+.dark .math-preview-content {
+  background: hsl(var(--background)) !important;
+  border: 1px solid hsl(var(--border)) !important;
+}
+
+.math-preview-content svg {
+  max-width: 100%;
+  height: auto;
+}
+
+.math-render-error {
+  color: hsl(var(--destructive));
+  font-size: 12px;
+  padding: 8px;
+}

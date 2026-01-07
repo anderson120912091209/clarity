@@ -5,9 +5,13 @@ import { editor, languages } from 'monaco-editor'
 import * as monaco from 'monaco-editor'
 import latex from 'monaco-latex'
 import { useLatexSyntaxHighlighting } from './useLatexSyntaxHighlighting'
+import { createMathPreview, MathPreviewExtension } from '@/features/source-editor/extensions/math-preview'
+import { setupAutoCloseBrackets } from '@/features/languages/latex/linter/autoclose-bracket'
 
 export function useEditorSetup(onChange: (value: string) => void, value: string) {
   const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null)
+  const mathPreviewRef = useRef<MathPreviewExtension | null>(null)
+  const autoCloseDisposableRef = useRef<monaco.IDisposable | null>(null)
   const { setTheme } = useEditorTheme()
   const { setupLatexSyntaxHighlighting } = useLatexSyntaxHighlighting()
 
@@ -30,6 +34,12 @@ export function useEditorSetup(onChange: (value: string) => void, value: string)
     languages.setMonarchTokensProvider('latex', latex);
     
     monacoInstance.editor.setModelLanguage(editor.getModel()!, 'latex');
+
+    // Initialize math preview extension
+    mathPreviewRef.current = createMathPreview(editor, monacoInstance, true)
+
+    // Setup auto-closing brackets for LaTeX
+    autoCloseDisposableRef.current = setupAutoCloseBrackets(editor, monacoInstance)
 
     editor.setValue(value)
 

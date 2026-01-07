@@ -28,8 +28,18 @@ export default function LatexCanvas({
 
   useEffect(() => {
     // Ensure worker is ready before rendering
-    if (typeof window !== 'undefined' && pdfjs.GlobalWorkerOptions.workerSrc) {
-      setWorkerReady(true)
+    if (typeof window !== 'undefined') {
+      // Set worker source if not already set
+      if (!pdfjs.GlobalWorkerOptions.workerSrc) {
+        pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.mjs`
+      }
+      
+      // Wait a bit to ensure worker is loaded
+      const timer = setTimeout(() => {
+        setWorkerReady(true)
+      }, 100)
+      
+      return () => clearTimeout(timer)
     }
   }, [])
 
@@ -57,7 +67,7 @@ export default function LatexCanvas({
         loading={<Skeleton className="w-full h-full max-w-4xl" />}
         options={options}
       >
-        {isDocumentReady && numPages > 0 && !documentError &&
+        {isDocumentReady && numPages > 0 && !documentError && workerReady &&
           Array.from(new Array(numPages), (el, index) => (
             <Page
               key={`page_${index + 1}`}
@@ -68,6 +78,11 @@ export default function LatexCanvas({
               loading={<Skeleton className="w-full h-[calc(100vh-80px)] mb-4" />}
               onRenderError={(error) => {
                 console.error(`Error rendering page ${index + 1}:`, error)
+                setDocumentError(`Failed to render page ${index + 1}`)
+              }}
+              onLoadError={(error) => {
+                console.error(`Error loading page ${index + 1}:`, error)
+                setDocumentError(`Failed to load page ${index + 1}`)
               }}
             />
           ))}
