@@ -1,1 +1,4 @@
 [2026-01-07T10:53:33.111Z] Chat Request Started. History length: 1
+[2026-01-07T15:50:40.503Z] AI Request Started. Input length: 537
+[2026-01-07T15:50:40.504Z] Starting streamText call with Gemini 2.0 Flash
+[2026-01-07T15:50:41.801Z] Stream processing final cleanup

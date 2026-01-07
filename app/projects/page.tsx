@@ -1,9 +1,9 @@
 'use client'
 import { useState } from 'react'
-import { Card, CardContent, CardFooter } from '@/components/ui/card'
+import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { SearchIcon, PlusIcon } from 'lucide-react'
+import { SearchIcon, PlusIcon, FileText } from 'lucide-react'
 import ProjectNav from '@/components/projects/project-nav'
 import Link from 'next/link'
 import ProjectSkeleton from '@/components/projects/project-skeleton'
@@ -25,52 +25,65 @@ export default function Projects() {
   const allProjects = projects
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
+    <div className="min-h-screen bg-[#050505] text-white flex flex-col font-sans selection:bg-white/20">
       <ProjectNav />
-      <main className="flex-grow container mx-auto px-4 py-8">
-        <div className="mb-8 flex justify-between items-center">
-          <div className="relative flex-grow mr-4">
-            <SearchIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+      {/* Ambient Background Removed for cleaner look */}
+
+      <main className="flex-grow container mx-auto px-6 py-12 z-10 max-w-7xl">
+        <div className="mb-12 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+          <div className="relative w-full md:w-96 group">
+            <SearchIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 text-zinc-600 group-focus-within:text-zinc-400 transition-colors h-4 w-4" />
             <Input
-              className="pl-10 py-5 text-sm w-full"
-              placeholder="Search Jules Projects..."
+              className="pl-10 h-10 bg-white/[0.03] border-white/5 text-sm text-zinc-300 placeholder:text-zinc-600 focus:bg-white/[0.05] focus:border-white/10 rounded-lg transition-all"
+              placeholder="Search projects..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
-          <Button className="whitespace-nowrap" asChild>
+          <Button 
+            className="h-10 px-6 bg-white text-black hover:bg-zinc-200 text-[13px] font-semibold tracking-wide rounded-lg transition-all shadow-lg shadow-white/5" 
+            asChild
+          >
             <Link href="/new">
               <PlusIcon className="mr-2 h-4 w-4" />
-              Add Project
+              New Project
             </Link>
           </Button>
         </div>
 
         {allProjects.length === 0 ? (
-          <Card className="p-12 text-center">
-            <h2 className="text-xl font-semibold mb-4">No Projects Yet</h2>
-            <p className="text-muted-foreground mb-4">Get started by creating your first LaTeX project.</p>
-            <Button asChild>
+          <div className="flex flex-col items-center justify-center py-32 text-center animate-in fade-in duration-700">
+            <div className="w-16 h-16 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center mb-6">
+              <FileText className="h-8 w-8 text-zinc-600" />
+            </div>
+            <h2 className="text-lg font-medium text-zinc-200 mb-2">No projects yet</h2>
+            <p className="text-sm text-zinc-500 max-w-sm mb-8">
+              Create your first project to start writing beautiful LaTeX documents with AI assistance.
+            </p>
+            <Button 
+              asChild
+              variant="outline"
+              className="bg-transparent border-white/10 text-zinc-400 hover:text-white hover:bg-white/5 hover:border-white/20 transition-all"
+            >
               <Link href="/new">
-                <PlusIcon className="mr-2 h-4 w-4" />
-                Add Your First Project
+                Create Project
               </Link>
             </Button>
-          </Card>
+          </div>
         ) : searchTerm ? (
-          <section>
-            <h2 className="text-xl font-semibold mb-4">Results</h2>
-            <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-6">
+          <section className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+            <h2 className="text-[11px] uppercase tracking-widest font-bold text-zinc-500 mb-6 pl-1">Search Results</h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
               {filteredProjects.map((project) => (
                 <ProjectCard key={project.id} project={project} />
               ))}
             </div>
           </section>
         ) : (
-          <>
-            <section className="mb-12">
-              <h2 className="text-xl font-semibold mb-4">Recents</h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="space-y-16 animate-in fade-in slide-in-from-bottom-4 duration-700">
+            <section>
+              <h2 className="text-[11px] uppercase tracking-widest font-bold text-zinc-500 mb-6 pl-1">Recent</h2>
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
                 {recentProjects.map((project) => (
                   <ProjectCard key={project.id} project={project} detailed={true} />
                 ))}
@@ -78,14 +91,14 @@ export default function Projects() {
             </section>
 
             <section>
-              <h2 className="text-xl font-semibold mb-4">All Projects</h2>
-              <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-6">
+              <h2 className="text-[11px] uppercase tracking-widest font-bold text-zinc-500 mb-6 pl-1">All Projects</h2>
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
                 {allProjects.map((project) => (
                   <ProjectCard key={project.id} project={project} />
                 ))}
               </div>
             </section>
-          </>
+          </div>
         )}
       </main>
     </div>

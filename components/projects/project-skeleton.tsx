@@ -1,73 +1,44 @@
 import { Skeleton } from '@/components/ui/skeleton'
-import { Card, CardContent, CardFooter } from '@/components/ui/card'
 import ProjectNav from '@/components/projects/project-nav'
 
 export default function ProjectSkeleton() {
   return (
-    <div className="min-h-screen bg-background flex flex-col">
+    <div className="min-h-screen bg-[#050505] flex flex-col font-sans">
       <ProjectNav />
-      <main className="flex-grow container mx-auto px-4 py-8">
-        <div className="mb-8 flex justify-between items-center">
-          <div className="relative flex-grow mr-4">
-            <Skeleton className="h-10 w-full" />
+      <main className="flex-grow container mx-auto px-6 py-12 max-w-7xl">
+        <div className="mb-12 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+          <div className="relative w-full md:w-96">
+            <Skeleton className="h-10 w-full rounded-lg bg-white/5" />
           </div>
-          <Skeleton className="h-10 w-32" />
+          <Skeleton className="h-10 w-32 rounded-lg bg-white/5" />
         </div>
 
-        <section className="mb-12">
-          <Skeleton className="h-8 w-48 mb-4" />
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <section className="mb-16">
+          <Skeleton className="h-4 w-24 mb-6 bg-white/5" />
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
             {[...Array(3)].map((_, i) => (
-              <Card key={i} className="flex flex-col">
-                <CardContent className="flex-grow p-4">
-                  <div className="flex items-center justify-between mb-4">
-                    <Skeleton className="h-5 w-20" />
-                    <Skeleton className="h-8 w-8 rounded-full" />
-                  </div>
-                  <div className="flex space-x-4">
-                    <div className="flex-shrink-0">
-                      <Skeleton className="h-12 w-12 rounded" />
-                    </div>
-                    <div className="flex-grow">
-                      <Skeleton className="h-6 w-3/4 mb-2" />
-                      <Skeleton className="h-4 w-1/2" />
-                    </div>
-                  </div>
-                </CardContent>
-                <CardFooter className="p-4 flex justify-between items-center">
-                  <Skeleton className="h-4 w-24" />
-                  <Skeleton className="h-8 w-20" />
-                </CardFooter>
-              </Card>
+              <div key={i} className="flex flex-col">
+                <div className="aspect-[1.414/1] w-full bg-white/5 rounded-[4px] border border-white/5" />
+                <div className="mt-3 space-y-2 px-0.5">
+                  <Skeleton className="h-4 w-3/4 bg-white/5" />
+                  <Skeleton className="h-3 w-1/2 bg-white/5" />
+                </div>
+              </div>
             ))}
           </div>
         </section>
 
         <section>
-          <Skeleton className="h-8 w-48 mb-4" />
-          <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-6">
+          <Skeleton className="h-4 w-24 mb-6 bg-white/5" />
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
             {[...Array(8)].map((_, i) => (
-              <Card key={i} className="flex flex-col">
-                <CardContent className="flex-grow p-4">
-                  <div className="flex items-center justify-between mb-4">
-                    <Skeleton className="h-5 w-20" />
-                    <Skeleton className="h-8 w-8 rounded-full" />
-                  </div>
-                  <div className="flex space-x-4">
-                    <div className="flex-shrink-0">
-                      <Skeleton className="h-12 w-12 rounded" />
-                    </div>
-                    <div className="flex-grow">
-                      <Skeleton className="h-6 w-3/4 mb-2" />
-                      <Skeleton className="h-4 w-1/2" />
-                    </div>
-                  </div>
-                </CardContent>
-                <CardFooter className="p-4 flex justify-between items-center">
-                  <Skeleton className="h-4 w-24" />
-                  <Skeleton className="h-8 w-20" />
-                </CardFooter>
-              </Card>
+              <div key={i} className="flex flex-col">
+                <div className="aspect-[1.414/1] w-full bg-white/5 rounded-[4px] border border-white/5" />
+                <div className="mt-3 space-y-2 px-0.5">
+                  <Skeleton className="h-4 w-3/4 bg-white/5" />
+                  <Skeleton className="h-3 w-1/2 bg-white/5" />
+                </div>
+              </div>
             ))}
           </div>
         </section>

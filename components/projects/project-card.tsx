@@ -2,9 +2,8 @@
 import { useEffect } from 'react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardFooter } from '@/components/ui/card'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
-import { CopyIcon, DownloadIcon, Edit2Icon, MoreVertical, XIcon } from 'lucide-react'
+import { CopyIcon, DownloadIcon, Edit2Icon, MoreHorizontal, XIcon, MoreVertical } from 'lucide-react'
 import { db } from '@/lib/constants'
 import { tx } from '@instantdb/react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
@@ -188,88 +187,81 @@ export default function ProjectCard({ project, detailed = false }: { project: an
 
   return (
     <>
-      <Link href={`/project/${project.id}`} passHref>
-        <Card className="flex flex-col overflow-hidden">
-          <div className="relative">
-            <Image
-              src={!imageError && imageURL ? imageURL : '/placeholder.svg'}
-              alt={`Preview of ${project.title}`}
-              className="w-full h-40 object-cover"
-              width={300}
-              height={160}
-              loader={({ src }) => src}
-              onError={() => setImageError(true)}
-            />
-            <div className="absolute top-2 right-2">
+      <Link href={`/project/${project.id}`} className="group relative block outline-none">
+        {/* Card Cover */}
+        <div className="relative aspect-[1.414/1] w-full overflow-hidden rounded-[4px] border border-white/10 bg-zinc-900 shadow-sm transition-all duration-200 hover:border-white/20">
+          <Image
+            src={!imageError && imageURL ? imageURL : '/placeholder.svg'}
+            alt=""
+            className="h-full w-full object-cover opacity-80 transition-opacity duration-300 group-hover:opacity-100"
+            width={400}
+            height={300}
+            loader={({ src }) => src}
+            onError={() => setImageError(true)}
+          />
+
+          {/* More Options Overlay */}
+          <div className="absolute right-2 top-2 opacity-0 transition-opacity duration-200 group-focus-within:opacity-100 group-hover:opacity-100">
+             <div onClick={(e) => {e.preventDefault(); e.stopPropagation();}}>
               <DropdownMenu open={isDropdownOpen} onOpenChange={setIsDropdownOpen}>
                 <DropdownMenuTrigger asChild>
                   <Button
-                    variant="secondary"
+                    variant="ghost"
                     size="icon"
-                    className="h-8 w-8"
-                    onClick={(e) => {
-                      e.preventDefault()
-                      e.stopPropagation()
-                    }}
+                    className="h-6 w-6 rounded-md bg-zinc-900/90 text-zinc-400 hover:bg-zinc-800 hover:text-white ring-1 ring-white/10"
                   >
+                    <MoreHorizontal className="h-3.5 w-3.5" />
                     <span className="sr-only">Open menu</span>
-                    <MoreVertical className="h-4 w-4" />
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent
                   align="end"
-                  onClick={(e) => {
-                    e.preventDefault()
-                    e.stopPropagation()
-                  }}
+                  className="w-48 bg-[#0A0A0A] border rounded-lg border-white/10 text-zinc-400 p-1"
                 >
-                  <DropdownMenuItem onClick={handleDelete}>
-                    <XIcon className="mr-2 h-4 w-4" />
-                    <span>Delete</span>
+                  <DropdownMenuItem className="focus:bg-white/5 focus:text-white rounded-sm cursor-pointer text-xs font-medium py-2" onClick={handleEdit}>
+                    <Edit2Icon className="mr-2 h-3.5 w-3.5" />
+                    <span>Rename</span>
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={handleEdit}>
-                    <Edit2Icon className="mr-2 h-4 w-4" />
-                    <span>Edit</span>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={handleDuplicate}>
-                    <CopyIcon className="mr-2 h-4 w-4" />
+                  <DropdownMenuItem className="focus:bg-white/5 focus:text-white rounded-sm cursor-pointer text-xs font-medium py-2" onClick={handleDuplicate}>
+                    <CopyIcon className="mr-2 h-3.5 w-3.5" />
                     <span>Duplicate</span>
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={handleDownload}>
-                    <DownloadIcon className="mr-2 h-4 w-4" />
-                    <span>Download</span>
+                  <DropdownMenuItem className="focus:bg-white/5 focus:text-white rounded-sm cursor-pointer text-xs font-medium py-2" onClick={handleDownload}>
+                    <DownloadIcon className="mr-2 h-3.5 w-3.5" />
+                    <span>Download PDF</span>
+                  </DropdownMenuItem>
+                  <div className="h-[1px] bg-white/5 my-1" />
+                  <DropdownMenuItem className="focus:bg-red-500/10 focus:text-red-400 text-red-400/80 rounded-sm cursor-pointer text-xs font-medium py-2" onClick={handleDelete}>
+                    <XIcon className="mr-2 h-3.5 w-3.5" />
+                    <span>Delete Project</span>
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>
           </div>
-          <CardContent className="flex-grow p-4">
-            <h3 className="font-semibold truncate text-lg mb-1">{project.title}</h3>
-            <p className="text-sm text-muted-foreground mb-1">
-              {project.last_compiled 
-                ? `Last updated: ${getTimeAgo(new Date(project.last_compiled))}`
-                : "Not compiled yet"}
-            </p>
-          </CardContent>
-          {detailed && (
-            <CardFooter className="p-4 pt-0">
-              <Button variant="outline" className="w-full">
-                Open
-              </Button>
-            </CardFooter>
-          )}
-        </Card>
+        </div>
+        
+        {/* Title & Info Below Card */}
+        <div className="mt-3 flex flex-col gap-0.5 px-0.5">
+          <h3 className="truncate text-[13px] font-medium text-zinc-300 group-hover:text-white transition-colors">{project.title}</h3>
+          <p className="text-[11px] text-zinc-600">
+            {project.last_compiled 
+              ? `Edited ${getTimeAgo(new Date(project.last_compiled))}`
+              : "Draft"}
+          </p>
+        </div>
       </Link>
       <Dialog open={isDialogOpen} onOpenChange={handleDialogOpenChange}>
-        <DialogContent>
+        <DialogContent className="bg-[#0A0A0A] border-white/10 text-white sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Edit Document Title</DialogTitle>
+            <DialogTitle className="text-sm font-semibold text-zinc-200">Rename Project</DialogTitle>
           </DialogHeader>
-          <div className="py-4">
+          <div className="py-2">
             <Input 
               value={newTitle} 
               onChange={(e) => setNewTitle(e.target.value)} 
               placeholder="Enter new title" 
+              className="bg-white/5 border-white/10 text-white focus:bg-white/10 transition-colors"
               onKeyDown={(e) => {
                 if (e.key === 'Enter') {
                   db.transact([tx.projects[project.id].update({ title: newTitle })])
@@ -278,15 +270,16 @@ export default function ProjectCard({ project, detailed = false }: { project: an
               }} 
             />
           </div>
-          <DialogFooter>
-            <Button onClick={() => handleDialogOpenChange(false)}>Cancel</Button>
+          <DialogFooter className="flex gap-2">
+            <Button variant="ghost" className="text-zinc-400 hover:text-white hover:bg-white/5" onClick={() => handleDialogOpenChange(false)}>Cancel</Button>
             <Button
+              className="bg-white text-black hover:bg-zinc-200"
               onClick={() => {
                 db.transact([tx.projects[project.id].update({ title: newTitle })])
                 handleDialogOpenChange(false)
               }}
             >
-              Save
+              Save Changes
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -304,18 +297,18 @@ function getTimeAgo(date: Date): string {
     return 'Just now';
   } else if (diffInSeconds < 3600) {
     const minutes = Math.floor(diffInSeconds / 60);
-    return `${minutes} minute${minutes > 1 ? 's' : ''} ago`;
+    return `${minutes}m ago`;
   } else if (diffInSeconds < 86400) {
     const hours = Math.floor(diffInSeconds / 3600);
-    return `${hours} hour${hours > 1 ? 's' : ''} ago`;
+    return `${hours}h ago`;
   } else if (diffInSeconds < 2592000) {
     const days = Math.floor(diffInSeconds / 86400);
-    return `${days} day${days > 1 ? 's' : ''} ago`;
+    return `${days}d ago`;
   } else if (diffInSeconds < 31536000) {
     const months = Math.floor(diffInSeconds / 2592000);
-    return `${months} month${months > 1 ? 's' : ''} ago`;
+    return `${months}mo ago`;
   } else {
     const years = Math.floor(diffInSeconds / 31536000);
-    return `${years} year${years > 1 ? 's' : ''} ago`;
+    return `${years}y ago`;
   }
 }
