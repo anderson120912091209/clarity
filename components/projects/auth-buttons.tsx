@@ -13,20 +13,26 @@ export default function AuthButtons() {
       {user ? (
         <Button
           size="sm"
-          className="dark:bg-transparent dark:border-primary/75 dark:border dark:text-primary dark:hover:bg-primary/5 light:border-primary/75 light:border light:text-primary light:hover:bg-primary/10"
+          className="rounded-none border-white/10 bg-transparent text-[11px] font-bold tracking-tight hover:bg-white/5 h-8 px-4"
           asChild
         >
           <Link href="/projects">
-            <LayoutGrid className="h-4 w-4" />
-            <span className="ml-2">Projects</span>
+            <LayoutGrid className="h-3 w-3 mr-2 opacity-50" />
+            Projects
           </Link>
         </Button>
       ) : (
-        <Button size="sm" asChild>
+        <Button 
+          size="sm" 
+          className="rounded-none bg-white text-black hover:bg-zinc-200 text-[11px] font-bold tracking-tight h-8 px-4"
+          asChild
+        >
           <Link href="/login">Log In</Link>
         </Button>
       )}
-      <ModeToggle />
+      <div className="opacity-40 hover:opacity-100 transition-opacity translate-y-[1px]">
+        <ModeToggle />
+      </div>
     </div>
   )
 }

@@ -1,6 +1,12 @@
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area"
 import { Document, Page, pdfjs } from 'react-pdf'
 import { Skeleton } from "@/components/ui/skeleton"
+import { useEffect, useState } from 'react'
+
+// Ensure worker is initialized
+if (typeof window !== 'undefined') {
+  pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.mjs`
+}
 
 export default function LatexCanvas({
   pdfUrl,
@@ -17,26 +23,59 @@ export default function LatexCanvas({
   numPages: number;
   scale: number;
 }) {
+  const [workerReady, setWorkerReady] = useState(false)
+  const [documentError, setDocumentError] = useState<string | null>(null)
+
+  useEffect(() => {
+    // Ensure worker is ready before rendering
+    if (typeof window !== 'undefined' && pdfjs.GlobalWorkerOptions.workerSrc) {
+      setWorkerReady(true)
+    }
+  }, [])
+
+  if (!workerReady) {
+    return (
+      <div className="flex justify-center items-center w-full h-full">
+        <Skeleton className="w-full h-full max-w-4xl" />
+      </div>
+    )
+  }
+
   return (
     <ScrollArea className="flex-grow w-full h-full bg-foreground/5">
       <Document
         file={pdfUrl}
-        onLoadSuccess={onDocumentLoadSuccess}
+        onLoadSuccess={(pdf) => {
+          setDocumentError(null)
+          onDocumentLoadSuccess(pdf)
+        }}
+        onLoadError={(error) => {
+          console.error('PDF load error:', error)
+          setDocumentError(error.message || 'Failed to load PDF')
+        }}
         className="flex flex-col items-center w-full"
         loading={<Skeleton className="w-full h-full max-w-4xl" />}
         options={options}
       >
-        {isDocumentReady &&
+        {isDocumentReady && numPages > 0 && !documentError &&
           Array.from(new Array(numPages), (el, index) => (
             <Page
               key={`page_${index + 1}`}
               pageNumber={index + 1}
               className="mb-4 shadow-lg"
               scale={scale}
-              width={Math.min(window.innerWidth - 80, 800)}
+              width={typeof window !== 'undefined' ? Math.min(window.innerWidth - 80, 800) : 800}
               loading={<Skeleton className="w-full h-[calc(100vh-80px)] mb-4" />}
+              onRenderError={(error) => {
+                console.error(`Error rendering page ${index + 1}:`, error)
+              }}
             />
           ))}
+        {documentError && (
+          <div className="p-4 text-red-500">
+            Error loading PDF: {documentError}
+          </div>
+        )}
       </Document>
       <ScrollBar orientation="horizontal" />
       <ScrollBar orientation="vertical" />

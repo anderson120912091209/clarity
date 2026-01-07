@@ -12,10 +12,11 @@ import { useFrontend } from '@/contexts/FrontendContext'
 import { getAllProjects } from '@/hooks/data'
 
 export default function Projects() {
-  const { user } = useFrontend();
+  const { user, isLoading: userLoading } = useFrontend();
   const [searchTerm, setSearchTerm] = useState('');
-  const { isLoading, error, data } = getAllProjects(user.id);
+  const { isLoading, error, data } = getAllProjects(user?.id || '');
 
+  if (userLoading || !user) return <ProjectSkeleton />
   if (isLoading) return <ProjectSkeleton />
 
   const projects = data?.projects || []

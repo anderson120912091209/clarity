@@ -19,7 +19,10 @@ import LatexLoading from './latex-loading'
 import LatexCanvas from './latex-canvas'
 import { updateProject } from '@/hooks/data'
 
-pdfjs.GlobalWorkerOptions.workerSrc = '/pdf.worker.mjs'
+// Use the worker from pdfjs-dist package to ensure version matching
+if (typeof window !== 'undefined') {
+  pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.mjs`
+}
 
 function LatexRenderer() {
   const { user } = useFrontend();
@@ -42,6 +45,13 @@ function LatexRenderer() {
 
   const handlePdf = async () => {
     if (isDataLoading || !user) return
+    
+    // Validate files before attempting to fetch PDF
+    if (!files || (Array.isArray(files) && files.length === 0)) {
+      setError('No files available to compile. Please create or open a LaTeX file.')
+      return
+    }
+    
     setIsLoading(true)
     setError(null)
     setIsDocumentReady(false)
@@ -53,8 +63,32 @@ function LatexRenderer() {
       const url = URL.createObjectURL(blob)
       setPdfUrl(url)
     } catch (error) {
-      console.error('Error fetching PDF:', error)
-      setError(error instanceof Error ? error.message : String(error))
+      // Enhanced error logging to handle all error types
+      console.error('Error fetching PDF:', error);
+      
+      if (error instanceof Error) {
+        console.error('Error Name:', error.name);
+        console.error('Error Message:', error.message);
+        console.error('Error Stack:', error.stack);
+        if ('cause' in error) console.error('Error Cause:', (error as any).cause);
+        setError(error.message)
+      } else if (typeof error === 'string') {
+        console.error('Error (string):', error);
+        setError(error)
+      } else if (error && typeof error === 'object') {
+        // Try to extract meaningful information from object errors
+        const errorInfo = {
+          message: (error as any).message || (error as any).error || 'Unknown error',
+          details: (error as any).details || (error as any).stack || JSON.stringify(error, null, 2)
+        }
+        console.error('Error (object):', errorInfo);
+        setError(errorInfo.message + (errorInfo.details ? '\n\n' + errorInfo.details : ''))
+      } else {
+        // Fallback for any other error type
+        const errorString = String(error) || 'Unknown error occurred'
+        console.error('Error (unknown type):', errorString);
+        setError(errorString)
+      }
     } finally {
       setIsLoading(false)
     }
