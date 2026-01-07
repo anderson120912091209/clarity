@@ -92,7 +92,9 @@ export async function chat(messages: { role: 'user' | 'assistant', content: stri
           '1. Answer questions about the LaTeX document accurately.\n' +
           '2. If requested to change code, provide the full LaTeX block or explain clearly.\n' +
           '3. Be concise but premium in your tone.\n' +
-          '4. You can analyze the structure, suggest packages, or fix syntax errors.',
+          '4. You can analyze the structure, suggest packages, or fix syntax errors.\n' +
+          '5. CRITICAL: Always format your responses in Markdown. Use code blocks with language tags for LaTeX code (```latex), use headings, lists, and proper formatting for readability.\n' +
+          '6. For code examples, always use syntax-highlighted code blocks with the appropriate language identifier (latex, python, javascript, etc.).',
         messages: messages,
       })
 

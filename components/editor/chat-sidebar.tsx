@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { readStreamableValue } from 'ai/rsc'
 import { chat } from '@/app/actions'
 import { cn } from '@/lib/utils'
+import { MarkdownRenderer } from './markdown-renderer'
 
 interface Message {
   role: 'user' | 'assistant'
@@ -73,29 +74,34 @@ export const ChatSidebar: React.FC<ChatSidebarProps> = ({ isOpen, onClose, fileC
           initial={{ x: '100%' }}
           animate={{ x: 0 }}
           exit={{ x: '100%' }}
-          transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-          className="fixed right-0 top-0 h-full w-[400px] z-[100] bg-background/80 backdrop-blur-xl border-l shadow-2xl flex flex-col overflow-hidden"
+          transition={{ type: 'spring', damping: 30, stiffness: 300 }}
+          className="fixed right-0 top-0 h-full w-[420px] z-[100] bg-[hsl(var(--background))] border-l border-border/50 shadow-[0_0_50px_rgba(0,0,0,0.1)] flex flex-col overflow-hidden"
         >
           {/* Header */}
-          <div className="p-4 border-b flex items-center justify-between bg-background/50 backdrop-blur-md">
-            <div className="flex items-center gap-2">
-              <div className="p-1.5 bg-blue-500/10 rounded-lg">
-                <MessageSquare className="h-5 w-5 text-blue-500" />
+          <div className="h-12 px-4 border-b border-border/50 flex items-center justify-between bg-[hsl(var(--muted)/0.2)]">
+            <div className="flex items-center gap-2.5">
+              <div className="p-1.5 bg-blue-500/10 rounded-md">
+                <MessageSquare className="h-4 w-4 text-blue-500" />
               </div>
               <div>
-                <h3 className="text-sm font-semibold">AI Assistant</h3>
-                <p className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold">Context-Aware</p>
+                <h3 className="text-xs font-semibold text-foreground">AI Assistant</h3>
+                <p className="text-[10px] text-muted-foreground">Context-aware</p>
               </div>
             </div>
-            <Button variant="ghost" size="icon" onClick={onClose} className="rounded-full hover:bg-muted/50">
-              <X className="h-4 w-4" />
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              onClick={onClose} 
+              className="h-7 w-7 rounded-md hover:bg-muted/50"
+            >
+              <X className="h-3.5 w-3.5" />
             </Button>
           </div>
 
           {/* Messages */}
           <div 
             ref={scrollRef}
-            className="flex-grow overflow-y-auto p-4 space-y-4 scroll-smooth"
+            className="flex-grow overflow-y-auto p-4 space-y-3 scroll-smooth scrollbar-thin"
           >
             {messages.length === 0 && (
               <div className="h-full flex flex-col items-center justify-center text-center space-y-4 px-6">
@@ -127,12 +133,19 @@ export const ChatSidebar: React.FC<ChatSidebarProps> = ({ isOpen, onClose, fileC
                   {msg.role === 'user' ? <User className="h-4 w-4" /> : <Bot className="h-4 w-4 text-blue-500" />}
                 </div>
                 <div className={cn(
-                  "p-3 rounded-2xl text-sm leading-relaxed",
+                  "px-3 py-2.5 rounded-lg text-sm leading-relaxed",
                   msg.role === 'user' 
-                    ? "bg-blue-500 text-white rounded-tr-none shadow-lg shadow-blue-500/20" 
-                    : "bg-muted/50 border rounded-tl-none"
+                    ? "bg-blue-500 text-white ml-auto max-w-[85%]" 
+                    : "bg-[hsl(var(--muted)/0.3)] border border-border/50 mr-auto max-w-[90%]"
                 )}>
-                  {msg.content}
+                  {msg.role === 'assistant' ? (
+                    <MarkdownRenderer 
+                      content={msg.content} 
+                      className="text-foreground"
+                    />
+                  ) : (
+                    <p className="whitespace-pre-wrap break-words">{msg.content}</p>
+                  )}
                 </div>
               </motion.div>
             ))}
@@ -151,10 +164,9 @@ export const ChatSidebar: React.FC<ChatSidebarProps> = ({ isOpen, onClose, fileC
           </div>
 
           {/* Input Area */}
-          <div className="p-4 bg-background/50 border-t">
-            <div className="relative group">
-              <div className="absolute -inset-0.5 bg-gradient-to-r from-blue-500 to-indigo-500 rounded-xl blur opacity-20 group-focus-within:opacity-40 transition duration-300" />
-              <div className="relative flex items-center bg-background border rounded-xl overflow-hidden focus-within:border-blue-500/50 transition-colors">
+          <div className="p-3 bg-[hsl(var(--muted)/0.2)] border-t border-border/50">
+            <div className="relative flex items-end gap-2">
+              <div className="flex-1 relative">
                 <textarea
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
@@ -164,22 +176,22 @@ export const ChatSidebar: React.FC<ChatSidebarProps> = ({ isOpen, onClose, fileC
                       handleSend()
                     }
                   }}
-                  placeholder="Ask anything about your document..."
-                  className="flex-grow bg-transparent border-none focus:ring-0 text-sm p-3 min-h-[44px] max-h-32 resize-none"
+                  placeholder="Ask about your document..."
+                  className="w-full bg-background border border-border/50 rounded-lg px-3 py-2.5 text-sm resize-none focus:ring-1 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all min-h-[40px] max-h-32 scrollbar-thin"
                   rows={1}
                 />
-                <Button 
-                  size="icon" 
-                  disabled={!input.trim() || isTyping}
-                  onClick={handleSend}
-                  className="mr-2 h-8 w-8 rounded-lg bg-blue-500 hover:bg-blue-600 shadow-lg shadow-blue-500/20 transition-all active:scale-95 disabled:grayscale"
-                >
-                  <Send className="h-4 w-4 text-white" />
-                </Button>
               </div>
+              <Button 
+                size="icon" 
+                disabled={!input.trim() || isTyping}
+                onClick={handleSend}
+                className="h-10 w-10 rounded-lg bg-blue-500 hover:bg-blue-600 text-white transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0"
+              >
+                <Send className="h-4 w-4" />
+              </Button>
             </div>
-            <p className="mt-2 text-[10px] text-center text-muted-foreground font-medium uppercase tracking-tight opacity-50">
-              Shift + Enter for new line
+            <p className="mt-2 text-[10px] text-center text-muted-foreground/60">
+              Press <kbd className="px-1 py-0.5 bg-muted rounded text-[9px]">Enter</kbd> to send, <kbd className="px-1 py-0.5 bg-muted rounded text-[9px]">Shift+Enter</kbd> for new line
             </p>
           </div>
         </motion.div>

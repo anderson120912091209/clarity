@@ -68,6 +68,15 @@ def latex_to_pdf():
                         "message": "Found '\\titlef' which is not a valid LaTeX command. Did you mean '\\titleformat'?",
                         "details": f"File content (first 20 lines):\n" + "\n".join(f"{i}: {line}" for i, line in enumerate(file_lines[:20], 1))
                     }, 400
+                
+                # Check for \maketitle without \title
+                if '\\maketitle' in file_content:
+                    if '\\title' not in file_content:
+                        return {
+                            "error": "LaTeX compilation error",
+                            "message": "\\maketitle requires \\title to be defined",
+                            "details": "You're using \\maketitle but haven't defined a \\title. Add \\title{Your Title} before \\begin{document}, or remove \\maketitle if you don't want a title page.\n\nExample:\n\\title{Your Document Title}\n\\author{Your Name}\n\\date{\\today}\n\\begin{document}\n\\maketitle"
+                        }, 400
             
             try:
                 print("Running pdflatex for the first time")
@@ -86,6 +95,16 @@ def latex_to_pdf():
                 if result1.returncode != 0:
                     print(f"First pdflatex run failed with return code {result1.returncode}")
                     print(f"Output: {result1.stdout}")
+                    
+                    # Check for specific common errors
+                    error_output = result1.stdout
+                    if "No \\title given" in error_output or "No \\title" in error_output:
+                        return {
+                            "error": "LaTeX compilation error",
+                            "message": "\\maketitle requires \\title to be defined",
+                            "details": "You're using \\maketitle but haven't defined a \\title. Add \\title{Your Title} before \\begin{document}, or remove \\maketitle if you don't want a title page.\n\nExample:\n\\title{Your Document Title}\n\\author{Your Name}\n\\date{\\today}\n\\begin{document}\n\\maketitle\n\nOr simply remove \\maketitle if you don't need a title page."
+                        }, 400
+                    
                     return {
                         "error": "LaTeX compilation failed",
                         "message": f"pdflatex returned exit code {result1.returncode}",

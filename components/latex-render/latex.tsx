@@ -169,7 +169,7 @@ function LatexRenderer() {
   }
 
   return (
-    <div className="w-full h-full flex flex-col">
+    <div className="w-full h-full flex flex-col bg-[hsl(var(--muted)/0.1)]">
       <div className="flex justify-between items-center border-b shadow-sm p-2 gap-4">
         <div className="flex items-center gap-4">
           <Button variant="outline" onClick={handlePdf} disabled={isLoading}>
