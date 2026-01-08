@@ -1,5 +1,5 @@
 'use client'
-import FileTree from '@/components/file-tree/file-tree'
+import FileTree from '@/workbench/components/sidebar/file-tree'
 import { ModeToggle } from '@/components/ui/mode-toggle'
 import { useState } from 'react'
 import { Input } from '@/components/ui/input'
