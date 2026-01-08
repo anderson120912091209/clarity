@@ -86,7 +86,10 @@ function countSurroundingCharacters(
   }
   
   // Count forwards
-  col = position.column - 1
+  // Start AFTER the current inserted character(s)
+  // position points to the start of the inserted character
+  // So we skip 'char.length' to avoid counting the one we just inserted
+  col = (position.column - 1) + char.length
   while (col + char.length <= lineContent.length) {
     const substr = lineContent.substring(col, col + char.length)
     if (substr !== char) break
@@ -240,13 +243,13 @@ export function setupAutoCloseBrackets(
     // Skip if this is a deletion (text length is 0 or range is not empty)
     if (!insertedText || insertedText.length === 0) return
     
-    // Check if range is empty (single character insertion)
+    // Check if range is empty (single character insertion, no selection replacement)
     const range = change.range
     if (
       range.startLineNumber !== range.endLineNumber ||
       range.startColumn !== range.endColumn
     ) {
-      return // Not an empty range, skip
+      return // Not an empty range replacement, likely a paste or selection overwrite
     }
 
     // Check if a bracket was typed
@@ -254,12 +257,14 @@ export function setupAutoCloseBrackets(
     if (!bracketPair) return
 
     // Get the position BEFORE the bracket was inserted
+    // Since we're in onDidChangeModelContent, the content is already inserted.
+    // The insertion happened at change.range.startLineNumber, change.range.startColumn
     const positionBeforeInsert = new monacoInstance.Position(
       change.range.startLineNumber,
       change.range.startColumn
     )
 
-    // Check if we should auto-close (using position before insertion)
+    // Check if we should auto-close
     const insertText = buildInsert(model, positionBeforeInsert, bracketPair.open, bracketPair.close)
 
     // If we need to insert a closing bracket
@@ -277,8 +282,9 @@ export function setupAutoCloseBrackets(
         }
 
         // Expected position is AFTER the opening bracket
-        const expectedLine = change.range.endLineNumber
-        const expectedCol = change.range.endColumn
+        // We calculate where the cursor should be if the user just typed the opening bracket
+        const expectedLine = change.range.startLineNumber
+        const expectedCol = change.range.startColumn + insertedText.length
 
         // Check if cursor is at the expected position (right after the opening bracket)
         if (
@@ -295,12 +301,17 @@ export function setupAutoCloseBrackets(
                 currentPosition.column
               ),
               text: closingBracket,
-              forceMoveMarkers: false,
+              forceMoveMarkers: true,
             },
           ])
 
-          // Keep cursor between the brackets (don't move it)
-          editor.setPosition(currentPosition)
+          // Move cursor back between the brackets
+          // Since forceMoveMarkers is true, cursor likely moved after closing bracket.
+          // We want it between.
+          editor.setPosition({
+              lineNumber: currentPosition.lineNumber,
+              column: currentPosition.column 
+          })
         }
 
         isProcessing = false

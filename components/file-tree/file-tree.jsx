@@ -45,6 +45,7 @@ const FileTree = ({ projectId, query = '' }) => {
             user_id: user.id,
             // Pass content/url for access if needed
             content: file.content,
+            isNew: file.isNew, // Pass isNew flag
           }
 
           if (file.type === 'folder') {
@@ -108,6 +109,7 @@ const FileTree = ({ projectId, query = '' }) => {
         created_at: new Date(),
         pathname: newItemPath,
         user_id: user?.id,
+        isNew: true, // Flag to trigger auto-rename
       }
 
       db.transact([tx.files[newItemId].update(newItem)])
@@ -118,28 +120,129 @@ const FileTree = ({ projectId, query = '' }) => {
     [projectId, filesData, user?.id]
   )
 
+  // --- Robust File Operations Helpers ---
+
+  // Helper to find all descendants of a folder
+  const getDescendants = (files, folderId) => {
+    let descendants = []
+    const children = files.filter(f => f.parent_id === folderId)
+    children.forEach(child => {
+      descendants.push(child)
+      if (child.type === 'folder') {
+        descendants = descendants.concat(getDescendants(files, child.id))
+      }
+    })
+    return descendants
+  }
+
+  // Helper to construct path
+  const getPath = (files, parentId, fileName) => {
+     if (!parentId) return fileName
+     const parent = files.find(f => f.id === parentId)
+     return parent ? `${parent.pathname}/${fileName}` : fileName
+  }
+
   const handleRename = useCallback(({ id, name }) => {
-    const file = filesData.files.find((file) => file.id === id)
-    if (!file) return;
-    const oldPath = file.pathname;
-    const newPath = oldPath.substring(0, oldPath.lastIndexOf('/')) + '/' + name; 
-    // Basic path update - a real system would recursively update children paths
-    db.transact([tx.files[id].update({ name: name, pathname: name })]) 
+    const file = filesData.files.find((f) => f.id === id)
+    if (!file) return
+
+    // 1. Check for duplicates in the same folder
+    const siblingWithSameName = filesData.files.find(
+      (f) => f.parent_id === file.parent_id && f.name === name && f.id !== id
+    )
+    if (siblingWithSameName) {
+      // Allow renaming if it's the newly created file avoiding conflict, or just append distinct logic?
+      // For now, simple return or alert. 
+      // User requested "functional", let's basic handle:
+      console.warn("File with same name exists")
+      return
+    }
+
+    const txs = []
+    
+    // 2. Calculate new path for this file
+    const parentPath = file.pathname.substring(0, file.pathname.lastIndexOf('/'))
+    // If it was at root, parentPath is empty string if logic follows, or we use parent lookup
+    // Robust way: lookup parent
+    const parent = filesData.files.find(f => f.id === file.parent_id)
+    const newPath = parent ? `${parent.pathname}/${name}` : name
+
+    txs.push(tx.files[id].update({ name: name, pathname: newPath, isNew: null }))
+
+    // 3. If folder, recursively update paths of all descendants
+    if (file.type === 'folder') {
+       const descendants = getDescendants(filesData.files, id)
+       descendants.forEach(descendant => {
+          // Replace the prefix of the descendant's path
+          // Old prefix: file.pathname
+          // New prefix: newPath
+          const newDescendantPath = descendant.pathname.replace(file.pathname, newPath)
+          txs.push(tx.files[descendant.id].update({ pathname: newDescendantPath }))
+       })
+    }
+
+    db.transact(txs)
   }, [filesData])
 
   const handleMove = ({ dragIds, parentId, index }) => {
-    // Basic D&D implementation
-    const updates = dragIds.map((id) => {
-       return tx.files[id].update({ parent_id: parentId })
+    const txs = []
+    
+    // Validate move (cannot move folder into its own descendant)
+    if (parentId) {
+       const parent = filesData.files.find(f => f.id === parentId)
+       // Check if parent calls any of dragIds as ancestor
+       // This is complex, but basic check:
+       if (dragIds.includes(parentId)) return // Can't move into self
+       
+       // recursive check: is 'parentId' a descendant of any 'dragId'?
+       let cur = parent
+       while (cur && cur.parent_id) {
+          if (dragIds.includes(cur.parent_id)) return // Cycle detected
+          cur = filesData.files.find(f => f.id === cur.parent_id)
+       }
+       if (cur && dragIds.includes(cur.id)) return // Cycle detected at root
+    }
+
+    dragIds.forEach(id => {
+       const file = filesData.files.find(f => f.id === id)
+       if (!file) return
+
+       // Calculate new path
+       const parent = filesData.files.find(f => f.id === parentId)
+       const newPath = parent ? `${parent.pathname}/${file.name}` : file.name
+       
+       txs.push(tx.files[id].update({ parent_id: parentId, pathname: newPath }))
+
+       // If folder, update descendants
+       if (file.type === 'folder') {
+          const descendants = getDescendants(filesData.files, id)
+          descendants.forEach(descendant => {
+             const newDescendantPath = descendant.pathname.replace(file.pathname, newPath)
+             txs.push(tx.files[descendant.id].update({ pathname: newDescendantPath }))
+          })
+       }
     })
-    db.transact(updates)
+
+    db.transact(txs)
   }
 
   const handleDelete = ({ ids }) => {
-     // Simplified delete
-     if (!ids.length) return
-     const deletes = ids.map(id => tx.files[id].delete())
-     db.transact(deletes)
+     const txs = []
+     ids.forEach(id => {
+        const file = filesData.files.find(f => f.id === id)
+        if (!file) return
+
+        txs.push(tx.files[id].delete())
+        
+        // Recursive delete
+        if (file.type === 'folder') {
+           const descendants = getDescendants(filesData.files, id)
+           descendants.forEach(d => {
+              txs.push(tx.files[d.id].delete())
+           })
+        }
+     })
+     db.transact(txs)
   }
 
   const handleToggle = ({ id, isExpanded, type }) => {
@@ -174,17 +277,34 @@ const FileTree = ({ projectId, query = '' }) => {
 
   return (
     <div className="flex flex-col h-full w-full">
-      {/* File Actions - Minimalist Toolbar */}
-      <div className="flex items-center justify-end px-2 py-1 gap-0.5 opacity-0 hover:opacity-100 transition-opacity mb-2">
-         <button onClick={() => handleAddItem('file')} className="p-1 rounded hover:bg-white/10 text-muted-foreground hover:text-foreground transition-colors" title="New File">
-            <FilePlus2 className="w-3.5 h-3.5" />
-         </button>
-         <button onClick={() => handleAddItem('folder')} className="p-1 rounded hover:bg-white/10 text-muted-foreground hover:text-foreground transition-colors" title="New Folder">
-            <FolderPlus className="w-3.5 h-3.5" />
-         </button>
-         <button onClick={handleUpload} className="p-1 rounded hover:bg-white/10 text-muted-foreground hover:text-foreground transition-colors" title="Upload">
-            <Upload className="w-3.5 h-3.5" />
-         </button>
+      {/* Explorer Header with Actions */}
+      <div className="group flex items-center justify-between px-3 py-1.5 shrink-0 hover:bg-[#2B2D31] cursor-pointer transition-colors mb-0.5">
+          <span className="text-[11px] font-bold text-[#CCCCCC] group-hover:text-white uppercase tracking-wider">
+             Explorer
+          </span>
+          <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+            <button 
+              onClick={(e) => { e.stopPropagation(); handleAddItem('file'); }} 
+              className="p-1 rounded-sm hover:bg-[#3F4148] text-[#CCCCCC] transition-colors"
+              title="New File"
+            >
+                <FilePlus2 className="w-3.5 h-3.5" />
+            </button>
+            <button 
+              onClick={(e) => { e.stopPropagation(); handleAddItem('folder'); }} 
+              className="p-1 rounded-sm hover:bg-[#3F4148] text-[#CCCCCC] transition-colors"
+              title="New Folder"
+            >
+                <FolderPlus className="w-3.5 h-3.5" />
+            </button>
+            <button 
+               onClick={(e) => { e.stopPropagation(); handleUpload(); }}
+               className="p-1 rounded-sm hover:bg-[#3F4148] text-[#CCCCCC] transition-colors"
+               title="Upload"
+            >
+                <Upload className="w-3.5 h-3.5" />
+            </button>
+          </div>
       </div>
 
       <div ref={treeContainerRef} className="flex-grow w-full overflow-hidden">
@@ -194,11 +314,11 @@ const FileTree = ({ projectId, query = '' }) => {
           onToggle={handleToggle}
           onDelete={console.log} 
           onRename={handleRename}
-          className="text-foreground focus:outline-none"
+          className="text-[#CCCCCC] focus:outline-none"
           width={treeContainer.width}
           height={treeContainer.height}
-          rowHeight={28} // Compact rows
-          indent={12}
+          rowHeight={28} // Comfortable spacing
+          indent={14}
           initialOpenState={initialOpenState}
           newItemType={newItemType}
           newItemParentId={newItemParentId}

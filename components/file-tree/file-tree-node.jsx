@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react'
-import { File, Folder, FolderOpen, ChevronRight, ChevronDown, Edit, Trash2, FilePlus2, FolderPlus } from 'lucide-react'
+import { File, Folder, ChevronRight, Edit, Trash2, FilePlus2, FolderPlus } from 'lucide-react'
+import { FileIcon } from './file-icon'
 import { cn } from '@/lib/utils'
 import Tex from '@/public/tex'
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from '@/components/ui/context-menu'
@@ -15,22 +16,43 @@ const FileTreeNode = ({ node, style, dragHandle }) => {
     setInputValue(node.data.name)
   }, [node.data.name])
 
-  // Handle auto-focus for new items
+  // Handle auto-focus for new items or specific rename requests
   useEffect(() => {
-    if (node.tree.props.newItemType && node.id === node.tree.props.newItemParentId) {
-      // Logic to detect if this specific node is the new one being added? 
-      // Actually, usually the *new* node is what we want to edit. 
-      // This logic seems to check if *this* node is the parent of a new item.
-      const newItemIndex = node.children ? node.children.findIndex((child) => !child.data.id || child.data.name.startsWith('untitled')) : -1
-       // If we found a child that looks new? The previous logic was a bit fuzzy.
-       // Let's assume the tree handles new item creation by adding a node.
+    // If we are renaming, focus and select all text
+    if (isRenaming && inputRef.current) {
+        inputRef.current.focus()
+        inputRef.current.select()
     }
-  }, [node, node.tree.props.newItemType])
+  }, [isRenaming])
+
+  // If the node name is "untitled.tex" or "New Folder" and it was just created (within last few seconds? hard to track)
+  // Instead, relies on a prop or fuzzy match for now if we don't change parent state
+  useEffect(() => {
+      // Basic heuristic: if it's 'untitled.tex' or 'New Folder', assume it's new and trigger rename
+      // ideally the Tree component passes 'editingId'
+      if (node.data.name === 'untitled.tex' || node.data.name === 'New Folder') {
+          // Check if this node was just added (timestamp check could help but let's just trigger)
+          // We can't unconditionally set this or it loops.
+          // We rely on the parent creation logic to have set a flag, OR we detect it once.
+          // Better approach: Adding a 'isNew' flag to the data model in `file-tree.jsx`
+          if (node.data.isNew) {
+               setIsRenaming(true)
+          }
+      }
+  }, [node.data.name, node.data.isNew])
 
 
   const handleRenameSubmit = () => {
     const trimmed = inputValue.trim()
-    if (trimmed && trimmed !== node.data.name) {
+    if (!trimmed) {
+       // If empty name on new file, maybe delete it?
+       // For now just cancel
+       setIsRenaming(false)
+       setInputValue(node.data.name)
+       return
+    }
+    
+    if (trimmed !== node.data.name) {
       node.tree.props.onRename({ id: node.id, name: trimmed })
     }
     setIsRenaming(false)
@@ -48,35 +70,30 @@ const FileTreeNode = ({ node, style, dragHandle }) => {
   const handleClick = (e) => {
     e.stopPropagation()
     if (node.isLeaf) {
-       // Open file logic usually handled by tree selection or custom handler
-       // node.select(); // arborist might handle this native
-       node.toggle(); // Selects if leaf, expands if folder usually
-       // We might need to trigger an 'onSelect' prop if the tree doesn't auto-do it.
-       // But assuming the parent Tree component handles selection state.
-       
-       // Force open state update to DB:
-       node.tree.props.onToggle({
-         id: node.id, 
-         isExpanded: !node.data.isExpanded, 
-         type: node.data.type, 
-         isOpen: true // explicit open action
-       })
+       node.toggle() // Actually select?
+       // Trigger file open
+       // We can traverse up to find 'onSelect' or just let Arborist handle selection
     } else {
        node.toggle()
-       node.tree.props.onToggle({
-        id: node.id,
-        isExpanded: !node.isExpanded,
-        type: node.data.type,
-        isOpen: node.data.isOpen,
-      })
     }
+  }
+
+  const handleDeleteClick = (e) => {
+      e.stopPropagation()
+      node.tree.props.onDelete({ ids: [node.id] })
   }
 
   if (isRenaming) {
     return (
-      <div style={style} className="flex items-center gap-1.5 px-2 py-0.5">
-        <span className="shrink-0 text-muted-foreground">
-           {node.isLeaf ? <File className="w-3.5 h-3.5" /> : <Folder className="w-3.5 h-3.5" />}
+      <div style={style} className="flex items-center gap-1.5 px-2 py-0.5 bg-[#37373D] outline outline-1 outline-[#007FD4] -outline-offset-1">
+        <span className="shrink-0 flex items-center justify-center">
+            {/* Same icon as usual */}
+           <FileIcon 
+              name={inputValue} 
+              isFolder={!node.isLeaf} 
+              isOpen={true} 
+              className="w-4 h-4"
+           />
         </span>
         <Input
           ref={inputRef}
@@ -84,8 +101,7 @@ const FileTreeNode = ({ node, style, dragHandle }) => {
           onChange={(e) => setInputValue(e.target.value)}
           onBlur={handleRenameSubmit}
           onKeyDown={handleKeyDown}
-          autoFocus
-          className="h-6 py-0 px-1 text-xs bg-zinc-900 border-blue-500/50 text-foreground w-full rounded-sm"
+          className="h-5 py-0 px-0 text-[13px] bg-transparent border-none text-white w-full rounded-none focus-visible:ring-0 placeholder:text-zinc-500"
           onClick={(e) => e.stopPropagation()}
         />
       </div>
@@ -103,61 +119,70 @@ const FileTreeNode = ({ node, style, dragHandle }) => {
           ref={dragHandle}
           onClick={handleClick}
           className={cn(
-            "group flex items-center pr-2 py-0.5 cursor-pointer select-none transition-colors duration-100",
-            isSelected ? "bg-blue-500/10" : "hover:bg-zinc-800/50"
+            "group flex items-center pr-2 py-[3px] cursor-pointer select-none transition-colors duration-75 relative",
+            isSelected ? "bg-[#37373D] text-white" : "text-[#CCCCCC] hover:bg-[#2A2D2E] hover:text-white"
           )}
         >
-          {/* Indent guide could go here if manually rendering, but Arborist handles indent via style.paddingLeft usually? 
-              Actually Arborist passes `style` which includes padding. We should respect it but maybe tweak it.
-          */}
-          
            {/* Folder Arrow */}
             <div className={cn(
-               "flex items-center justify-center w-4 h-4 shrink-0 mr-0.5 text-muted-foreground/50 transition-transform duration-200",
+               "flex items-center justify-center w-4 h-4 shrink-0 mr-0.5 transition-transform duration-200 text-[#858585] group-hover:text-white",
                isExpanded && "rotate-90",
                node.isLeaf && "opacity-0"
             )}>
               <ChevronRight className="w-3 h-3" />
             </div>
 
-            {/* Icon */}
-            <div className={cn("shrink-0 mr-1.5 text-muted-foreground", isSelected && "text-blue-400")}>
-              {node.isLeaf ? (
-                 node.data.name.endsWith('.tex') ? <Tex className="w-3.5 h-3.5" /> : <File className="w-3.5 h-3.5" />
-              ) : (
-                 isExpanded ? <FolderOpen className="w-3.5 h-3.5 text-blue-400/80" /> : <Folder className="w-3.5 h-3.5" />
-              )}
+            {/* File Icon */}
+            <div className="shrink-0 mr-2 flex items-center justify-center">
+               <FileIcon 
+                  name={node.data.name} 
+                  isFolder={!node.isLeaf} 
+                  isOpen={isExpanded} 
+                  className="w-4 h-4"
+               />
             </div>
 
             {/* Name */}
             <span className={cn(
-              "text-[13px] truncate font-medium",
-              isSelected ? "text-blue-100" : "text-zinc-400 group-hover:text-zinc-200"
+              "text-[13px] truncate font-normal leading-none pt-0.5 flex-1",
+              isSelected ? "text-white" : "text-[#CCCCCC] group-hover:text-white"
             )}>
               {node.data.name}
             </span>
+            
+            {/* Hover Actions (Delete) */}
+            <div className={cn(
+                "absolute right-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity flex items-center"
+            )}>
+                <button 
+                    onClick={handleDeleteClick}
+                    className="p-1 hover:bg-[#454545] rounded-sm text-[#858585] hover:text-white"
+                >
+                    <Trash2 className="w-3.5 h-3.5" />
+                </button>
+            </div>
         </div>
       </ContextMenuTrigger>
       
-      <ContextMenuContent className="w-48 bg-zinc-900 border-zinc-800 text-zinc-300">
-        <ContextMenuItem onClick={(e) => { e.stopPropagation(); setIsRenaming(true) }} className="focus:bg-zinc-800 focus:text-white">
+      <ContextMenuContent className="w-48 bg-[#252526] border-[#454545] text-[#CCCCCC]">
+        <ContextMenuItem onClick={(e) => { e.stopPropagation(); setIsRenaming(true) }} className="focus:bg-[#094771] focus:text-white data-[highlighted]:bg-[#094771] text-[13px] h-7">
           <Edit className="w-3.5 h-3.5 mr-2" />
-          <span className="text-xs">Rename</span>
+          <span>Rename</span>
         </ContextMenuItem>
-        <ContextMenuItem onClick={(e) => { e.stopPropagation(); node.tree.props.onDelete({ ids: [node.id] }) }} className="focus:bg-red-900/50 focus:text-red-200 text-red-400">
+        <ContextMenuItem onClick={(e) => { e.stopPropagation(); node.tree.props.onDelete({ ids: [node.id] }) }} className="focus:bg-[#094771] focus:text-white text-red-400 text-[13px] h-7 data-[highlighted]:bg-[#094771]">
           <Trash2 className="w-3.5 h-3.5 mr-2" />
-          <span className="text-xs">Delete</span>
+          <span>Delete</span>
         </ContextMenuItem>
         {!node.isLeaf && (
           <>
-            <div className="h-px bg-zinc-800 my-1" />
-            <ContextMenuItem onClick={() => node.tree.props.onAddItem('file', node.id)} className="focus:bg-zinc-800 focus:text-white">
+            <div className="h-px bg-[#454545] my-1" />
+            <ContextMenuItem onClick={() => node.tree.props.onAddItem('file', node.id)} className="focus:bg-[#094771] focus:text-white text-[13px] h-7 data-[highlighted]:bg-[#094771]">
               <FilePlus2 className="w-3.5 h-3.5 mr-2" />
-              <span className="text-xs">New File</span>
+              <span>New File</span>
             </ContextMenuItem>
-            <ContextMenuItem onClick={() => node.tree.props.onAddItem('folder', node.id)} className="focus:bg-zinc-800 focus:text-white">
+            <ContextMenuItem onClick={() => node.tree.props.onAddItem('folder', node.id)} className="focus:bg-[#094771] focus:text-white text-[13px] h-7 data-[highlighted]:bg-[#094771]">
               <FolderPlus className="w-3.5 h-3.5 mr-2" />
-              <span className="text-xs">New Folder</span>
+              <span>New Folder</span>
             </ContextMenuItem>
           </>
         )}
