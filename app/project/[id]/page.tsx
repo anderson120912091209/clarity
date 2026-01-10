@@ -7,14 +7,13 @@ import { cn } from '@/lib/utils'
 import { Sidebar } from '@/workbench/components/sidebar'
 import LatexRenderer from '@/components/latex-render/latex'
 import CursorEditorContainer from '@/components/editor/cursor-editor-container'
-import { CursorChat } from '@/components/editor/cursor-chat'
+import { ChatPanel, ChatNavContent } from '@/features/ai-chat'
 import { ProjectProvider } from '@/contexts/ProjectContext'
 import { useParams } from 'next/navigation'
 import { useProject } from '@/contexts/ProjectContext'
 import { WorkspaceNav } from '@/workbench/components/top-nav/workspace-nav'
 import { EditorNavContent } from '@/components/editor/cursor-editor-container'
 import { PDFNavContent } from '@/components/latex-render/latex'
-import { ChatNavContent } from '@/components/editor/cursor-chat'
 
 export const maxDuration = 30
 
@@ -108,7 +107,7 @@ function EditorLayout() {
                         <>
                         <ResizableHandle className="w-px bg-[#1f1f1f] hover:bg-[#2f2f2f] transition-colors" />
                         <ResizablePanel defaultSize={20} minSize={20} maxSize={45} collapsible={true}>
-                            <CursorChat 
+                            <ChatPanel 
                             fileContent={fileContent}
                             isVisible={isChatVisible}
                             onToggle={() => setIsChatVisible(false)}

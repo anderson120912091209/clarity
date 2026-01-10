@@ -6,7 +6,7 @@ import remarkGfm from 'remark-gfm'
 import rehypeHighlight from 'rehype-highlight'
 import rehypeRaw from 'rehype-raw'
 import { cn } from '@/lib/utils'
-import { Check, Copy, Terminal } from 'lucide-react'
+import { Check, Copy } from 'lucide-react'
 
 interface MarkdownRendererProps {
   content: string
@@ -15,7 +15,7 @@ interface MarkdownRendererProps {
 
 export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content, className }) => {
   return (
-    <div className={cn("prose prose-sm dark:prose-invert max-w-none leading-7", className)}>
+    <div className={cn('prose prose-sm dark:prose-invert max-w-none leading-7', className)}>
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         rehypePlugins={[rehypeRaw, rehypeHighlight]}
@@ -24,12 +24,12 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content, cla
             const match = /language-(\w+)/.exec(className || '')
             const language = match ? match[1] : ''
             const codeString = String(children).replace(/\n$/, '')
-            
+
             if (inline) {
               return (
                 <code
                   className={cn(
-                    "px-1.5 py-0.5 rounded-md text-[13px] font-medium font-mono bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-200 border border-zinc-200 dark:border-zinc-700/50",
+                    'px-1.5 py-0.5 rounded-md text-[13px] font-medium font-mono bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-200 border border-zinc-200 dark:border-zinc-700/50',
                     className
                   )}
                   {...props}
@@ -39,9 +39,7 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content, cla
               )
             }
 
-            return (
-              <CodeBlock language={language} code={codeString} />
-            )
+            return <CodeBlock language={language} code={codeString} />
           },
           p({ children, ...props }: any) {
             return (
@@ -52,35 +50,50 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content, cla
           },
           h1({ children, ...props }: any) {
             return (
-              <h1 className="text-2xl font-semibold mt-8 mb-4 tracking-tight text-zinc-900 dark:text-zinc-100" {...props}>
+              <h1
+                className="text-2xl font-semibold mt-8 mb-4 tracking-tight text-zinc-900 dark:text-zinc-100"
+                {...props}
+              >
                 {children}
               </h1>
             )
           },
           h2({ children, ...props }: any) {
             return (
-              <h2 className="text-xl font-semibold mt-6 mb-3 tracking-tight text-zinc-900 dark:text-zinc-100" {...props}>
+              <h2
+                className="text-xl font-semibold mt-6 mb-3 tracking-tight text-zinc-900 dark:text-zinc-100"
+                {...props}
+              >
                 {children}
               </h2>
             )
           },
           h3({ children, ...props }: any) {
             return (
-              <h3 className="text-lg font-medium mt-5 mb-2 tracking-tight text-zinc-900 dark:text-zinc-100" {...props}>
+              <h3
+                className="text-lg font-medium mt-5 mb-2 tracking-tight text-zinc-900 dark:text-zinc-100"
+                {...props}
+              >
                 {children}
               </h3>
             )
           },
           ul({ children, ...props }: any) {
             return (
-              <ul className="list-disc list-outside mb-4 space-y-1 ml-4 text-zinc-700 dark:text-zinc-300Marker" {...props}>
+              <ul
+                className="list-disc list-outside mb-4 space-y-1 ml-4 text-zinc-700 dark:text-zinc-300"
+                {...props}
+              >
                 {children}
               </ul>
             )
           },
           ol({ children, ...props }: any) {
             return (
-              <ol className="list-decimal list-outside mb-4 space-y-1 ml-4 text-zinc-700 dark:text-zinc-300" {...props}>
+              <ol
+                className="list-decimal list-outside mb-4 space-y-1 ml-4 text-zinc-700 dark:text-zinc-300"
+                {...props}
+              >
                 {children}
               </ol>
             )
@@ -126,7 +139,7 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content, cla
   )
 }
 
-const CodeBlock = ({ language, code }: { language: string, code: string }) => {
+const CodeBlock = ({ language, code }: { language: string; code: string }) => {
   const [copied, setCopied] = useState(false)
 
   const copyToClipboard = async () => {
@@ -141,17 +154,17 @@ const CodeBlock = ({ language, code }: { language: string, code: string }) => {
 
   return (
     <div className="relative my-5 rounded-lg overflow-hidden border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-[#18181b] group">
-       {/* Header */}
+      {/* Header */}
       <div className="flex items-center justify-between px-3 py-2 bg-zinc-100 dark:bg-zinc-900 border-b border-zinc-200 dark:border-zinc-800">
         <div className="flex items-center gap-2">
-            <div className="flex gap-1.5">
-               <div className="w-2.5 h-2.5 rounded-full bg-red-500/20" />
-               <div className="w-2.5 h-2.5 rounded-full bg-yellow-500/20" />
-               <div className="w-2.5 h-2.5 rounded-full bg-green-500/20" />
-            </div>
-            <span className="text-xs font-medium text-zinc-500 dark:text-zinc-400 uppercase tracking-wider ml-2">
-               {language || 'text'}
-            </span>
+          <div className="flex gap-1.5">
+            <div className="w-2.5 h-2.5 rounded-full bg-red-500/20" />
+            <div className="w-2.5 h-2.5 rounded-full bg-yellow-500/20" />
+            <div className="w-2.5 h-2.5 rounded-full bg-green-500/20" />
+          </div>
+          <span className="text-xs font-medium text-zinc-500 dark:text-zinc-400 uppercase tracking-wider ml-2">
+            {language || 'text'}
+          </span>
         </div>
         <button
           onClick={copyToClipboard}
@@ -170,13 +183,19 @@ const CodeBlock = ({ language, code }: { language: string, code: string }) => {
           )}
         </button>
       </div>
-      
+
       {/* Code */}
       <div className="overflow-x-auto p-4">
-        <code className={cn("font-mono text-sm leading-relaxed", !language && "text-zinc-800 dark:text-zinc-300")}>
-           {code}
+        <code
+          className={cn(
+            'font-mono text-sm leading-relaxed',
+            !language && 'text-zinc-800 dark:text-zinc-300'
+          )}
+        >
+          {code}
         </code>
       </div>
     </div>
   )
 }
+

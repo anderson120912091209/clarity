@@ -1,17 +1,16 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import ReactDOM from 'react-dom/client'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import * as monaco from 'monaco-editor'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Sparkles, Command, CornerDownLeft, X, ArrowUp } from 'lucide-react'
+import { Sparkles, X } from 'lucide-react'
 
 export const promptModal = async (
   editor: monaco.editor.IStandaloneCodeEditor,
-  monacoInstance: typeof monaco,
-  selection: monaco.Range
+  monacoInstance: typeof monaco
 ) => {
   return new Promise<string>((resolve, reject) => {
     // Create container if it doesn't exist

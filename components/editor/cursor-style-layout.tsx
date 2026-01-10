@@ -138,4 +138,3 @@ export function CursorStyleLayout({
     </div>
   )
 }
-
