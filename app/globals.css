@@ -97,6 +97,17 @@
   }
 }
 
+/* Disable blue selection highlight in chat UI */
+.chat-container ::selection,
+.chat-container ::-moz-selection {
+  background-color: transparent;
+}
+
+.chat-container .select-text ::selection,
+.chat-container .select-text ::-moz-selection {
+  background-color: rgba(59, 130, 246, 0.3);
+}
+
 .ai-streaming-cursor {
   display: inline-block;
   width: 2px;

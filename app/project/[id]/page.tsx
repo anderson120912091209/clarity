@@ -11,6 +11,10 @@ import { CursorChat } from '@/components/editor/cursor-chat'
 import { ProjectProvider } from '@/contexts/ProjectContext'
 import { useParams } from 'next/navigation'
 import { useProject } from '@/contexts/ProjectContext'
+import { WorkspaceNav } from '@/workbench/components/top-nav/workspace-nav'
+import { EditorNavContent } from '@/components/editor/cursor-editor-container'
+import { PDFNavContent } from '@/components/latex-render/latex'
+import { ChatNavContent } from '@/components/editor/cursor-chat'
 
 export const maxDuration = 30
 
@@ -59,8 +63,37 @@ function EditorLayout() {
 
         {/* Main Container with rounded edges */}
         <div className="flex-1 h-full p-2.5 pl-2 overflow-hidden">
-            <div className="h-full w-full rounded-2xl bg-[#0c0c0e] border border-[#1f1f1f] shadow-2xl overflow-hidden">
-                <ResizablePanelGroup direction="horizontal" className="h-full">
+            <div className="h-full w-full rounded-2xl bg-[#0c0c0e] border border-[#1f1f1f] shadow-2xl overflow-hidden flex flex-col">
+                {/* Unified Workspace Navigation */}
+                <WorkspaceNav 
+                    editorSection={
+                        <EditorNavContent 
+                            currentlyOpen={currentlyOpen}
+                            onChatToggle={() => setIsChatVisible(!isChatVisible)}
+                            isChatVisible={isChatVisible}
+                        />
+                    }
+                    pdfSection={
+                        <PDFNavContent 
+                            isLoading={false}
+                            autoFetch={false}
+                            scale={0.9}
+                            projectId={currentlyOpen?.projectId || ''}
+                            onCompile={() => {}}
+                            onZoomIn={() => {}}
+                            onZoomOut={() => {}}
+                            onResetZoom={() => {}}
+                            onDownload={() => {}}
+                        />
+                    }
+                    chatSection={
+                        <ChatNavContent onToggle={() => setIsChatVisible(false)} />
+                    }
+                    isChatVisible={isChatVisible}
+                />
+                
+                {/* Content Panels */}
+                <ResizablePanelGroup direction="horizontal" className="flex-1">
                     <ResizablePanel defaultSize={50} minSize={25}>
                         <CursorEditorContainer 
                             onChatToggle={() => setIsChatVisible(!isChatVisible)}
@@ -74,7 +107,7 @@ function EditorLayout() {
                     {isChatVisible && (
                         <>
                         <ResizableHandle className="w-px bg-[#1f1f1f] hover:bg-[#2f2f2f] transition-colors" />
-                        <ResizablePanel defaultSize={32} minSize={20} maxSize={45} collapsible={true}>
+                        <ResizablePanel defaultSize={20} minSize={20} maxSize={45} collapsible={true}>
                             <CursorChat 
                             fileContent={fileContent}
                             isVisible={isChatVisible}

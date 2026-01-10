@@ -26,7 +26,7 @@ export const editorDefaultOptions: editor.IStandaloneEditorConstructionOptions =
   renderLineHighlight: 'all',
   fontLigatures: true,
   smoothScrolling: true,
-  mouseWheelZoom: true,
+  mouseWheelZoom: false, // Disable trackpad zoom, only allow Cmd+/Cmd- shortcuts
   contextmenu: true,
   fixedOverflowWidgets: true,
   padding: { top: 20, bottom: 20 },

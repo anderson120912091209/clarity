@@ -68,51 +68,6 @@ const CursorEditorContainer: React.FC<CursorEditorContainerProps> = ({
 
   return (
     <div className="relative flex flex-col w-full h-full bg-background overflow-hidden group/editor">
-      {/* Editor Header / Breadcrumbs */}
-      {currentlyOpen && !isImageFile && (
-        <div className="h-10 flex items-center justify-between px-4 bg-background border-b border-border/40 select-none">
-          <div className="flex items-center gap-2 text-sm text-muted-foreground/80">
-            <File className="w-3.5 h-3.5 opacity-70" />
-            <div className="flex items-center gap-1.5 opacity-70 hover:opacity-100 transition-opacity">
-               <span className="hover:text-foreground/90 cursor-pointer transition-colors">Project</span>
-               <ChevronRight className="w-3.5 h-3.5 text-muted-foreground/50" />
-               <span className="font-medium text-foreground">{currentlyOpen.name}</span>
-            </div>
-            {currentlyOpen.unsaved && (
-               <div className="w-1.5 h-1.5 rounded-full bg-blue-500 ml-1" />
-            )}
-          </div>
-          
-          <div className="flex items-center gap-2">
-            <div 
-              className="flex items-center gap-1.5 px-2 py-1 rounded bg-muted/30 border border-border/50 text-muted-foreground hover:bg-muted/50 transition-colors cursor-pointer group/cmd"
-              onClick={() => {
-                 // Trigger AI command logic if implemented
-                 // This visualizes the shortcut
-              }}
-            >
-              <Command className="h-3 w-3 group-hover/cmd:text-foreground transition-colors" />
-              <span className="text-[10px] font-mono font-medium group-hover/cmd:text-foreground transition-colors">K</span>
-            </div>
-            
-            {onChatToggle && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={onChatToggle}
-                className={cn(
-                  "h-7 px-2.5 gap-2 text-xs font-normal text-muted-foreground hover:text-foreground hover:bg-muted/50 rounded-md transition-all",
-                  isChatVisible && "bg-primary/10 text-primary hover:bg-primary/20 hover:text-primary"
-                )}
-              >
-                <MessageSquare className={cn("h-3.5 w-3.5", isChatVisible && "fill-current")} />
-                <span className="hidden sm:inline">Chat</span>
-              </Button>
-            )}
-          </div>
-        </div>
-      )}
-
       {/* Editor Content Area */}
       {!currentlyOpen ? (
         <div className="flex-grow flex items-center justify-center bg-zinc-950/50">
@@ -181,6 +136,64 @@ const CursorEditorContainer: React.FC<CursorEditorContainerProps> = ({
         </div>
       )}
     </div>
+  )
+}
+
+export function EditorNavContent({ 
+  currentlyOpen, 
+  onChatToggle, 
+  isChatVisible 
+}: { 
+  currentlyOpen: any
+  onChatToggle?: () => void
+  isChatVisible?: boolean 
+}) {
+  const fileType = getFileExtension(currentlyOpen?.name || '')
+  const isImageFile = ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp', 'svg'].includes(fileType.toLowerCase())
+  
+  if (!currentlyOpen || isImageFile) return null
+  
+  return (
+    <>
+      <div className="flex items-center gap-2 text-sm text-muted-foreground/80 flex-1 min-w-0">
+        <File className="w-3.5 h-3.5 opacity-70 shrink-0" />
+        <div className="flex items-center gap-1.5 opacity-70 hover:opacity-100 transition-opacity min-w-0">
+           <span className="hover:text-foreground/90 cursor-pointer transition-colors shrink-0">Project</span>
+           <ChevronRight className="w-3.5 h-3.5 text-muted-foreground/50 shrink-0" />
+           <span className="font-medium text-foreground truncate">{currentlyOpen.name}</span>
+        </div>
+        {currentlyOpen.unsaved && (
+           <div className="w-1.5 h-1.5 rounded-full bg-blue-500 ml-1 shrink-0" />
+        )}
+      </div>
+      
+      <div className="flex items-center gap-2 shrink-0">
+        <div 
+          className="flex items-center gap-1.5 px-2 py-1 rounded bg-muted/30 border border-border/50 text-muted-foreground hover:bg-muted/50 transition-colors cursor-pointer group/cmd"
+          onClick={() => {
+             // Trigger AI command logic if implemented
+          }}
+        >
+          <Command className="h-3 w-3 group-hover/cmd:text-foreground transition-colors" />
+          <span className="text-[10px] font-mono font-medium group-hover/cmd:text-foreground transition-colors">K</span>
+        </div>
+        
+        {onChatToggle && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onChatToggle}
+            className={cn(
+              "h-7 px-2.5 gap-2 text-xs font-normal text-muted-foreground hover:text-foreground hover:bg-muted/50 rounded-md transition-all",
+              isChatVisible && "bg-primary/10 text-primary hover:bg-primary/20 hover:text-primary"
+            )}
+          >
+            <MessageSquare className={cn("h-3.5 w-3.5", isChatVisible && "fill-current")} />
+            <span className="hidden sm:inline">Chat</span>
+          </Button>
+        )}
+      </div>
+    </>
   )
 }
 

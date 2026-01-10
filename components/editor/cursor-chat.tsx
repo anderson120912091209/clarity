@@ -93,25 +93,7 @@ export const CursorChat: React.FC<CursorChatProps> = ({ fileContent, isVisible, 
   }
 
   return (
-    <div className="h-full flex flex-col bg-background/95 backdrop-blur-sm border-l border-border/50 font-sans">
-      {/* Header */}
-      <div className="h-12 px-4 border-b border-border/40 flex items-center justify-between bg-muted/10 shrink-0">
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2 px-2 py-1 rounded-md bg-muted/50 text-muted-foreground transition-colors hover:text-foreground hover:bg-muted/80 cursor-pointer">
-             <MessageSquare className="h-4 w-4" />
-             <span className="text-xs font-semibold tracking-wide uppercase">Chat</span>
-          </div>
-        </div>
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={onToggle}
-          className="h-7 w-7 rounded-md hover:bg-destructive/10 hover:text-destructive transition-colors"
-        >
-          <X className="h-4 w-4" />
-        </Button>
-      </div>
-
+    <div className="chat-container h-full flex flex-col bg-background/95 backdrop-blur-sm border-l border-border/50 font-sans">
       {/* Messages */}
       <div 
         ref={scrollRef}
@@ -142,7 +124,7 @@ export const CursorChat: React.FC<CursorChatProps> = ({ fileContent, isVisible, 
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               className={cn(
-                "group relative flex gap-4",
+                "group relative flex gap-4 select-text",
                 msg.role === 'user' ? "flex-row-reverse" : "flex-row"
               )}
             >
@@ -206,7 +188,7 @@ export const CursorChat: React.FC<CursorChatProps> = ({ fileContent, isVisible, 
       {/* Input Area */}
       <div className="p-4 bg-background/95 border-t border-border/40 shrink-0">
         <div className="relative group rounded-xl border border-border/50 bg-muted/20 shadow-sm focus-within:ring-1 focus-within:ring-primary/30 focus-within:border-primary/40 focus-within:bg-background transition-all">
-          <textarea
+            <textarea
             ref={inputRef}
             value={input}
             onChange={(e) => {
@@ -216,8 +198,11 @@ export const CursorChat: React.FC<CursorChatProps> = ({ fileContent, isVisible, 
             }}
             onKeyDown={handleKeyDown}
             placeholder="Ask anything (Cmd+L)..."
-            className="w-full bg-transparent border-none rounded-xl px-4 py-3 text-sm resize-none focus:ring-0 placeholder:text-muted-foreground/40 min-h-[50px] max-h-[200px] scrollbar-thin"
+            className="w-full bg-transparent border-none rounded-xl px-4 py-3 text-sm resize-none focus:ring-0 focus:outline-none placeholder:text-muted-foreground/40 min-h-[50px] max-h-[200px] scrollbar-thin"
             rows={1}
+            onSelect={(e) => {
+              // Allow text selection in textarea for editing
+            }}
           />
           
           <div className="flex items-center justify-between px-2 pb-2">
@@ -253,3 +238,27 @@ export const CursorChat: React.FC<CursorChatProps> = ({ fileContent, isVisible, 
     </div>
   )
 }
+
+export function ChatNavContent({ onToggle }: { onToggle: () => void }) {
+  return (
+    <>
+      <div 
+        className="flex items-center gap-2 px-2 py-1 rounded-md bg-muted/50 text-muted-foreground transition-colors hover:text-foreground hover:bg-muted/80 cursor-pointer select-none"
+        onMouseDown={(e) => e.preventDefault()}
+      >
+         <MessageSquare className="h-4 w-4" />
+         <span className="text-xs font-semibold tracking-wide uppercase">Chat</span>
+      </div>
+      <div className="flex-1" />
+      <Button
+        variant="ghost"
+        size="icon"
+        onClick={onToggle}
+        className="h-7 w-7 rounded-md hover:bg-destructive/10 hover:text-destructive transition-colors"
+      >
+        <X className="h-4 w-4" />
+      </Button>
+    </>
+  )
+}
+

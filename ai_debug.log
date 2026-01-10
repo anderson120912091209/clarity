@@ -2,3 +2,11 @@
 [2026-01-07T15:50:40.503Z] AI Request Started. Input length: 537
 [2026-01-07T15:50:40.504Z] Starting streamText call with Gemini 2.0 Flash
 [2026-01-07T15:50:41.801Z] Stream processing final cleanup
+[2026-01-10T08:16:13.101Z] Chat Request Started. History length: 1
+[2026-01-10T08:18:00.580Z] AI Request Started. Input length: 305
+[2026-01-10T08:18:00.581Z] Starting streamText call with Gemini 2.0 Flash
+[2026-01-10T08:18:06.741Z] CRITICAL ERROR: AI_RetryError: Failed after 3 attempts. Last error: Cannot connect to API: Hostname/IP does not match certificate's altnames: Host: generativelanguage.googleapis.com. is not in the cert's altnames: DNS:*.cc.ntu.edu.tw, DNS:cc.ntu.edu.tw
+[2026-01-10T08:18:06.799Z] Stream processing final cleanup
+[2026-01-10T08:18:54.383Z] AI Request Started. Input length: 243
+[2026-01-10T08:18:54.385Z] Starting streamText call with Gemini 2.0 Flash
+[2026-01-10T08:18:55.474Z] Stream processing final cleanup
