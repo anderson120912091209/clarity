@@ -1,5 +1,6 @@
 'use client'
 import { useState } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@/components/ui/resizable'
 import CursorSideNav from '@/components/nav/cursor-side-nav'
 import { cn } from '@/lib/utils'
@@ -35,17 +36,26 @@ function EditorLayout() {
 
   return (
     <div className="flex-1 flex overflow-hidden">
-        {/* Sidebar with smooth toggle animation */}
-        <div className={cn(
-            "h-full shrink-0 transition-all duration-300 ease-in-out",
-            isSidebarCollapsed ? "w-12" : "w-42"
-        )}>
+        {/* Sidebar with Framer Motion smooth animation */}
+        <motion.div 
+            initial={false}
+            animate={{ 
+                width: isSidebarCollapsed ? 48 : 180 // 48px = w-12, 165`px = w-40
+            }}
+            transition={{ 
+                type: "spring",
+                stiffness: 300,
+                damping: 30,
+                mass: 0.8
+            }}
+            className="h-full shrink-0"
+        >
             <Sidebar 
                 isCollapsed={isSidebarCollapsed} 
                 onToggle={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
-                className="w-full border-none"
+                className="w-full h-full border-none"
             />
-        </div>
+        </motion.div>
 
         {/* Main Container with rounded edges */}
         <div className="flex-1 h-full p-2.5 pl-2 overflow-hidden">
