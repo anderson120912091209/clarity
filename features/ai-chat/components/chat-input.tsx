@@ -73,21 +73,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
             >
               <Plus className="h-3.5 w-3.5" />
             </Button>
-            
-            <Select value={mode} onValueChange={setMode}>
-              <SelectTrigger className="h-auto w-auto px-1 py-0.5 text-xs border-none bg-transparent text-white hover:bg-white/10 focus:ring-0 focus:ring-offset-0 shadow-none gap-1 [&>svg]:opacity-70 [&>svg]:h-3 [&>svg]:w-3 min-w-0 shrink">
-                <ChevronUp className="h-3 w-3 opacity-70 shrink-0" />
-                <span className="truncate hidden sm:inline">
-                  <SelectValue />
-                </span>
-              </SelectTrigger>
-              <SelectContent className="bg-zinc-900 border-zinc-700">
-                <SelectItem value="Planning" className="text-white focus:bg-zinc-800">Planning</SelectItem>
-                <SelectItem value="Coding" className="text-white focus:bg-zinc-800">Coding</SelectItem>
-                <SelectItem value="Research" className="text-white focus:bg-zinc-800">Research</SelectItem>
-                <SelectItem value="Writing" className="text-white focus:bg-zinc-800">Writing</SelectItem>
-              </SelectContent>
-            </Select>
+          
 
             <Select value={model} onValueChange={setModel}>
               <SelectTrigger className="h-auto w-auto px-1 py-0.5 text-xs border-none bg-transparent text-white hover:bg-white/10 focus:ring-0 focus:ring-offset-0 shadow-none gap-1 [&>svg]:opacity-70 [&>svg]:h-3 [&>svg]:w-3 min-w-0 shrink">
