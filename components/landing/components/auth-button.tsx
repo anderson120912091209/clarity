@@ -11,12 +11,11 @@ export function AuthButton() {
 
   if (user) {
     return (
-      <Button asChild variant="ghost" className="text-zinc-400 
-      hover:text-white transition-colors text-sm font-medium">
-        <Link href="/projects">
+        <Link className="hidden md:flex items-center gap-8 text-[13px] 
+        hover:text-white font-medium text-zinc-400" 
+        href="/projects">
           Dashboard
         </Link>
-      </Button>
     )
   }
 
