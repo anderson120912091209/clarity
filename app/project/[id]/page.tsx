@@ -13,7 +13,7 @@ import { useParams } from 'next/navigation'
 import { useProject } from '@/contexts/ProjectContext'
 import { WorkspaceNav } from '@/workbench/components/top-nav/workspace-nav'
 import { EditorNavContent } from '@/components/editor/cursor-editor-container'
-import { PDFNavContent } from '@/components/latex-render/latex'
+import { PDFNavContent, useLatex } from '@/components/latex-render/latex'
 
 export const maxDuration = 30
 
@@ -36,6 +36,19 @@ function EditorLayout() {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false)
   const { currentlyOpen } = useProject()
   const fileContent = currentlyOpen?.content || ''
+
+  const { 
+    pdfUrl, 
+    isLoading, 
+    error, 
+    compile, 
+    scale, 
+    autoFetch, 
+    handleZoomIn, 
+    handleZoomOut, 
+    handleResetZoom, 
+    handleDownload 
+  } = useLatex()
 
   return (
     <div className="flex-1 flex overflow-hidden">
@@ -74,15 +87,15 @@ function EditorLayout() {
                     }
                     pdfSection={
                         <PDFNavContent 
-                            isLoading={false}
-                            autoFetch={false}
-                            scale={0.9}
+                            isLoading={isLoading}
+                            autoFetch={autoFetch}
+                            scale={scale}
                             projectId={currentlyOpen?.projectId || ''}
-                            onCompile={() => {}}
-                            onZoomIn={() => {}}
-                            onZoomOut={() => {}}
-                            onResetZoom={() => {}}
-                            onDownload={() => {}}
+                            onCompile={compile}
+                            onZoomIn={handleZoomIn}
+                            onZoomOut={handleZoomOut}
+                            onResetZoom={handleResetZoom}
+                            onDownload={handleDownload}
                         />
                     }
                     chatSection={
@@ -101,7 +114,11 @@ function EditorLayout() {
                     </ResizablePanel>
                     <ResizableHandle className="w-px bg-[#1f1f1f] hover:bg-[#2f2f2f] transition-colors" />
                     <ResizablePanel defaultSize={50} minSize={20} collapsible={true}>
-                        <LatexRenderer />
+                        <LatexRenderer 
+                            pdfUrl={pdfUrl}
+                            isLoading={isLoading}
+                            error={error}
+                        />
                     </ResizablePanel>
                     {isChatVisible && (
                         <>

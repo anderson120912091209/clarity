@@ -22,26 +22,26 @@ if (typeof window !== 'undefined') {
   pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.mjs`
 }
 
-function LatexRenderer() {
-  const { user } = useFrontend();
-  const { project: data, isLoading: isDataLoading, projectId, currentlyOpen, files } = useProject();
-  const scale = data?.projectScale ?? 0.9;
-  const autoFetch = data?.isAutoFetching ?? false;
-  const latex = currentlyOpen?.content
-
-  const [numPages, setNumPages] = useState<number>(0)
+// Hook for managing LaTeX compilation state
+export function useLatex() {
+  const { user } = useFrontend()
+  const { project: data, isLoading: isDataLoading, projectId, files } = useProject()
   const [pdfUrl, setPdfUrl] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [isDocumentReady, setIsDocumentReady] = useState(false)
+  
+  const scale = data?.projectScale ?? 0.9
+  const autoFetch = data?.isAutoFetching ?? false
+  const latex = files?.find((f: any) => f.name === 'main.tex')?.content
 
+  // Initial load of cached PDF
   useEffect(() => {
     if (!isDataLoading && data?.cachedPdfUrl) {
       setPdfUrl(data.cachedPdfUrl)
     }
   }, [isDataLoading, data])
 
-  const handlePdf = async () => {
+  const compile = async () => {
     if (isDataLoading || !user) return
     
     if (!files || (Array.isArray(files) && files.length === 0)) {
@@ -51,7 +51,7 @@ function LatexRenderer() {
     
     setIsLoading(true)
     setError(null)
-    setIsDocumentReady(false)
+    
     try {
       const blob = await fetchPdf(files);
       const pathname = createPathname(user.id, projectId)
@@ -67,32 +67,20 @@ function LatexRenderer() {
     }
   }
 
+  // Auto-compile effect
   useEffect(() => {
     let debounceTimer: NodeJS.Timeout
     const resetTimer = () => {
       clearTimeout(debounceTimer)
       debounceTimer = setTimeout(() => {
         if (autoFetch && latex && latex.trim() !== '') {
-          handlePdf()
+          compile()
         }
       }, 1000)
     }
     resetTimer()
     return () => clearTimeout(debounceTimer)
   }, [latex, autoFetch, isDataLoading, user])
-
-  const onDocumentLoadSuccess = ({ numPages }: { numPages: number }) => {
-    setNumPages(numPages)
-    setIsDocumentReady(true)
-  }
-
-  const options = useMemo(
-    () => ({
-      cMapUrl: 'cmaps/',
-      cMapPacked: true,
-    }),
-    []
-  )
 
   const handleZoomIn = () => {
     const newScale = Math.min(scale + 0.1, 2.0)
@@ -127,7 +115,47 @@ function LatexRenderer() {
     }
   }
 
-  if (isDataLoading) {
+  return {
+    pdfUrl,
+    isLoading,
+    error,
+    compile,
+    scale,
+    autoFetch,
+    handleZoomIn,
+    handleZoomOut,
+    handleResetZoom,
+    handleDownload
+  }
+}
+
+interface LatexRendererProps {
+  pdfUrl: string | null
+  isLoading: boolean
+  error: string | null
+}
+
+function LatexRenderer({ pdfUrl, isLoading, error }: LatexRendererProps) {
+  const { project: data } = useProject();
+  const scale = data?.projectScale ?? 0.9;
+  
+  const [numPages, setNumPages] = useState<number>(0)
+  const [isDocumentReady, setIsDocumentReady] = useState(false)
+
+  const onDocumentLoadSuccess = ({ numPages }: { numPages: number }) => {
+    setNumPages(numPages)
+    setIsDocumentReady(true)
+  }
+
+  const options = useMemo(
+    () => ({
+      cMapUrl: 'cmaps/',
+      cMapPacked: true,
+    }),
+    []
+  )
+
+  if (isLoading && !pdfUrl) {
     return (
       <div className="flex justify-center items-center w-full h-full bg-zinc-950/50">
         <LatexLoading />

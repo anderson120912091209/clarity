@@ -1,12 +1,12 @@
 import type { Metadata } from 'next'
-import { Inter } from 'next/font/google'
+import { Manrope } from 'next/font/google'
 import './globals.css'
 import { FrontendProvider } from '@/contexts/FrontendContext'
 import { ThemeProvider } from '@/components/theme-provider'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { Analytics } from "@vercel/analytics/react"
 
-const inter = Inter({ subsets: ['latin'] })
+const manrope = Manrope({ subsets: ['latin'] })
 export const metadata: Metadata = {
   title: 'Jules',
   description: 'AI LaTeX Editor',
@@ -22,7 +22,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className={inter.className} suppressHydrationWarning>
+      <body className={manrope.className} suppressHydrationWarning>
         <ThemeProvider attribute="class" defaultTheme="system" disableTransitionOnChange>
           <TooltipProvider>
             <FrontendProvider>
