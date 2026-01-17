@@ -8,6 +8,7 @@ import { db } from '@/lib/constants'
 import { ModeToggle } from '@/components/ui/mode-toggle'
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
+import Image from 'next/image'
 
 export default function DashboardSidebar() {
   const router = useRouter()
@@ -22,10 +23,15 @@ export default function DashboardSidebar() {
   return (
     <>
       {/* Mobile Header */}
-      <div className="lg:hidden fixed top-0 left-0 right-0 z-50 h-12 bg-[#0A0A0A] border-b border-white/[0.08] flex items-center justify-between px-4">
+      <div className="lg:hidden fixed top-0 left-0 right-0 z-50 h-12 bg-[#090909] border-b border-white/[0.08] flex items-center justify-between px-4">
         <Link href="/" className="flex items-center gap-2">
-          <div className="h-4 w-4 bg-white rounded-[1px]" />
-          <span className="text-[13px] font-bold tracking-tight text-white/90">Clarity</span>
+          <Image
+            src="/logos/claritylogogreen.svg"
+            alt="Clarity"
+            width={20}
+            height={17}
+            className="h-4 w-auto"
+          />
         </Link>
         <button
           onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
@@ -39,7 +45,7 @@ export default function DashboardSidebar() {
       {/* Sidebar */}
       <aside
         className={`
-          fixed lg:sticky top-0 left-0 h-screen w-48 bg-[#0A0A0A] flex flex-col z-40
+          fixed lg:sticky top-0 left-0 h-screen w-48 bg-[#090909] flex flex-col z-40
           transition-transform duration-200 lg:translate-x-0
           ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
         `}
@@ -47,10 +53,13 @@ export default function DashboardSidebar() {
         {/* Logo */}
         <div className="h-12 flex items-center px-4 mt-12 lg:mt-0">
           <Link href="/" className="flex items-center gap-2 group outline-none">
-            <div className="h-4 w-4 bg-white rounded-[1px] group-focus-visible:ring-2 group-focus-visible:ring-indigo-500" />
-            <span className="text-[13px] font-bold tracking-tight text-white/90 group-hover:text-white transition-colors">
-              Clarity
-            </span>
+            <Image
+              src="/logos/claritylogogreen.svg"
+              alt="Clarity"
+              width={20}
+              height={17}
+              className="h-4 w-auto group-focus-visible:ring-2 group-focus-visible:ring-indigo-500 rounded-sm"
+            />
           </Link>
         </div>
 
@@ -58,9 +67,18 @@ export default function DashboardSidebar() {
         <nav className="flex-1 px-3 py-4 space-y-1">
           <Link
             href="/projects"
-            className="flex items-center gap-2 px-2 py-1.5 text-[12px] font-medium text-white/90 bg-white/[0.08] rounded-[4px] outline-none focus-visible:ring-2 focus-visible:ring-white/20 transition-colors"
+            className="group flex items-center gap-2 px-2 py-1.5 text-[12px] font-medium 
+            text-white/90 bg-white/[0.08] rounded-[4px] outline-none focus-visible:ring-2 focus-visible:ring-white/20 transition-colors"
             onClick={() => setIsMobileMenuOpen(false)}
           >
+            <Image
+              src="/sidebar/box-projects.svg"
+              alt="Projects"
+              width={16}
+              height={16}
+              className="w-4 h-4 brightness-0 invert opacity-70 
+              group-hover:opacity-100 transition-opacity"
+            />
             Projects
           </Link>
         </nav>
@@ -81,7 +99,7 @@ export default function DashboardSidebar() {
                 </div>
               </button>
             </PopoverTrigger>
-            <PopoverContent align="end" side="right" className="w-56 p-1 bg-[#0A0A0A] border-white/10 text-zinc-400 shadow-2xl shadow-black/50 rounded-sm">
+            <PopoverContent align="end" side="right" className="w-56 p-1 bg-[#090909] border-white/10 text-zinc-400 shadow-2xl shadow-black/50 rounded-sm">
               <div className="flex flex-col gap-0.5">
                 <div className="px-2 py-2 text-xs font-medium text-zinc-500 border-b border-white/5 mb-1 truncate">
                   {user?.email}

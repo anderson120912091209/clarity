@@ -1,11 +1,10 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { SearchIcon, PlusIcon, FileText } from 'lucide-react'
 import Link from 'next/link'
-import ProjectSkeleton from '@/components/projects/project-skeleton'
 import ProjectCard from '@/components/projects/project-card'
 import { useFrontend } from '@/contexts/FrontendContext'
 import { getAllProjects } from '@/hooks/data'
@@ -17,13 +16,23 @@ export default function ProjectsPage() {
   const [searchTerm, setSearchTerm] = useState('')
   const [view, setView] = useState<'grid' | 'list'>('grid')
   const [sortOrder, setSortOrder] = useState<'date' | 'name'>('date')
+  const [minLoadTimeElapsed, setMinLoadTimeElapsed] = useState(false)
   
   const { isLoading, error, data } = getAllProjects(user?.id || '')
 
-  if (userLoading || !user) return <ProjectSkeleton />
-  if (isLoading) return <ProjectSkeleton />
+  // Loading Screen Timer, use this to adjust the loading screen UI 
+  // For loading other resources we could elongate the loading screen time for users first entrance 
+  // so we could load the first few documents in the background to allow for faster UX. 
+  useEffect(() => {
+    setMinLoadTimeElapsed(false)
+    const timer = setTimeout(() => {
+      setMinLoadTimeElapsed(true)
+    }, 0)
+    return () => clearTimeout(timer)
+  }, [])
 
   const projects = data?.projects || []
+  const isPageLoading = !minLoadTimeElapsed || userLoading || !user || isLoading
   const filteredProjects = projects.filter((project) => 
     project.title.toLowerCase().includes(searchTerm.toLowerCase())
   )
@@ -81,7 +90,30 @@ export default function ProjectsPage() {
       </div>
 
       {/* Content */}
-      {sortedProjects.length === 0 && !searchTerm ? (
+      {isPageLoading ? (
+        <div className="animate-in fade-in duration-500">
+          {view === 'grid' ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5">
+              {[...Array(8)].map((_, i) => (
+                <ProjectCard key={i} loading={true} />
+              ))}
+            </div>
+          ) : (
+            <div className="flex flex-col border border-white/[0.06] rounded-sm overflow-hidden bg-white/[0.01]">
+              {/* List Header */}
+              <div className="grid grid-cols-[auto_1fr_auto_auto] items-center gap-4 py-2 px-4 border-b border-white/[0.06] bg-white/[0.02] text-[11px] font-medium text-zinc-500 uppercase tracking-wider">
+                <div className="w-8"></div>
+                <div>Name</div>
+                <div className="hidden sm:block">Last Edited</div>
+                <div className="w-7"></div>
+              </div>
+              {[...Array(8)].map((_, i) => (
+                <ProjectListItem key={i} project={null} loading={true} />
+              ))}
+            </div>
+          )}
+        </div>
+      ) : sortedProjects.length === 0 && !searchTerm ? (
         <div className="flex flex-col items-center justify-center py-32 text-center">
           <div className="w-16 h-16 rounded-sm bg-white/[0.02] border border-white/[0.05] flex items-center justify-center mb-6">
             <FileText className="h-7 w-7 text-zinc-600" />
@@ -99,7 +131,7 @@ export default function ProjectsPage() {
           </Button>
         </div>
       ) : (
-        <div className="animate-in fade-in slide-in-from-bottom-2 duration-500">
+        <>
           {view === 'grid' ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5">
               {sortedProjects.map((project) => (
@@ -120,7 +152,7 @@ export default function ProjectsPage() {
               ))}
             </div>
           )}
-        </div>
+        </>
       )}
     </>
   )

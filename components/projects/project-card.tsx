@@ -17,47 +17,49 @@ import { createPathname } from '@/lib/utils/client-utils'
 import { getAllProjectFiles } from '@/hooks/data'
 import { useFrontend } from '@/contexts/FrontendContext';
 import { deleteFileFromStorage } from '@/lib/utils/db-utils';
+import { Skeleton } from '@/components/ui/skeleton';
 
-export default function ProjectCard({ project, detailed = false }: { project: any; detailed?: boolean }) {
+export default function ProjectCard({ project, detailed = false, loading = false }: { project?: any; detailed?: boolean; loading?: boolean }) {
   const [isDialogOpen, setIsDialogOpen] = useState(false)
-  const [newTitle, setNewTitle] = useState(project.title)
+  const [newTitle, setNewTitle] = useState(project?.title || '')
   const [isDropdownOpen, setIsDropdownOpen] = useState(false)
   const [imageURL, setImageURL] = useState('')
   const [imageError, setImageError] = useState(false)
   const { user } = useFrontend();
-  const { email, id: userId } = user
+  const { email, id: userId } = user || { email: '', id: '' }
   const [downloadURL, setDownloadURL] = useState('');
-  const { data: files} = getAllProjectFiles(project.id, userId)
+  const { data: files} = getAllProjectFiles(project?.id || '', userId)
 
   useEffect(() => {
-    if (email && userId) {
-      const pathname = createPathname(userId, project.id)
-      if (project.cachedPdfExpiresAt < Date.now() || project.cachedPreviewExpiresAt < Date.now()) {
-        const expiresAt = Date.now() + 30 * 60 * 1000;
-        db.storage.getDownloadUrl(pathname + 'main.pdf').then((url) => {
-          db.transact(tx.projects[project.id].update({ cachedPdfUrl: url, cachedPdfExpiresAt: expiresAt })).then(() => {
-            db.storage.getDownloadUrl(pathname + 'main.pdf').then((validatedUrl) => {
-              setDownloadURL(validatedUrl)
-            })
+    if (loading || !project || !email || !userId) return
+    
+    const pathname = createPathname(userId, project.id)
+    if (project.cachedPdfExpiresAt < Date.now() || project.cachedPreviewExpiresAt < Date.now()) {
+      const expiresAt = Date.now() + 30 * 60 * 1000;
+      db.storage.getDownloadUrl(pathname + 'main.pdf').then((url) => {
+        db.transact(tx.projects[project.id].update({ cachedPdfUrl: url, cachedPdfExpiresAt: expiresAt })).then(() => {
+          db.storage.getDownloadUrl(pathname + 'main.pdf').then((validatedUrl) => {
+            setDownloadURL(validatedUrl)
           })
         })
-        db.storage.getDownloadUrl(pathname + 'preview.webp').then((url) => {
-          db.transact(tx.projects[project.id].update({ cachedPreviewUrl: url, cachedPreviewExpiresAt: expiresAt })).then(() => {
-            db.storage.getDownloadUrl(pathname + 'preview.webp').then((validatedUrl) => {
-              setImageURL(validatedUrl)
-            })
+      })
+      db.storage.getDownloadUrl(pathname + 'preview.webp').then((url) => {
+        db.transact(tx.projects[project.id].update({ cachedPreviewUrl: url, cachedPreviewExpiresAt: expiresAt })).then(() => {
+          db.storage.getDownloadUrl(pathname + 'preview.webp').then((validatedUrl) => {
+            setImageURL(validatedUrl)
           })
         })
-      } else {
-        setImageURL(project.cachedPreviewUrl)
-        setDownloadURL(project.cachedPdfUrl)
-      }
+      })
+    } else {
+      setImageURL(project.cachedPreviewUrl)
+      setDownloadURL(project.cachedPdfUrl)
     }
-  }, [project.id, project.title, email, userId])
+  }, [project?.id, project?.title, email, userId, loading])
 
   const handleDelete = (e: React.MouseEvent) => {
     e.preventDefault()
     e.stopPropagation();
+    if (!project) return
 
     db.transact([tx.projects[project.id].delete()]);
     if (files && files.files) {
@@ -71,6 +73,7 @@ export default function ProjectCard({ project, detailed = false }: { project: an
   const handleEdit = (e: React.MouseEvent) => {
     e.preventDefault()
     e.stopPropagation()
+    if (!project) return
     setIsDialogOpen(true)
     setIsDropdownOpen(false)
   }
@@ -79,7 +82,7 @@ export default function ProjectCard({ project, detailed = false }: { project: an
     e.preventDefault()
     e.stopPropagation()
     setIsDropdownOpen(false);
-    if (!files) {
+    if (!project || !files) {
       return;
     }
 
@@ -158,6 +161,7 @@ export default function ProjectCard({ project, detailed = false }: { project: an
   const handleDownload = (e: React.MouseEvent) => {
     e.preventDefault()
     e.stopPropagation()
+    if (!project) return
     if (downloadURL) {
       fetch(downloadURL)
         .then((response) => response.blob())
@@ -184,6 +188,21 @@ export default function ProjectCard({ project, detailed = false }: { project: an
       setIsDropdownOpen(false)
     }
   }
+
+  // Show skeleton when loading
+  if (loading) {
+    return (
+      <div className="flex flex-col">
+        <Skeleton className="aspect-[1.414/1] w-full rounded-[4px] bg-white/[0.05] border border-white/[0.06]" />
+        <div className="mt-3 space-y-2 px-0.5">
+          <Skeleton className="h-3 w-3/4 bg-white/[0.05]" />
+          <Skeleton className="h-3 w-1/2 bg-white/[0.05]" />
+        </div>
+      </div>
+    )
+  }
+
+  if (!project) return null
 
   return (
     <>
@@ -266,7 +285,7 @@ export default function ProjectCard({ project, detailed = false }: { project: an
               placeholder="Enter new title" 
               className="bg-white/5 border-white/10 text-white focus:bg-white/10 transition-colors"
               onKeyDown={(e) => {
-                if (e.key === 'Enter') {
+                if (e.key === 'Enter' && project) {
                   db.transact([tx.projects[project.id].update({ title: newTitle })])
                   handleDialogOpenChange(false)
                 }
@@ -278,8 +297,10 @@ export default function ProjectCard({ project, detailed = false }: { project: an
             <Button
               className="bg-white text-black hover:bg-zinc-200"
               onClick={() => {
-                db.transact([tx.projects[project.id].update({ title: newTitle })])
-                handleDialogOpenChange(false)
+                if (project) {
+                  db.transact([tx.projects[project.id].update({ title: newTitle })])
+                  handleDialogOpenChange(false)
+                }
               }}
             >
               Save Changes

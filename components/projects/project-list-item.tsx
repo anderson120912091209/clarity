@@ -15,36 +15,39 @@ import { savePdfToStorage, savePreviewToStorage, deleteFileFromStorage } from '@
 import { createPathname } from '@/lib/utils/client-utils'
 import { getAllProjectFiles } from '@/hooks/data'
 import { useFrontend } from '@/contexts/FrontendContext'
+import { Skeleton } from '@/components/ui/skeleton'
 
 interface ProjectListItemProps {
-  project: any
+  project: any | null
+  loading?: boolean
 }
 
-export default function ProjectListItem({ project }: ProjectListItemProps) {
+export default function ProjectListItem({ project, loading = false }: ProjectListItemProps) {
   const [isDialogOpen, setIsDialogOpen] = useState(false)
-  const [newTitle, setNewTitle] = useState(project.title)
+  const [newTitle, setNewTitle] = useState(project?.title || '')
   const [isDropdownOpen, setIsDropdownOpen] = useState(false)
   const [downloadURL, setDownloadURL] = useState('');
   const { user } = useFrontend();
-  const { email, id: userId } = user
-  const { data: files } = getAllProjectFiles(project.id, userId)
+  const { email, id: userId } = user || { email: '', id: '' }
+  const { data: files } = getAllProjectFiles(project?.id || '', userId)
 
   useEffect(() => {
-    if (email && userId) {
-      if (project.cachedPdfExpiresAt < Date.now()) {
-          // Logic to refresh token would go here, simplified for list item to just use existing URL if valid-ish or fallback
-          // Ideally we share this logic via a hook
-           setDownloadURL(project.cachedPdfUrl)
-      } else {
-        setDownloadURL(project.cachedPdfUrl)
-      }
+    if (loading || !project || !email || !userId) return
+    
+    if (project.cachedPdfExpiresAt < Date.now()) {
+        // Logic to refresh token would go here, simplified for list item to just use existing URL if valid-ish or fallback
+        // Ideally we share this logic via a hook
+         setDownloadURL(project.cachedPdfUrl)
+    } else {
+      setDownloadURL(project.cachedPdfUrl)
     }
-  }, [project, email, userId])
+  }, [project, email, userId, loading])
 
 
    const handleDelete = (e: React.MouseEvent) => {
     e.preventDefault()
     e.stopPropagation();
+    if (!project) return
 
     db.transact([tx.projects[project.id].delete()]);
     if (files && files.files) {
@@ -75,6 +78,7 @@ export default function ProjectListItem({ project }: ProjectListItemProps) {
   const handleDownload = (e: React.MouseEvent) => {
      e.preventDefault()
     e.stopPropagation()
+    if (!project) return
     if (downloadURL) {
       fetch(downloadURL)
         .then((response) => response.blob())
@@ -98,6 +102,20 @@ export default function ProjectListItem({ project }: ProjectListItemProps) {
     if (!open) setIsDropdownOpen(false)
   }
 
+
+  // Show skeleton when loading
+  if (loading) {
+    return (
+      <div className="grid grid-cols-[auto_1fr_auto_auto] items-center gap-4 py-2 px-3 rounded-[4px] border-b border-white/[0.04] last:border-0">
+        <Skeleton className="w-7 h-7 rounded-[2px] bg-white/[0.05]" />
+        <Skeleton className="h-4 w-32 bg-white/[0.05]" />
+        <Skeleton className="h-3 w-16 bg-white/[0.05] hidden sm:block" />
+        <Skeleton className="w-6 h-6 rounded-[2px] bg-white/[0.05]" />
+      </div>
+    )
+  }
+
+  if (!project) return null
 
   return (
     <>
@@ -170,7 +188,7 @@ export default function ProjectListItem({ project }: ProjectListItemProps) {
               placeholder="Enter new title" 
               className="bg-white/5 border-white/10 text-white focus:bg-white/10 transition-colors"
                 onKeyDown={(e) => {
-                if (e.key === 'Enter') {
+                if (e.key === 'Enter' && project) {
                   db.transact([tx.projects[project.id].update({ title: newTitle })])
                   handleDialogOpenChange(false)
                 }
@@ -182,8 +200,10 @@ export default function ProjectListItem({ project }: ProjectListItemProps) {
             <Button
               className="bg-white text-black hover:bg-zinc-200"
               onClick={() => {
-                db.transact([tx.projects[project.id].update({ title: newTitle })])
-                handleDialogOpenChange(false)
+                if (project) {
+                  db.transact([tx.projects[project.id].update({ title: newTitle })])
+                  handleDialogOpenChange(false)
+                }
               }}
             >
               Save Changes

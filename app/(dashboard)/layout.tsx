@@ -6,14 +6,14 @@ export default function DashboardLayout({
   children: React.ReactNode
 }) {
   return (
-    <div className="h-screen bg-[#0A0A0A] text-white flex font-sans selection:bg-white/20">
+    <div className="h-screen bg-[#090909] text-white flex font-sans selection:bg-white/20">
       <DashboardSidebar />
       
       {/* Main Content Area */}
-      <main className="flex-1 flex flex-col p-4 pt-16 lg:pt-4 overflow-hidden">
+      <main className="flex-1 flex flex-col p-2 pt-16 lg:pt-2 overflow-hidden">
         {/* Content Container */}
-        <div className="flex-1 bg-[#0D0D0F] border border-white/[0.06]
-         rounded-md p-6 lg:p-8">
+        <div className="flex-1 bg-[#101011] border-[0.5px] border-white/[0.1] 
+         rounded-md p-4 lg:p-6">
           {children}
         </div>
       </main>
