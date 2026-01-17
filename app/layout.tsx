@@ -8,7 +8,7 @@ import { Analytics } from "@vercel/analytics/react"
 
 const manrope = Manrope({ subsets: ['latin'] })
 export const metadata: Metadata = {
-  title: 'Jules',
+  title: '{clarity}',
   description: 'AI LaTeX Editor',
   icons: {
     icon: '/favicon.ico',

@@ -187,51 +187,54 @@ export default function ProjectCard({ project, detailed = false }: { project: an
 
   return (
     <>
-      <Link href={`/project/${project.id}`} className="group relative block outline-none">
+      <Link 
+        href={`/project/${project.id}`} 
+        className="group relative block outline-none rounded-[4px]"
+      >
         {/* Card Cover */}
-        <div className="relative aspect-[1.414/1] w-full overflow-hidden rounded-[4px] border border-white/10 bg-zinc-900 shadow-sm transition-all duration-200 hover:border-white/20">
+        <div className="relative aspect-[1.414/1] w-full overflow-hidden rounded-[4px] border border-white/[0.08] bg-zinc-900/50 shadow-[0_1px_2px_rgba(0,0,0,0.2)] transition-colors duration-200 group-hover:bg-zinc-900 group-hover:border-white/20 group-focus-visible:ring-2 group-focus-visible:ring-offset-2 group-focus-visible:ring-zinc-400 group-focus-visible:ring-offset-[#050505]">
           <Image
             src={!imageError && imageURL ? imageURL : '/placeholder.svg'}
-            alt=""
+            alt={`Cover for ${project.title}`}
             className="h-full w-full object-cover opacity-80 transition-opacity duration-300 group-hover:opacity-100"
-            width={400}
+             width={400}
             height={300}
             loader={({ src }) => src}
             onError={() => setImageError(true)}
           />
 
           {/* More Options Overlay */}
-          <div className="absolute right-2 top-2 opacity-0 transition-opacity duration-200 group-focus-within:opacity-100 group-hover:opacity-100">
+          <div className="absolute top-3 right-3 opacity-0 transition-opacity duration-200 group-focus-within:opacity-100 group-hover:opacity-100 z-10">
              <div onClick={(e) => {e.preventDefault(); e.stopPropagation();}}>
               <DropdownMenu open={isDropdownOpen} onOpenChange={setIsDropdownOpen}>
                 <DropdownMenuTrigger asChild>
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="h-6 w-6 rounded-md bg-zinc-900/90 text-zinc-400 hover:bg-zinc-800 hover:text-white ring-1 ring-white/10"
+                    className="h-7 w-7 rounded-[4px] bg-black/80 backdrop-blur-md text-zinc-400 hover:bg-black hover:text-white border border-white/10 shadow-sm"
+                    aria-label="More options"
                   >
-                    <MoreHorizontal className="h-3.5 w-3.5" />
-                    <span className="sr-only">Open menu</span>
+                    <MoreHorizontal className="h-4 w-4" />
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent
                   align="end"
-                  className="w-48 bg-[#0A0A0A] border rounded-lg border-white/10 text-zinc-400 p-1"
+                  className="w-48 bg-[#0A0A0A]/95 backdrop-blur-xl border border-white/10 text-zinc-400 p-1 shadow-xl"
                 >
-                  <DropdownMenuItem className="focus:bg-white/5 focus:text-white rounded-sm cursor-pointer text-xs font-medium py-2" onClick={handleEdit}>
+                  <DropdownMenuItem className="focus:bg-white/10 focus:text-white rounded-md cursor-pointer text-[13px] font-medium py-2" onClick={handleEdit}>
                     <Edit2Icon className="mr-2 h-3.5 w-3.5" />
                     <span>Rename</span>
                   </DropdownMenuItem>
-                  <DropdownMenuItem className="focus:bg-white/5 focus:text-white rounded-sm cursor-pointer text-xs font-medium py-2" onClick={handleDuplicate}>
+                  <DropdownMenuItem className="focus:bg-white/10 focus:text-white rounded-md cursor-pointer text-[13px] font-medium py-2" onClick={handleDuplicate}>
                     <CopyIcon className="mr-2 h-3.5 w-3.5" />
                     <span>Duplicate</span>
                   </DropdownMenuItem>
-                  <DropdownMenuItem className="focus:bg-white/5 focus:text-white rounded-sm cursor-pointer text-xs font-medium py-2" onClick={handleDownload}>
+                  <DropdownMenuItem className="focus:bg-white/10 focus:text-white rounded-md cursor-pointer text-[13px] font-medium py-2" onClick={handleDownload}>
                     <DownloadIcon className="mr-2 h-3.5 w-3.5" />
                     <span>Download PDF</span>
                   </DropdownMenuItem>
                   <div className="h-[1px] bg-white/5 my-1" />
-                  <DropdownMenuItem className="focus:bg-red-500/10 focus:text-red-400 text-red-400/80 rounded-sm cursor-pointer text-xs font-medium py-2" onClick={handleDelete}>
+                  <DropdownMenuItem className="focus:bg-red-500/10 focus:text-red-400 text-red-400/80 rounded-md cursor-pointer text-[13px] font-medium py-2" onClick={handleDelete}>
                     <XIcon className="mr-2 h-3.5 w-3.5" />
                     <span>Delete Project</span>
                   </DropdownMenuItem>
@@ -244,9 +247,9 @@ export default function ProjectCard({ project, detailed = false }: { project: an
         {/* Title & Info Below Card */}
         <div className="mt-3 flex flex-col gap-0.5 px-0.5">
           <h3 className="truncate text-[13px] font-medium text-zinc-300 group-hover:text-white transition-colors">{project.title}</h3>
-          <p className="text-[11px] text-zinc-600">
+          <p className="text-[11px] text-zinc-600 font-mono tracking-tight">
             {project.last_compiled 
-              ? `Edited ${getTimeAgo(new Date(project.last_compiled))}`
+              ? getTimeAgo(new Date(project.last_compiled))
               : "Draft"}
           </p>
         </div>
@@ -287,7 +290,6 @@ export default function ProjectCard({ project, detailed = false }: { project: an
     </>
   )
 }
-
 
 function getTimeAgo(date: Date): string {
   const now = new Date();
