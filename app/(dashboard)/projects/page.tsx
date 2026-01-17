@@ -55,7 +55,9 @@ export default function ProjectsPage() {
             <SearchIcon className="h-3.5 w-3.5 text-zinc-600 group-focus-within:text-zinc-400 transition-colors" />
           </div>
           <Input
-            className="pl-8 h-8 bg-white/[0.03] border-white/[0.08] text-[12px] text-zinc-300 placeholder:text-zinc-600 focus:bg-white/[0.06] focus:border-white/20 focus:ring-0 rounded-[4px] transition-all"
+            className="pl-8 h-8 bg-white/[0.03] border-white/[0.08] text-[12px]
+             text-zinc-300 placeholder:text-zinc-600 focus:bg-white/[0.06]
+              focus:border-white/20 focus:ring-0 rounded-[4px] transition-all"
             placeholder="Search projects..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}

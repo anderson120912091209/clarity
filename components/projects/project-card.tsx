@@ -216,7 +216,7 @@ export default function ProjectCard({ project, detailed = false, loading = false
           <Image
             src={!imageError && imageURL ? imageURL : '/placeholder.svg'}
             alt={`Cover for ${project.title}`}
-            className="h-full w-full object-cover opacity-60 transition-opacity duration-300 group-hover:opacity-80"
+            className="h-full w-full object-cover opacity-80 transition-opacity duration-300 group-hover:opacity-90"
             width={240}
             height={320}
             loader={({ src }) => src}

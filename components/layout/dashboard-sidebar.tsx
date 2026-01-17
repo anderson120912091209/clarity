@@ -3,17 +3,20 @@
 import React from 'react'
 import Link from 'next/link'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
-import { LogOut, User, Menu, X } from 'lucide-react'
+import { LogOut, User, Menu, X, Search, Pencil, ChevronDown, ChevronRight } from 'lucide-react'
 import { db } from '@/lib/constants'
 import { ModeToggle } from '@/components/ui/mode-toggle'
-import { useRouter } from 'next/navigation'
+import { useRouter, usePathname } from 'next/navigation'
 import { useState } from 'react'
 import Image from 'next/image'
 
 export default function DashboardSidebar() {
   const router = useRouter()
+  const pathname = usePathname()
   const { user } = db.useAuth()
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
+  
+  const isProjectsActive = pathname?.startsWith('/projects')
 
   const handleSignOut = () => {
     db.auth.signOut()
@@ -50,25 +53,87 @@ export default function DashboardSidebar() {
           ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
         `}
       >
-        {/* Logo */}
-        <div className="h-12 flex items-center px-4 mt-12 lg:mt-0">
-          <Link href="/" className="flex items-center gap-2 group outline-none">
-            <Image
-              src="/logos/claritylogogreen.svg"
-              alt="Clarity"
-              width={20}
-              height={17}
-              className="h-4 w-auto group-focus-visible:ring-2 group-focus-visible:ring-indigo-500 rounded-sm"
-            />
-          </Link>
+        {/* Top Header with User Profile */}
+        <div className="h-12 flex items-center justify-between px-3 mt-12 lg:mt-0">
+          {/* User Profile with Dropdown */}
+          <Popover>
+            <PopoverTrigger asChild>
+              <button
+                className="flex items-center gap-2 group outline-none focus-visible:ring-2 focus-visible:ring-white/20 focus-visible:ring-offset-2 focus-visible:ring-offset-[#090909] rounded-sm px-1 py-1 hover:bg-white/5 transition-colors min-w-0 flex-1"
+                aria-label="User menu"
+              >
+                <div className="w-6 h-6 rounded-sm bg-zinc-800 flex items-center justify-center text-[9px] font-bold text-zinc-300 ring-1 ring-white/10 shrink-0">
+                  {user?.email?.[0]?.toUpperCase() || <User className="w-3 h-3" />}
+                </div>
+                <span className="text-[12px] font-medium text-white/90 group-hover:text-white transition-colors truncate">{user?.email || 'User'}</span>
+                <ChevronDown className="h-3 w-3 text-white/50 group-hover:text-white/70 transition-colors shrink-0" />
+              </button>
+            </PopoverTrigger>
+            <PopoverContent align="start" side="right" className="w-56 p-1 bg-[#090909] border-white/10 text-white shadow-2xl shadow-black/50 rounded-sm">
+              <div className="flex flex-col gap-0.5">
+                <button className="flex items-center justify-between px-2 py-1.5 hover:bg-white/5 rounded-sm cursor-pointer transition-colors group text-left w-full">
+                  <span className="text-[12px] text-white group-hover:text-white">Settings</span>
+                  <span className="text-[11px] text-white/40 font-mono">G then S</span>
+                </button>
+                <button className="px-2 py-1.5 hover:bg-white/5 rounded-sm cursor-pointer transition-colors text-left">
+                  <span className="text-[12px] text-white">Invite and manage members</span>
+                </button>
+                <div className="h-[1px] bg-white/5 my-1" />
+                <button className="px-2 py-1.5 hover:bg-white/5 rounded-sm cursor-pointer transition-colors text-left">
+                  <span className="text-[12px] text-white">Download desktop app</span>
+                </button>
+                <div className="h-[1px] bg-white/5 my-1" />
+                <button className="flex items-center justify-between px-2 py-1.5 hover:bg-white/5 rounded-sm cursor-pointer transition-colors group text-left w-full">
+                  <span className="text-[12px] text-white group-hover:text-white">Switch workspace</span>
+                  <div className="flex items-center gap-1">
+                    <span className="text-[11px] text-white/40 font-mono">O then W</span>
+                    <ChevronRight className="w-3 h-3 text-white/40" />
+                  </div>
+                </button>
+                <button
+                  onClick={handleSignOut}
+                  className="flex items-center justify-between px-2 py-1.5 hover:bg-red-500/10 rounded-sm text-left w-full transition-colors group"
+                >
+                  <span className="text-[12px] text-white/80 group-hover:text-white">Log out</span>
+                  <div className="flex items-center gap-0.5">
+                    <kbd className="px-1 py-0.5 text-[9px] font-mono text-white/40 border border-white/10 rounded">⌘</kbd>
+                    <kbd className="px-1 py-0.5 text-[9px] font-mono text-white/40 border border-white/10 rounded">⇧</kbd>
+                    <kbd className="px-1 py-0.5 text-[9px] font-mono text-white/40 border border-white/10 rounded">Q</kbd>
+                  </div>
+                </button>
+              </div>
+            </PopoverContent>
+          </Popover>
+
+          {/* Right Side Actions */}
+          <div className="flex items-center gap-1 shrink-0">
+            <button
+              className="w-7 h-7 flex items-center justify-center text-white/70 hover:text-white hover:bg-white/5 rounded-sm transition-colors outline-none focus-visible:ring-2 focus-visible:ring-white/20"
+              aria-label="Search"
+            >
+              <Search className="w-4 h-4" />
+            </button>
+            <Link
+              href="/new"
+              className="w-7 h-7 flex items-center justify-center text-white/70 hover:text-white hover:bg-white/5 rounded-sm transition-colors outline-none focus-visible:ring-2 focus-visible:ring-white/20"
+              aria-label="New document"
+              onClick={() => setIsMobileMenuOpen(false)}
+            >
+              <Pencil className="w-4 h-4" />
+            </Link>
+          </div>
         </div>
 
         {/* Navigation */}
         <nav className="flex-1 px-3 py-4 space-y-1">
           <Link
             href="/projects"
-            className="group flex items-center gap-2 px-2 py-1.5 text-[12px] font-medium 
-            text-white/90 bg-white/[0.08] rounded-[4px] outline-none focus-visible:ring-2 focus-visible:ring-white/20 transition-colors"
+            className={`group flex items-center gap-2 px-2 py-1.5 text-[12px] font-medium 
+            rounded-[4px] outline-none focus-visible:ring-2 focus-visible:ring-white/20 transition-colors
+            ${isProjectsActive 
+              ? 'bg-[#1E1F22] text-[#E3E4E5]' 
+              : 'text-[#E3E4E5] hover:bg-[#151619]'
+            }`}
             onClick={() => setIsMobileMenuOpen(false)}
           >
             <Image
@@ -76,51 +141,13 @@ export default function DashboardSidebar() {
               alt="Projects"
               width={16}
               height={16}
-              className="w-4 h-4 brightness-0 invert opacity-70 
-              group-hover:opacity-100 transition-opacity"
+              className={`w-4 h-4 brightness-0 invert transition-opacity
+              ${isProjectsActive ? 'opacity-100' : 'opacity-70 group-hover:opacity-100'}
+              `}
             />
             Projects
           </Link>
         </nav>
-
-        {/* User Menu */}
-        <div className="p-3">
-          <Popover>
-            <PopoverTrigger asChild>
-              <button
-                className="w-full flex items-center gap-2 px-2 py-1.5 rounded-[4px] hover:bg-white/[0.05] transition-colors outline-none focus-visible:ring-2 focus-visible:ring-white/20"
-                aria-label="User menu"
-              >
-                <div className="w-6 h-6 rounded-[2px] bg-zinc-800 flex items-center justify-center text-[9px] font-bold text-zinc-300 ring-1 ring-white/10">
-                  {user?.email?.[0]?.toUpperCase() || <User className="w-3 h-3" />}
-                </div>
-                <div className="flex-1 text-left min-w-0">
-                  <div className="text-[11px] font-medium text-zinc-400 truncate">{user?.email}</div>
-                </div>
-              </button>
-            </PopoverTrigger>
-            <PopoverContent align="end" side="right" className="w-56 p-1 bg-[#090909] border-white/10 text-zinc-400 shadow-2xl shadow-black/50 rounded-sm">
-              <div className="flex flex-col gap-0.5">
-                <div className="px-2 py-2 text-xs font-medium text-zinc-500 border-b border-white/5 mb-1 truncate">
-                  {user?.email}
-                </div>
-                <div className="flex items-center justify-between px-2 py-1.5 hover:bg-white/5 rounded-sm cursor-pointer transition-colors group">
-                  <span className="text-[12px] group-hover:text-zinc-200">Theme</span>
-                  <div className="scale-75 origin-right">
-                    <ModeToggle />
-                  </div>
-                </div>
-                <button
-                  onClick={handleSignOut}
-                  className="flex items-center gap-2 w-full text-left px-2 py-1.5 hover:bg-red-500/10 rounded-sm text-[12px] text-zinc-400 hover:text-red-400 transition-colors"
-                >
-                  <LogOut className="w-3.5 h-3.5" />
-                  Sign out
-                </button>
-              </div>
-            </PopoverContent>
-          </Popover>
-        </div>
       </aside>
 
       {/* Mobile Overlay */}

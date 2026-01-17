@@ -34,13 +34,13 @@ export default function ProjectListItem({ project, loading = false }: ProjectLis
   useEffect(() => {
     if (loading || !project || !email || !userId) return
     
-    if (project.cachedPdfExpiresAt < Date.now()) {
-        // Logic to refresh token would go here, simplified for list item to just use existing URL if valid-ish or fallback
-        // Ideally we share this logic via a hook
-         setDownloadURL(project.cachedPdfUrl)
-    } else {
-      setDownloadURL(project.cachedPdfUrl)
-    }
+      if (project.cachedPdfExpiresAt < Date.now()) {
+          // Logic to refresh token would go here, simplified for list item to just use existing URL if valid-ish or fallback
+          // Ideally we share this logic via a hook
+           setDownloadURL(project.cachedPdfUrl)
+      } else {
+        setDownloadURL(project.cachedPdfUrl)
+      }
   }, [project, email, userId, loading])
 
 
@@ -201,8 +201,8 @@ export default function ProjectListItem({ project, loading = false }: ProjectLis
               className="bg-white text-black hover:bg-zinc-200"
               onClick={() => {
                 if (project) {
-                  db.transact([tx.projects[project.id].update({ title: newTitle })])
-                  handleDialogOpenChange(false)
+                db.transact([tx.projects[project.id].update({ title: newTitle })])
+                handleDialogOpenChange(false)
                 }
               }}
             >
