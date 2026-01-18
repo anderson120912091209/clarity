@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input'
 import { SearchIcon, PlusIcon, FileText } from 'lucide-react'
 import Link from 'next/link'
 import ProjectCard from '@/components/projects/project-card'
+import NewProjectCard from '@/components/projects/new-project-card'
 import { useFrontend } from '@/contexts/FrontendContext'
 import { getAllProjects } from '@/hooks/data'
 import { ViewToggle } from '@/components/projects/view-toggle'
@@ -116,30 +117,23 @@ export default function ProjectsPage() {
             </div>
           )}
         </div>
-      ) : sortedProjects.length === 0 && !searchTerm ? (
-        <div className="flex flex-col items-center justify-center py-32 text-center">
-          <div className="w-16 h-16 rounded-sm bg-white/[0.02] border border-white/[0.05] flex items-center justify-center mb-6">
-            <FileText className="h-7 w-7 text-zinc-600" />
-          </div>
-          <h2 className="text-[15px] font-medium text-zinc-300 mb-2">No projects yet</h2>
-          <p className="text-[12px] text-zinc-500 max-w-sm mb-8 leading-relaxed">
-            Create your first project to start writing.
-          </p>
-          <Button 
-            asChild
-            variant="outline"
-            className="h-8 px-4 bg-transparent border-white/10 text-zinc-400 hover:text-white hover:bg-white/5 hover:border-white/20 transition-all rounded-[4px] text-[12px]"
-          >
-            <Link href="/new">Create Project</Link>
-          </Button>
-        </div>
       ) : (
         <>
           {view === 'grid' ? (
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+               {/* New Project Card - Always visible in grid view */}
+              <NewProjectCard />
+              
               {sortedProjects.map((project) => (
                 <ProjectCard key={project.id} project={project} />
               ))}
+              
+              {/* Show message if no projects found during search */}
+              {searchTerm && sortedProjects.length === 0 && (
+                 <div className="col-span-full flex flex-col items-center justify-center py-12 text-zinc-500">
+                    <p>No projects found matching &quot;{searchTerm}&quot;</p>
+                 </div>
+              )}
             </div>
           ) : (
             <div className="flex flex-col border border-white/[0.06] rounded-sm overflow-hidden bg-white/[0.01]">
@@ -150,9 +144,20 @@ export default function ProjectsPage() {
                 <div className="hidden sm:block">Last Edited</div>
                 <div className="w-7"></div>
               </div>
+              
+              {/* In list view, we might want a "New Project" row or just rely on the top button. 
+                  Usually list views rely on the header button, but grid views use the card. 
+                  I'll leave it as just projects for list view for now unless requested. */}
+                  
               {sortedProjects.map((project) => (
                 <ProjectListItem key={project.id} project={project} />
               ))}
+              
+              {sortedProjects.length === 0 && (
+                <div className="py-12 flex flex-col items-center justify-center text-zinc-500">
+                   <p>{searchTerm ? `No projects found matching "${searchTerm}"` : "No projects yet"}</p>
+                </div>
+              )}
             </div>
           )}
         </>

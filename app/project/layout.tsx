@@ -1,7 +1,13 @@
+import { SidebarProvider } from '@/contexts/SidebarContext'
+
 export default function ProjectLayout({
   children,
 }: Readonly<{
   children: React.ReactNode
 }>) {
-  return <>{children}</>
+  return (
+    <SidebarProvider>
+      {children}
+    </SidebarProvider>
+  )
 }
