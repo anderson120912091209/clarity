@@ -80,12 +80,13 @@ export default function ProjectsPage() {
           </Button>
           
           <Button 
-            className="h-8 px-3 bg-white text-black hover:bg-zinc-200 text-[12px] font-medium tracking-wide rounded-[4px] transition-all shadow-sm ml-auto md:ml-0" 
+            className="h-8 px-3 text-white font-medium tracking-wide rounded-md transition-all shadow-sm ml-auto md:ml-0 text-[12px]" 
+            style={{ backgroundColor: '#6D78E7' }}
             asChild
           >
             <Link href="/new">
               <PlusIcon className="mr-1.5 h-3.5 w-3.5" />
-              New Project
+              NewProject
             </Link>
           </Button>
         </div>
