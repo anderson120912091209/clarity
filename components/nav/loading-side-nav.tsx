@@ -21,7 +21,6 @@ export default function LoadingSideNav() {
 
       <div className="flex-grow overflow-auto p-2">
         <Skeleton className="h-6 w-3/4 mb-2" />
-        <Skeleton className="h-6 w-1/2 mb-2" />
         <Skeleton className="h-6 w-2/3 mb-2" />
         <Skeleton className="h-6 w-3/5 mb-2" />
         <Skeleton className="h-6 w-4/5 mb-2" />

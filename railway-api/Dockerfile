@@ -8,6 +8,9 @@ RUN apt-get update && apt-get install -y \
     texlive-fonts-recommended \
     texlive-fonts-extra \
     texlive-latex-recommended \
+    texlive-publishers \
+    texlive-science \
+    texlive-pictures \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
