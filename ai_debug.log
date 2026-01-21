@@ -40,3 +40,9 @@
 [2026-01-19T07:11:30.319Z] Chat Request Started. History length: 1
 [2026-01-19T07:12:19.850Z] Chat Request Started. History length: 3
 [2026-01-19T10:55:50.332Z] Chat Request Started. History length: 5
+[2026-01-20T03:58:56.557Z] AI Request Started. Input length: 1084
+[2026-01-20T03:58:56.558Z] Starting streamText call with Gemini 2.0 Flash
+[2026-01-20T03:58:59.318Z] Stream processing final cleanup
+[2026-01-20T04:11:37.356Z] AI Request Started. Input length: 1096
+[2026-01-20T04:11:37.357Z] Starting streamText call with Gemini 2.0 Flash
+[2026-01-20T04:11:39.966Z] Stream processing final cleanup
