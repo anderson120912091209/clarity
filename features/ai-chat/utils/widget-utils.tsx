@@ -14,7 +14,8 @@ export const createContentWidget = (
   oldText: string,
   newText: string,
   currentLine: number,
-  oldDecorations: string[]
+  oldDecorations: string[],
+  onChange: (value: string) => void
 ) => {
   const widgetId = `diff-widget-${Date.now()}`
   
@@ -45,6 +46,8 @@ export const createContentWidget = (
         // Text is already in the editor, so we just clear everything
         editor.deltaDecorations(oldDecorations, [])
         editor.removeContentWidget(this)
+        // CRITICAL: Trigger onChange to sync editor state to database
+        onChange(editor.getValue())
       }
 
       const WidgetContent = () => (

@@ -30,7 +30,7 @@ CRITICAL RULES:
 6. Do not include a preamble (\\documentclass, etc.) unless you are writing a completely new file.`
 
 export const CHAT_CONFIG = {
-  MODEL: 'gemini-2.0-flash-exp' as const,
+  MODEL: 'gemini-2.5-flash' as const,
   MAX_MESSAGE_HISTORY: 50,
   STREAM_CHUNK_DELAY: 0,
   DEFAULT_PLACEHOLDER: 'Ask anything (Cmd+L)...',

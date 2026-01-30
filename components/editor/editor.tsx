@@ -20,7 +20,7 @@ const EditorLoading = () => (
 
 export const CodeEditor = ({ onChange, value, setIsStreaming }: CodeEditorProps) => {
   const { editorRef, handleEditorDidMount } = useEditorSetup(onChange, value)
-  const { handleAIAssist } = useAIAssist()
+  const { handleAIAssist } = useAIAssist(onChange)
   const { setTheme } = useEditorTheme()
 
   return (
@@ -34,7 +34,7 @@ export const CodeEditor = ({ onChange, value, setIsStreaming }: CodeEditorProps)
       onMount={(editor, monaco) => {
         setTheme(monaco) // Initialize custom theme
         handleEditorDidMount(editor, monaco)
-        handleAIAssist(editor, monaco, setIsStreaming)
+        handleAIAssist(editor, monaco, setIsStreaming, onChange)
         
         // Ensure layout updates if container changes (e.g. sidebar toggle)
         const resizeObserver = new ResizeObserver(() => {

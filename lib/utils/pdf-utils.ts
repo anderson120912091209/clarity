@@ -1,7 +1,7 @@
 'use client'
 import '@ungap/with-resolvers'
 import { PDFDocumentProxy } from 'pdfjs-dist'
-import { RAILWAY_ENDPOINT_URL } from '@/lib/constants'  
+// CLSI URL is configured via NEXT_PUBLIC_CLSI_URL environment variable
 
 export async function createPreview(
   pdfDocument: PDFDocumentProxy,
@@ -55,139 +55,101 @@ export async function fetchPdf(files: EditorFiles | EditorFiles[] | undefined | 
   }
   
   if (!filesArray.some((file: any) => file?.name === 'main.tex')) {
-        const errorData = {
-            error: 'Missing File',
-            message: 'No main.tex file found',
+    const errorData = {
+      error: 'Missing File',
+      message: 'No main.tex file found',
       details: 'The main.tex file is required for LaTeX compilation.',
     }
     console.error('Error fetching PDF:', errorData)
     throw new Error(`${errorData.error}: ${errorData.message}\n\nDetails: ${errorData.details}`)
-    }
-
-  const formData = new FormData()
-    
-  await Promise.all(
-    filesArray.map(async (file: any) => {
-        if (file.type === 'file') {
-        const extension = file.name.split('.').pop()?.toLowerCase()
-        let mimeType: string
-            
-            switch (extension) {
-                case 'tex':
-            mimeType = 'text/plain'
-            break
-                case 'png':
-            mimeType = 'image/png'
-            break
-                case 'jpg':
-                case 'jpeg':
-            mimeType = 'image/jpeg'
-            break
-                case 'svg':
-            mimeType = 'image/svg+xml'
-            break
-                default:
-            throw new Error(`Unsupported file type: ${extension}`)
-            }
-
-        const pathname = file.pathname
-
-        let blob: Blob
-            if (extension !== 'tex' && typeof file.content === 'string') {
-                // For images, file.content is a URL
-          const response = await fetch(file.content)
-          blob = await response.blob()
-            } else {
-                // For .tex files, create blob from content
-          // Validate content is not empty
-          if (extension === 'tex') {
-            const content = file.content || ''
-            if (typeof content !== 'string') {
-              throw new Error(`File ${file.name} has invalid content type. Expected string, got ${typeof content}`)
-            }
-            if (!content.trim()) {
-              throw new Error(`File ${file.name} is empty. Please add content to the file before compiling.`)
-            }
-            // Ensure content ends with newline (LaTeX requirement)
-            const normalizedContent = content.endsWith('\n') ? content : content + '\n'
-            
-            // Log file content for debugging (first 500 chars)
-            if (file.name === 'main.tex') {
-              const preview = normalizedContent.substring(0, 500)
-              const lines = normalizedContent.split('\n')
-              console.log(`[PDF Debug] main.tex content preview (first 500 chars):`, preview)
-              console.log(`[PDF Debug] main.tex total lines:`, lines.length)
-              console.log(`[PDF Debug] main.tex first 10 lines:`, lines.slice(0, 10))
-              
-              // Check for common typos
-              if (normalizedContent.includes('\\titlef') && !normalizedContent.includes('\\titleformat')) {
-                console.error(`[PDF Debug] Found potential typo: \\titlef (should be \\titleformat)`)
-              }
-            }
-            
-            blob = new Blob([normalizedContent], { type: mimeType })
-          } else {
-            blob = new Blob([file.content], { type: mimeType })
-          }
-            }
-        formData.append(pathname, blob)
-        }
-    })
-  )
-
-  // Validate Railway endpoint URL
-  if (!RAILWAY_ENDPOINT_URL) {
-    throw new Error(
-      'Railway endpoint URL is not configured. Please set NEXT_PUBLIC_RAILWAY_ENDPOINT_URL in your .env.local file.'
-    )
   }
 
-  console.log('Fetching PDF from endpoint:', RAILWAY_ENDPOINT_URL)
+  // Transform files into CLSI resource format
+  const resources = filesArray
+    .filter((file: any) => file.type === 'file')
+    .map((file: any) => ({
+      path: file.name,
+      content: file.content || ''
+    }))
+
+  // CLSI endpoint (defaults to localhost for development)
+  const CLSI_URL = process.env.NEXT_PUBLIC_CLSI_URL || 'http://localhost:3013'
   
-  let response: Response
+  console.log('[CLSI] Compiling with CLSI service:', CLSI_URL)
+  console.log('[CLSI] Resources:', resources.map(r => r.path))
+
+  // Call CLSI compilation API
+  let compileResponse: Response
   try {
-    response = await fetch(RAILWAY_ENDPOINT_URL, {
-        method: 'POST',
-        body: formData,
+    compileResponse = await fetch(`${CLSI_URL}/project/user-project/compile`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        compiler: 'pdflatex',
+        rootResourcePath: 'main.tex',
+        resources
+      })
     })
   } catch (networkError: any) {
-    // Handle network errors (CORS, connection refused, etc.)
     throw new Error(
-      `Failed to connect to Railway endpoint.\n\n` +
+      `Failed to connect to CLSI service.\n\n` +
       `Please check:\n` +
-      `1. Your Railway service is deployed and running\n` +
-      `2. The endpoint URL is correct: ${RAILWAY_ENDPOINT_URL}\n` +
-      `3. CORS is properly configured on your Railway service\n` +
-      `4. Your network connection is working\n\n` +
+      `1. CLSI service is running (npm run dev in services/clsi)\n` +
+      `2. The service is accessible at: ${CLSI_URL}\n` +
+      `3. Your network connection is working\n\n` +
       `Original error: ${networkError?.message || String(networkError)}`
     )
   }
 
-    if (!response.ok) {
-    let errorMessage = `HTTP Error: ${response.status} ${response.statusText}`
+  if (!compileResponse.ok) {
+    let errorMessage = `CLSI Error: ${compileResponse.status} ${compileResponse.statusText}`
     try {
-      const errorData = await response.json()
-      if (errorData?.error && errorData?.message) {
-        errorMessage = `${errorData.error}: ${errorData.message}${errorData.details ? '\n\nDetails: ' + errorData.details : ''}`
+      const errorData = await compileResponse.json()
+      if (errorData?.message) {
+        errorMessage = errorData.message
       }
     } catch (jsonError) {
-      // If response is not JSON, try to get text
-      try {
-        const text = await response.text()
-        if (text) errorMessage += `\n\nResponse: ${text.substring(0, 200)}`
-      } catch (textError) {
-        // If we can't read the response, just use the status
-      }
+      // If response is not JSON, use status text
     }
     throw new Error(errorMessage)
   }
 
+  const compileResult = await compileResponse.json()
+  
+  console.log('[CLSI] Compile result:', compileResult)
+
+  // Handle compilation errors
+  if (compileResult.status !== 'success') {
+    let errorMessage = compileResult.message || 'LaTeX compilation failed'
+    
+    // Add link to log file if available
+    const logFile = compileResult.outputFiles?.find((f: any) => f.path === 'output.log')
+    if (logFile) {
+      errorMessage += `\n\nView compilation log: ${CLSI_URL}${logFile.url}`
+    }
+    
+    throw new Error(errorMessage)
+  }
+
+  // Extract PDF URL from successful compilation
+  const pdfFile = compileResult.outputFiles?.find((f: any) => f.path === 'output.pdf')
+  if (!pdfFile || !pdfFile.url) {
+    throw new Error('CLSI compilation succeeded but no PDF was generated')
+  }
+
+  console.log('[CLSI] Downloading PDF from:', `${CLSI_URL}${pdfFile.url}`)
+
+  // Fetch the compiled PDF
   try {
-    return await response.blob()
+    const pdfResponse = await fetch(`${CLSI_URL}${pdfFile.url}`)
+    if (!pdfResponse.ok) {
+      throw new Error(`Failed to download PDF: ${pdfResponse.status} ${pdfResponse.statusText}`)
+    }
+    return await pdfResponse.blob()
   } catch (blobError: any) {
     throw new Error(
-      `Failed to read PDF blob from response.\n\n` +
-      `The server returned a successful response, but the PDF data could not be read.\n` +
+      `Failed to download compiled PDF.\n\n` +
+      `The compilation succeeded, but the PDF could not be retrieved.\n` +
       `Original error: ${blobError?.message || String(blobError)}`
     )
   }

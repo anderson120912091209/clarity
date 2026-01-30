@@ -5,8 +5,8 @@ import { promptModal } from '../utils/prompt-utils'
 import * as monaco from 'monaco-editor'
 import type { editor } from 'monaco-editor'
 
-export const useAIAssist = () => {
-  const handleAIAssist = (editor: editor.IStandaloneCodeEditor, monacoInstance: typeof monaco, setIsStreaming: (isStreaming: boolean) => void) => {
+export const useAIAssist = (onChange: (value: string) => void) => {
+  const handleAIAssist = (editor: editor.IStandaloneCodeEditor, monacoInstance: typeof monaco, setIsStreaming: (isStreaming: boolean) => void, onChangeCallback: (value: string) => void) => {
     
     // Global shortcut for Cmd+K
     editor.addCommand(monacoInstance.KeyMod.CtrlCmd | monacoInstance.KeyCode.KeyK, async () => {
@@ -132,7 +132,8 @@ export const useAIAssist = () => {
           oldText,
           fullNewText,
           updatedLine,
-          finalDecorationIds
+          finalDecorationIds,
+          onChangeCallback
         )
         
         editor.addContentWidget(contentWidget as any)

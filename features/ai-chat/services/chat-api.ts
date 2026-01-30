@@ -41,7 +41,7 @@ export async function chat(
       const systemPrompt = CHAT_SYSTEM_PROMPT.replace('{context}', context)
 
       const result = await streamText({
-        model: google('gemini-2.0-flash-exp'),
+        model: google('gemini-2.5-flash'),
         system: systemPrompt,
         messages: messages.map((msg) => ({
           role: msg.role,
@@ -89,10 +89,10 @@ export async function generate(input: string): Promise<{ output: ReturnType<type
         return
       }
 
-      appendLog(`Starting streamText call with Gemini 2.0 Flash`)
+      appendLog(`Starting streamText call with Gemini 2.5 Flash`)
 
       const result = await streamText({
-        model: google('gemini-2.0-flash-exp'),
+        model: google('gemini-2.5-flash'),
         system: GENERATE_SYSTEM_PROMPT,
         prompt: input,
       })

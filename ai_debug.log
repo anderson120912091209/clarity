@@ -46,3 +46,51 @@
 [2026-01-20T04:11:37.356Z] AI Request Started. Input length: 1096
 [2026-01-20T04:11:37.357Z] Starting streamText call with Gemini 2.0 Flash
 [2026-01-20T04:11:39.966Z] Stream processing final cleanup
+[2026-01-30T05:57:25.422Z] AI Request Started. Input length: 703
+[2026-01-30T05:57:25.423Z] Starting streamText call with Gemini 2.0 Flash
+[2026-01-30T05:57:25.536Z] CRITICAL ERROR: AI_APICallError: models/gemini-2.0-flash-exp is not found for API version v1beta, or is not supported for generateContent. Call ListModels to see the list of available models and their supported methods.
+[2026-01-30T05:57:25.567Z] Stream processing final cleanup
+[2026-01-30T07:28:44.393Z] AI Request Started. Input length: 1125
+[2026-01-30T07:28:44.393Z] Starting streamText call with Gemini 2.0 Flash
+[2026-01-30T07:28:44.461Z] CRITICAL ERROR: AI_APICallError: models/gemini-2.0-flash-exp is not found for API version v1beta, or is not supported for generateContent. Call ListModels to see the list of available models and their supported methods.
+[2026-01-30T07:28:44.478Z] Stream processing final cleanup
+[2026-01-30T07:30:16.685Z] AI Request Started. Input length: 1136
+[2026-01-30T07:30:16.686Z] Starting streamText call with Gemini 2.0 Flash
+[2026-01-30T07:30:16.784Z] CRITICAL ERROR: AI_APICallError: models/gemini-2.0-flash-exp is not found for API version v1beta, or is not supported for generateContent. Call ListModels to see the list of available models and their supported methods.
+[2026-01-30T07:30:16.793Z] Stream processing final cleanup
+[2026-01-30T07:31:33.355Z] AI Request Started. Input length: 894
+[2026-01-30T07:31:33.356Z] Starting streamText call with Gemini 1.5 Flash
+[2026-01-30T07:31:33.436Z] CRITICAL ERROR: AI_APICallError: models/gemini-1.5-flash is not found for API version v1beta, or is not supported for generateContent. Call ListModels to see the list of available models and their supported methods.
+[2026-01-30T07:31:33.450Z] Stream processing final cleanup
+[2026-01-30T07:31:45.624Z] AI Request Started. Input length: 858
+[2026-01-30T07:31:45.625Z] Starting streamText call with Gemini 1.5 Flash
+[2026-01-30T07:31:45.681Z] CRITICAL ERROR: AI_APICallError: models/gemini-1.5-flash is not found for API version v1beta, or is not supported for generateContent. Call ListModels to see the list of available models and their supported methods.
+[2026-01-30T07:31:45.688Z] Stream processing final cleanup
+[2026-01-30T07:32:46.161Z] AI Request Started. Input length: 1119
+[2026-01-30T07:32:46.162Z] Starting streamText call with Gemini 1.5 Flash
+[2026-01-30T07:32:46.222Z] CRITICAL ERROR: AI_APICallError: models/gemini-3-flash is not found for API version v1beta, or is not supported for generateContent. Call ListModels to see the list of available models and their supported methods.
+[2026-01-30T07:32:46.233Z] Stream processing final cleanup
+[2026-01-30T07:34:08.080Z] AI Request Started. Input length: 1094
+[2026-01-30T07:34:08.081Z] Starting streamText call with Gemini 2.5 Flash
+[2026-01-30T07:34:12.274Z] Stream processing final cleanup
+[2026-01-30T07:41:27.137Z] AI Request Started. Input length: 630
+[2026-01-30T07:41:27.138Z] Starting streamText call with Gemini 2.5 Flash
+[2026-01-30T07:41:35.152Z] Stream processing final cleanup
+[2026-01-30T07:41:51.080Z] AI Request Started. Input length: 742
+[2026-01-30T07:41:51.081Z] Starting streamText call with Gemini 2.5 Flash
+[2026-01-30T07:41:56.042Z] Stream processing final cleanup
+[2026-01-30T07:55:03.263Z] AI Request Started. Input length: 591
+[2026-01-30T07:55:03.265Z] Starting streamText call with Gemini 2.5 Flash
+[2026-01-30T07:55:22.054Z] Stream processing final cleanup
+[2026-01-30T07:55:27.948Z] AI Request Started. Input length: 834
+[2026-01-30T07:55:27.949Z] Starting streamText call with Gemini 2.5 Flash
+[2026-01-30T07:55:52.644Z] Stream processing final cleanup
+[2026-01-30T08:02:36.241Z] AI Request Started. Input length: 639
+[2026-01-30T08:02:36.241Z] Starting streamText call with Gemini 2.5 Flash
+[2026-01-30T08:02:38.487Z] Stream processing final cleanup
+[2026-01-30T08:03:55.554Z] AI Request Started. Input length: 490
+[2026-01-30T08:03:55.555Z] Starting streamText call with Gemini 2.5 Flash
+[2026-01-30T08:04:03.009Z] Stream processing final cleanup
+[2026-01-30T08:05:19.008Z] AI Request Started. Input length: 1118
+[2026-01-30T08:05:19.008Z] Starting streamText call with Gemini 2.5 Flash
+[2026-01-30T08:05:21.136Z] Stream processing final cleanup
