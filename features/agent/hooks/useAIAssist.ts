@@ -57,6 +57,7 @@ export function useAIAssist(onChange?: (value: string) => void): UseAIAssistRetu
     abortController: AbortController
     decorationIds: string[]
     widgets: { widget: editor.IContentWidget, root: Root }[]
+    listeners?: monaco.IDisposable[]
   } | null>(null)
 
   const handleAIAssist = useCallback((
@@ -118,6 +119,7 @@ export function useAIAssist(onChange?: (value: string) => void): UseAIAssistRetu
         abortController,
         decorationIds: initialDecorations, // Store initial decoration
         widgets: [],
+        listeners: [],
       }
       
       // Handle submit - stream AI response
@@ -164,7 +166,7 @@ export function useAIAssist(onChange?: (value: string) => void): UseAIAssistRetu
           let currentLine = selection.lineNumbers.start
           let currentCol = 1
           let isFirstWrite = true
-          let decorationIds: string[] = [] // Reset implies we clear selection? 
+          let decorationIds: string[] = activeZoneRef.current?.decorationIds || [] 
           // Actually, we want to clear the selection highlight when streaming starts?
           // Or keep it? Cursor keeps it until replaced.
           // My code below uses `removeDecorations(editor, decorationIds)` inside loop.
@@ -253,6 +255,10 @@ export function useAIAssist(onChange?: (value: string) => void): UseAIAssistRetu
                 currentCol, 
                 currentLine + 5
               )
+              
+              if (activeZoneRef.current) {
+                activeZoneRef.current.decorationIds = decorationIds
+              }
             }
             
             if (delta.done || isComplete) break
@@ -410,6 +416,16 @@ export function useAIAssist(onChange?: (value: string) => void): UseAIAssistRetu
         })
       )
       
+      // Auto-cancel on cursor change (user clicked away)
+      const selectionListener = editor.onDidChangeCursorSelection((e) => {
+          // If the change came from user interaction (mouse/keyboard), cancel the input
+          if (e.source === 'mouse' || e.source === 'keyboard') {
+             handleCancel()
+          }
+      })
+
+      activeZoneRef.current?.listeners?.push(selectionListener)
+
       // Add ViewZone to editor
       editor.changeViewZones(accessor => {
         const zone: editor.IViewZone = {
@@ -467,11 +483,16 @@ function cleanupActiveZone(
     abortController: AbortController
     decorationIds: string[]
     widgets: { widget: editor.IContentWidget, root: Root }[]
+    listeners?: monaco.IDisposable[]
   }
 ) {
   zone.abortController.abort()
   zone.root.unmount()
   removeDecorations(editor, zone.decorationIds)
+  
+  // Dispose listeners
+  zone.listeners?.forEach(l => l.dispose())
+
   // Cleanup widgets
   if (zone.widgets) {
     zone.widgets.forEach(w => {
