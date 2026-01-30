@@ -1,7 +1,7 @@
 'use server'
 
-import { chat as chatImpl, generate as generateImpl } from '@/features/ai-chat/services/chat-api'
-import type { ChatMessage } from '@/features/ai-chat/types/chat.types'
+import { chat as chatImpl, generate as generateImpl } from '@/features/agent/services/chat-api'
+import type { ChatMessage } from '@/features/agent/types/chat.types'
 
 // Wrapper functions for backward compatibility
 export async function chat(messages: ChatMessage[], context: string) {

@@ -94,3 +94,98 @@
 [2026-01-30T08:05:19.008Z] AI Request Started. Input length: 1118
 [2026-01-30T08:05:19.008Z] Starting streamText call with Gemini 2.5 Flash
 [2026-01-30T08:05:21.136Z] Stream processing final cleanup
+[2026-01-30T11:42:41.213Z] AI Request Started. Input length: 24426
+[2026-01-30T11:42:41.214Z] Starting streamText call with Gemini 2.5 Flash
+[2026-01-30T11:43:17.167Z] Stream processing final cleanup
+[2026-01-30T11:43:35.707Z] AI Request Started. Input length: 588
+[2026-01-30T11:43:35.708Z] Starting streamText call with Gemini 2.5 Flash
+[2026-01-30T11:43:37.820Z] Stream processing final cleanup
+[2026-01-30T11:53:11.214Z] AI Request Started. Input length: 1073
+[2026-01-30T11:53:11.216Z] Starting streamText call with Gemini 2.5 Flash
+[2026-01-30T11:53:14.765Z] Stream processing final cleanup
+[2026-01-30T11:53:37.923Z] AI Request Started. Input length: 1082
+[2026-01-30T11:53:37.924Z] Starting streamText call with Gemini 2.5 Flash
+[2026-01-30T11:53:54.014Z] Stream processing final cleanup
+[2026-01-30T11:57:22.357Z] AI Request Started. Input length: 37630
+[2026-01-30T11:57:22.358Z] Starting streamText call with Gemini 2.5 Flash
+[2026-01-30T11:57:36.458Z] Stream processing final cleanup
+[2026-01-30T11:58:18.977Z] AI Request Started. Input length: 37674
+[2026-01-30T11:58:18.977Z] Starting streamText call with Gemini 2.5 Flash
+[2026-01-30T11:59:10.708Z] Stream processing final cleanup
+[2026-01-30T12:01:49.481Z] AI Request Started. Input length: 607
+[2026-01-30T12:01:49.482Z] Starting streamText call with Gemini 2.5 Flash
+[2026-01-30T12:02:09.606Z] AI Request Started. Input length: 604
+[2026-01-30T12:02:09.606Z] Starting streamText call with Gemini 2.5 Flash
+[2026-01-30T12:02:14.555Z] CRITICAL ERROR: AI_TypeValidationError: Type validation failed: Value: {"candidates":[{"content":{"role":"model"},"finishReason":"STOP","index":0}],"usageMetadata":{"promptTokenCount":284,"candidatesTokenCount":270,"totalTokenCount":1273,"promptTokensDetails":[{"modality":"TEXT","tokenCount":284}],"thoughtsTokenCount":719},"modelVersion":"gemini-2.5-flash","responseId":"wp18adH7F_Davr0P7IKDkAQ"}.
+Error message: [
+  {
+    "code": "invalid_type",
+    "expected": "array",
+    "received": "undefined",
+    "path": [
+      "candidates",
+      0,
+      "content",
+      "parts"
+    ],
+    "message": "Required"
+  }
+]
+[2026-01-30T12:05:24.172Z] AI Request Started. Input length: 384
+[2026-01-30T12:05:24.173Z] Starting streamText call with Gemini 2.5 Flash
+[2026-01-30T12:05:24.244Z] CRITICAL ERROR: AI_APICallError: models/gemini-1.5-flash is not found for API version v1beta, or is not supported for generateContent. Call ListModels to see the list of available models and their supported methods.
+[2026-01-30T12:05:41.266Z] AI Request Started. Input length: 281
+[2026-01-30T12:05:41.267Z] Starting streamText call with Gemini 2.5 Flash
+[2026-01-30T12:06:08.202Z] AI Request Started. Input length: 304
+[2026-01-30T12:06:08.203Z] Starting streamText call with Gemini 2.5 Flash
+[2026-01-30T12:10:26.773Z] AI Request Started. Input length: 373
+[2026-01-30T12:10:26.775Z] Starting streamText call with Gemini 2.5 Flash
+[2026-01-30T12:11:23.219Z] AI Request Started. Input length: 363
+[2026-01-30T12:11:23.219Z] Starting streamText call with Gemini 2.5 Flash
+[2026-01-30T12:12:21.221Z] AI Request Started. Input length: 355
+[2026-01-30T12:12:21.222Z] Starting streamText call with Gemini 2.5 Flash
+[2026-01-30T12:12:47.161Z] AI Request Started. Input length: 215
+[2026-01-30T12:12:47.161Z] Starting streamText call with Gemini 2.5 Flash
+[2026-01-30T12:16:14.112Z] AI Request Started. Input length: 327
+[2026-01-30T12:16:14.113Z] Starting streamText call with Gemini 2.5 Flash
+[2026-01-30T12:18:10.932Z] AI Request Started. Input length: 296
+[2026-01-30T12:18:10.933Z] Starting streamText call with Gemini 2.5 Flash
+[2026-01-30T12:19:08.397Z] AI Request Started. Input length: 1688
+[2026-01-30T12:19:08.398Z] Starting streamText call with Gemini 2.5 Flash
+[2026-01-30T12:19:25.181Z] AI Request Started. Input length: 1680
+[2026-01-30T12:19:25.181Z] Starting streamText call with Gemini 2.5 Flash
+[2026-01-30T12:27:16.290Z] AI Request Started. Input length: 324
+[2026-01-30T12:27:16.292Z] Starting streamText call with Gemini 2.5 Flash
+[2026-01-30T12:29:59.202Z] AI Request Started. Input length: 253
+[2026-01-30T12:29:59.203Z] Starting streamText call with Gemini 2.5 Flash
+[2026-01-30T12:34:10.017Z] AI Request Started. Input length: 1185
+[2026-01-30T12:34:10.018Z] Starting streamText call with Gemini 2.5 Flash
+[2026-01-30T12:34:19.678Z] AI Request Started. Input length: 1176
+[2026-01-30T12:34:19.679Z] Starting streamText call with Gemini 2.5 Flash
+[2026-01-30T12:37:15.754Z] AI Request Started. Input length: 374
+[2026-01-30T12:37:15.755Z] Starting streamText call with Gemini 2.5 Flash
+[2026-01-30T12:37:24.738Z] AI Request Started. Input length: 399
+[2026-01-30T12:37:24.739Z] Starting streamText call with Gemini 2.5 Flash
+[2026-01-30T12:39:19.613Z] AI Request Started. Input length: 12145
+[2026-01-30T12:39:19.614Z] Starting streamText call with Gemini 2.5 Flash
+[2026-01-30T12:39:28.464Z] AI Request Started. Input length: 12142
+[2026-01-30T12:39:28.464Z] Starting streamText call with Gemini 2.5 Flash
+[2026-01-30T12:39:49.326Z] AI Request Started. Input length: 375
+[2026-01-30T12:39:49.327Z] Starting streamText call with Gemini 2.5 Flash
+[2026-01-30T12:40:26.355Z] AI Request Started. Input length: 12765
+[2026-01-30T12:40:26.356Z] Starting streamText call with Gemini 2.5 Flash
+[2026-01-30T12:40:45.480Z] CRITICAL ERROR: AI_TypeValidationError: Type validation failed: Value: {"candidates":[{"content":{"role":"model"},"finishReason":"STOP","index":0}],"usageMetadata":{"promptTokenCount":3296,"candidatesTokenCount":297,"totalTokenCount":7786,"promptTokensDetails":[{"modality":"TEXT","tokenCount":3296}],"thoughtsTokenCount":4193},"modelVersion":"gemini-2.5-flash","responseId":"u6Z8aYzlDc-U1e8PgYW4wQ4"}.
+Error message: [
+  {
+    "code": "invalid_type",
+    "expected": "array",
+    "received": "undefined",
+    "path": [
+      "candidates",
+      0,
+      "content",
+      "parts"
+    ],
+    "message": "Required"
+  }
+]

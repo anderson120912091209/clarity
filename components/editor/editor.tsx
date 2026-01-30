@@ -1,7 +1,7 @@
 import React, { useEffect } from 'react'
 import Editor from '@monaco-editor/react'
 import { useEditorSetup } from './hooks/useEditorSetup'
-import { useAIAssist } from '@/features/ai-chat'
+import { useAIAssist } from '@/features/agent'
 import { useEditorTheme } from './hooks/useEditorTheme'
 import { editorDefaultOptions } from './constants/editorDefaults'
 import { Loader2 } from 'lucide-react'

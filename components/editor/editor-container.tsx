@@ -13,7 +13,7 @@ import ImageViewer from './image-viewer'
 import { MousePointer2, Sparkles, MessageSquare } from 'lucide-react'
 import { Command } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { ChatSidebar } from '@/features/ai-chat'
+import { ChatSidebar } from '@/features/agent'
 import { cn } from '@/lib/utils'
 
 

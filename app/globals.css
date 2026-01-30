@@ -159,3 +159,91 @@ code, kbd, samp, pre {
   font-size: 12px;
   padding: 8px;
 }
+
+/* Monaco Editor: AI Streaming Animation */
+/* Subtle, native-like typing effect */
+
+/* Current line being written */
+.monaco-editor .ai-streaming-line {
+  /* Very faint background, no heavy borders */
+  background-color: rgba(59, 130, 246, 0.08) !important;
+}
+
+/* Lines below cursor (faded) */
+.monaco-editor .ai-streaming-below {
+  /* Extremely subtle dimming, almost invisible but adds focus */
+  opacity: 0.7;
+}
+
+/* Animated cursor at write position */
+.monaco-editor .ai-cursor::after {
+  content: '';
+  position: absolute;
+  width: 2px;
+  height: 1.1em;
+  background-color: #3b82f6; /* Keep cursor standard blue */
+  /* Remove blinking for smoother feel? Or keep it? Standard cursors blink. */
+  animation: ai-cursor-blink 1s step-end infinite;
+}
+
+@keyframes ai-cursor-blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+/* Dark mode adjustments */
+.dark .monaco-editor .ai-streaming-line {
+  background-color: rgba(96, 165, 250, 0.08) !important;
+}
+
+.dark .monaco-editor .ai-streaming-below {
+  opacity: 0.7;
+}
+
+.dark .monaco-editor .ai-cursor::after {
+  background-color: #60a5fa;
+}
+
+/* Monaco Editor: Diff Visualization */
+/* Green for additions, Red for deletions */
+
+/* Added line (green background) */
+.monaco-editor .diff-line-added {
+  background-color: rgba(34, 197, 94, 0.15) !important;  /* Green tint */
+}
+
+.monaco-editor .diff-gutter-added {
+  background-color: #22c55e !important;  /* Green gutter marker */
+  width: 3px !important;
+  margin-left: 3px;
+}
+
+/* Deleted line (red background) */
+.monaco-editor .diff-line-deleted {
+  background-color: rgba(239, 68, 68, 0.15) !important;  /* Red tint */
+  text-decoration: line-through;
+  opacity: 0.7;
+}
+
+.monaco-editor .diff-gutter-deleted {
+  background-color: #ef4444 !important;  /* Red gutter marker */
+  width: 3px !important;
+  margin-left: 3px;
+}
+
+/* Dark mode adjustments */
+.dark .monaco-editor .diff-line-added {
+  background-color: rgba(34, 197, 94, 0.12) !important;
+}
+
+.dark .monaco-editor .diff-gutter-added {
+  background-color: #22c55e !important;
+}
+
+.dark .monaco-editor .diff-line-deleted {
+  background-color: rgba(239, 68, 68, 0.12) !important;
+}
+
+.dark .monaco-editor .diff-gutter-deleted {
+  background-color: #ef4444 !important;
+}
