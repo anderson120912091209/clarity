@@ -1,0 +1,260 @@
+/**
+ * Quick Edit Styles
+ * 
+ * CSS for diff visualization, streaming animations, and UI components.
+ * Uses CSS variables for theme compatibility.
+ */
+
+/* ============================================================================
+   Diff Highlighting
+   ============================================================================ */
+
+/* Green background for inserted/modified lines */
+.qe-diff-green-line {
+  background-color: rgba(40, 167, 69, 0.15) !important;
+}
+
+/* Green gutter indicator */
+.qe-diff-green-gutter {
+  background-color: #28a745 !important;
+  width: 4px !important;
+  margin-left: 3px;
+}
+
+/* Red background for deleted lines (used in ViewZone) */
+.qe-diff-red-line {
+  background-color: rgba(255, 85, 85, 0.15);
+  border-left: 3px solid #ff5555;
+}
+
+/* ============================================================================
+   Streaming Animation
+   ============================================================================ */
+
+/* Current line being written (bright highlight) */
+.qe-streaming-line {
+  background-color: rgba(59, 130, 246, 0.2) !important;
+  border-left: 2px solid #3b82f6;
+}
+
+/* Lines below cursor (dimmed/pending) */
+.qe-streaming-below {
+  background-color: rgba(59, 130, 246, 0.08) !important;
+  opacity: 0.6;
+}
+
+/* Blinking cursor at write position */
+.qe-streaming-cursor::after {
+  content: '';
+  display: inline-block;
+  width: 2px;
+  height: 1.2em;
+  background-color: #3b82f6;
+  margin-left: 1px;
+  animation: qe-cursor-blink 0.8s ease-in-out infinite;
+  vertical-align: text-bottom;
+}
+
+@keyframes qe-cursor-blink {
+  0%, 50% { opacity: 1; }
+  51%, 100% { opacity: 0; }
+}
+
+/* ============================================================================
+   Quick Edit Input Component
+   ============================================================================ */
+
+.qe-input-container {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  background: var(--vscode-input-background, #1e1e1e);
+  border: 1px solid var(--vscode-input-border, #3c3c3c);
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  max-width: 450px;
+  font-family: var(--vscode-font-family, system-ui, -apple-system, sans-serif);
+}
+
+.qe-input-textarea {
+  width: 100%;
+  min-height: 36px;
+  max-height: 120px;
+  padding: 8px 12px;
+  background: var(--vscode-input-background, #252526);
+  border: 1px solid var(--vscode-input-border, #3c3c3c);
+  border-radius: 6px;
+  color: var(--vscode-input-foreground, #cccccc);
+  font-size: 13px;
+  line-height: 1.4;
+  resize: none;
+  outline: none;
+  transition: border-color 0.15s ease;
+}
+
+.qe-input-textarea:focus {
+  border-color: var(--vscode-focusBorder, #007acc);
+}
+
+.qe-input-textarea::placeholder {
+  color: var(--vscode-input-placeholderForeground, #6c6c6c);
+}
+
+.qe-input-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.qe-input-hint {
+  font-size: 11px;
+  color: var(--vscode-descriptionForeground, #8c8c8c);
+}
+
+.qe-input-hint kbd {
+  display: inline-block;
+  padding: 2px 5px;
+  font-size: 10px;
+  font-family: monospace;
+  background: var(--vscode-keybindingLabel-background, #333333);
+  border: 1px solid var(--vscode-keybindingLabel-border, #555555);
+  border-radius: 3px;
+  color: var(--vscode-keybindingLabel-foreground, #cccccc);
+}
+
+.qe-input-buttons {
+  display: flex;
+  gap: 6px;
+}
+
+/* ============================================================================
+   Buttons
+   ============================================================================ */
+
+.qe-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 500;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.qe-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.qe-btn-primary {
+  background: var(--vscode-button-background, #0e639c);
+  color: var(--vscode-button-foreground, #ffffff);
+}
+
+.qe-btn-primary:hover:not(:disabled) {
+  background: var(--vscode-button-hoverBackground, #1177bb);
+}
+
+.qe-btn-secondary {
+  background: var(--vscode-button-secondaryBackground, #3a3d41);
+  color: var(--vscode-button-secondaryForeground, #ffffff);
+}
+
+.qe-btn-secondary:hover:not(:disabled) {
+  background: var(--vscode-button-secondaryHoverBackground, #45494e);
+}
+
+.qe-btn-icon {
+  padding: 6px;
+  min-width: 28px;
+}
+
+/* ============================================================================
+   Accept/Reject Widget
+   ============================================================================ */
+
+.qe-accept-reject-widget {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 6px;
+  background: var(--vscode-editorWidget-background, #252526);
+  border: 1px solid var(--vscode-editorWidget-border, #454545);
+  border-radius: 6px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+}
+
+.qe-widget-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: all 0.15s ease;
+}
+
+.qe-widget-btn-accept {
+  background: rgba(40, 167, 69, 0.2);
+  color: #28a745;
+}
+
+.qe-widget-btn-accept:hover {
+  background: rgba(40, 167, 69, 0.35);
+}
+
+.qe-widget-btn-reject {
+  background: rgba(255, 85, 85, 0.2);
+  color: #ff5555;
+}
+
+.qe-widget-btn-reject:hover {
+  background: rgba(255, 85, 85, 0.35);
+}
+
+/* ============================================================================
+   Loading Spinner
+   ============================================================================ */
+
+.qe-spinner {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border: 2px solid transparent;
+  border-top-color: currentColor;
+  border-radius: 50%;
+  animation: qe-spin 0.8s linear infinite;
+}
+
+@keyframes qe-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ============================================================================
+   Dark/Light Theme Adjustments
+   ============================================================================ */
+
+/* These use CSS variables that adapt to VS Code themes */
+@media (prefers-color-scheme: light) {
+  .qe-diff-green-line {
+    background-color: rgba(40, 167, 69, 0.12) !important;
+  }
+  
+  .qe-diff-red-line {
+    background-color: rgba(220, 53, 69, 0.12);
+  }
+  
+  .qe-streaming-line {
+    background-color: rgba(59, 130, 246, 0.15) !important;
+  }
+}

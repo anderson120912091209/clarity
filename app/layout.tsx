@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import { Manrope } from 'next/font/google'
 import './globals.css'
+import '@/styles/agent/quick-edit.css'
 import { FrontendProvider } from '@/contexts/FrontendContext'
 import { ThemeProvider } from '@/components/theme-provider'
 import { TooltipProvider } from '@/components/ui/tooltip'

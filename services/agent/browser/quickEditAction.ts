@@ -275,29 +275,12 @@ export class QuickEditAction {
    * Get context around a specific line (for AI prompting)
    */
   /**
+   * @deprecated Use useAIAssist hook instead - this method is kept for compatibility
    * Helper: Register Cmd+K with full quick edit flow
-   * This wires up the keybinding → prompt modal → EditCodeService
    */
   public registerQuickEditWithPrompt(onChange: (value: string) => void, setIsStreaming?: (val: boolean) => void): void {
-    this.registerKeybinding(async (selection) => {
-      try {
-        // Show prompt modal
-        const instructions = await promptModal(this.editor, this.monacoInstance)
-        
-        // Delegate to EditCodeService
-        await editCodeService.startQuickEdit({
-          editor: this.editor,
-          monacoInstance: this.monacoInstance,
-          selection,
-          instructions,
-          onChange,
-          setIsStreaming
-        })
-      } catch (error) {
-        // User cancelled or error occurred
-        console.log('[QuickEditAction] Quick edit cancelled or failed:', error)
-      }
-    })
+    console.warn('[QuickEditAction] registerQuickEditWithPrompt is deprecated. Use useAIAssist hook instead.')
+    // No-op - the useAIAssist hook now handles this with inline ViewZone UI
   }
 
   /**
