@@ -64,69 +64,188 @@
    Quick Edit Input Component
    ============================================================================ */
 
+/* ============================================================================
+   Quick Edit Input Component
+   ============================================================================ */
+
 .qe-input-container {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  padding: 12px;
-  background: var(--vscode-input-background, #1e1e1e);
-  border: 1px solid var(--vscode-input-border, #3c3c3c);
+  background: var(--vscode-editorWidget-background, #18181b); /* Darker background */
+  border: 1px solid var(--vscode-editorWidget-border, #27272a);
   border-radius: 8px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-  max-width: 450px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  width: 100%;
+  max-width: 600px;
   font-family: var(--vscode-font-family, system-ui, -apple-system, sans-serif);
+  position: relative;
+  z-index: 1000; /* Ensure it stays on top of editor content */
+  overflow: hidden;
+  padding-top: 10px; /* Space for close btn */
+}
+
+/* Close Button (Absolute Top Right) */
+.qe-close-btn {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  background: transparent;
+  border: none;
+  color: var(--vscode-descriptionForeground, #71717a);
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0.6;
+  transition: opacity 0.15s;
+  z-index: 10;
+}
+.qe-close-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  opacity: 1;
+  color: var(--vscode-foreground);
 }
 
 .qe-input-textarea {
   width: 100%;
-  min-height: 36px;
-  max-height: 120px;
-  padding: 8px 12px;
-  background: var(--vscode-input-background, #252526);
-  border: 1px solid var(--vscode-input-border, #3c3c3c);
-  border-radius: 6px;
-  color: var(--vscode-input-foreground, #cccccc);
+  min-height: 40px;
+  max-height: 200px;
+  padding: 12px;
+  background: transparent;
+  border: none;
+  color: var(--vscode-input-foreground, #e4e4e7);
   font-size: 13px;
-  line-height: 1.4;
+  line-height: 1.5;
   resize: none;
-  outline: none;
-  transition: border-color 0.15s ease;
+  outline: none !important; /* Force remove blue border */
+  box-shadow: none !important;
+  font-family: inherit;
 }
 
 .qe-input-textarea:focus {
-  border-color: var(--vscode-focusBorder, #007acc);
+  outline: none !important;
+  border: none !important;
+  box-shadow: none !important;
 }
 
 .qe-input-textarea::placeholder {
-  color: var(--vscode-input-placeholderForeground, #6c6c6c);
+  color: var(--vscode-input-placeholderForeground, #71717a);
 }
 
-.qe-input-actions {
+.qe-input-footer {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  padding: 8px 12px;
+  background: transparent;
+  gap: 12px;
+}
+
+.qe-footer-left,
+.qe-footer-right {
+  display: flex;
+  align-items: center;
   gap: 8px;
 }
 
-.qe-input-hint {
-  font-size: 11px;
-  color: var(--vscode-descriptionForeground, #8c8c8c);
-}
-
-.qe-input-hint kbd {
-  display: inline-block;
-  padding: 2px 5px;
-  font-size: 10px;
-  font-family: monospace;
-  background: var(--vscode-keybindingLabel-background, #333333);
-  border: 1px solid var(--vscode-keybindingLabel-border, #555555);
-  border-radius: 3px;
-  color: var(--vscode-keybindingLabel-foreground, #cccccc);
-}
-
-.qe-input-buttons {
+/* Fake Dropdown Buttons */
+.qe-dropdown-btn {
   display: flex;
+  align-items: center;
   gap: 6px;
+  background: transparent;
+  border: none;
+  color: var(--vscode-descriptionForeground, #a1a1aa);
+  font-size: 11px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background 0.1s;
+}
+
+.qe-dropdown-btn:hover {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--vscode-foreground);
+}
+
+/* Circular Submit Button */
+.qe-submit-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  background: var(--vscode-button-background, #0e639c);
+  color: var(--vscode-button-foreground, #ffffff);
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  padding: 0;
+}
+
+.qe-submit-btn:hover:not(:disabled) {
+  background: var(--vscode-button-hoverBackground, #1177bb);
+  transform: translateY(-1px);
+}
+
+.qe-submit-btn:disabled {
+  opacity: 0.5;
+  background: var(--vscode-button-secondaryBackground, #3a3d41);
+  cursor: not-allowed;
+}
+
+/* Selection Highlight */
+.qe-selection-background {
+  background-color: rgba(255, 255, 255, 0.05);
+}
+
+/* Action Buttons (Rectangular) */
+.qe-action-btn-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 5px 12px;
+  font-size: 11px; /* Smaller, cleaner */
+  font-weight: 500;
+  border-radius: 4px; /* Slightly rounded */
+  background: var(--vscode-button-background, #0e639c);
+  color: var(--vscode-button-foreground, #ffffff);
+  border: 1px solid transparent; 
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.qe-action-btn-primary:hover:not(:disabled) {
+  background: var(--vscode-button-hoverBackground, #1177bb);
+}
+
+.qe-action-btn-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.qe-action-btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 5px 12px;
+  font-size: 11px;
+  font-weight: 500;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--vscode-button-secondaryForeground, #cccccc);
+  border: 1px solid var(--vscode-button-secondaryHoverBackground, #45494e); /* Subtle border */
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.qe-action-btn-secondary:hover {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: var(--vscode-foreground);
+  color: var(--vscode-foreground);
 }
 
 /* ============================================================================

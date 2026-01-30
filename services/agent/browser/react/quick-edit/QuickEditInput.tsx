@@ -8,6 +8,27 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import type { QuickEditInputProps } from '../../quick-edit/types'
 
+// Icons
+const ArrowUpIcon = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+    <line x1="12" y1="19" x2="12" y2="5"></line>
+    <polyline points="5 12 12 5 19 12"></polyline>
+  </svg>
+)
+
+const ChevronDownIcon = () => (
+  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <polyline points="6 9 12 15 18 9"></polyline>
+  </svg>
+)
+
+const XIcon = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+     <line x1="18" y1="6" x2="6" y2="18"></line>
+     <line x1="6" y1="6" x2="18" y2="18"></line>
+  </svg>
+)
+
 export const QuickEditInput: React.FC<QuickEditInputProps> = ({
   diffZoneId,
   onSubmit,
@@ -15,7 +36,7 @@ export const QuickEditInput: React.FC<QuickEditInputProps> = ({
   onHeightChange,
   initialValue = '',
   isLoading = false,
-  placeholder = 'Enter instructions...',
+  placeholder = 'Edit selected code...',
 }) => {
   const [value, setValue] = useState(initialValue)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -73,6 +94,10 @@ export const QuickEditInput: React.FC<QuickEditInputProps> = ({
   
   return (
     <div ref={containerRef} className="qe-input-container">
+      <button className="qe-close-btn" onClick={onCancel} type="button">
+        <XIcon />
+      </button>
+
       <textarea
         ref={textareaRef}
         className="qe-input-textarea"
@@ -84,35 +109,29 @@ export const QuickEditInput: React.FC<QuickEditInputProps> = ({
         rows={1}
       />
       
-      <div className="qe-input-actions">
-        <span className="qe-input-hint">
-          <kbd>↵</kbd> Submit · <kbd>Esc</kbd> Cancel
-        </span>
+      <div className="qe-input-footer">
+        <div className="qe-footer-left">
+           <button className="qe-dropdown-btn" type="button">
+             Auto <ChevronDownIcon />
+           </button>
+        </div>
         
-        <div className="qe-input-buttons">
-          <button
-            className="qe-btn qe-btn-secondary"
-            onClick={onCancel}
-            disabled={isLoading}
-            type="button"
-          >
-            Cancel
-          </button>
-          <button
-            className="qe-btn qe-btn-primary"
-            onClick={handleSubmit}
-            disabled={isEmpty || isLoading}
-            type="button"
-          >
-            {isLoading ? (
-              <>
-                <span className="qe-spinner" />
-                Generating...
-              </>
-            ) : (
-              'Submit'
-            )}
-          </button>
+        <div className="qe-footer-right">
+           <button 
+             className="qe-action-btn-secondary" 
+             onClick={onCancel}
+             type="button"
+           >
+             Cancel
+           </button>
+           <button
+             className="qe-action-btn-primary"
+             onClick={handleSubmit}
+             disabled={isEmpty || isLoading}
+             type="button"
+           >
+             {isLoading ? <span className="qe-spinner" /> : 'Submit'}
+           </button>
         </div>
       </div>
     </div>

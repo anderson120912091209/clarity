@@ -46,7 +46,8 @@ export interface UseAIAssistReturn {
 }
 
 /**
- * Hook that provides AI-powered code editing capabilities
+ * Hook that provides AI-powered code editing capabilities (Cmd+K).
+ * Manages the lifecycle of the inline quick edit UI, including Monaco ViewZones, decorations, and widgets.
  */
 export function useAIAssist(onChange?: (value: string) => void): UseAIAssistReturn {
   const activeZoneRef = useRef<{
@@ -75,14 +76,36 @@ export function useAIAssist(onChange?: (value: string) => void): UseAIAssistRetu
         activeZoneRef.current = null
       }
 
+      // Calculate indentation for alignment
+      const model = editor.getModel()
+      let indentPixels = 0
+      if (model) {
+        const startLine = selection.lineNumbers.start
+        const column = model.getLineFirstNonWhitespaceColumn(startLine)
+        const indentCol = column > 0 ? column - 1 : 0
+        const fontInfo = editor.getOption(monacoInstance.editor.EditorOption.fontInfo)
+        indentPixels = indentCol * fontInfo.spaceWidth
+      }
+
       // Create the inline input UI in a ViewZone
       const zoneId = generateId('qe-zone')
       const domNode = document.createElement('div')
       domNode.className = 'qe-viewzone-container'
-      domNode.style.marginLeft = '60px' // Align with gutter
+      domNode.style.paddingLeft = `${indentPixels + 60}px` // Indent + Gutter width approx
+      // Note: 60px is a rough gutter estimate. ideally we read layout info but this is safe for now.
       
       let viewZoneId: string = ''
       const abortController = new AbortController()
+      
+      // Add selection highlight decoration
+      const selectionDecoration: editor.IModelDeltaDecoration = {
+        range: selection.range,
+        options: {
+          className: 'qe-selection-background',
+          isWholeLine: true,
+        }
+      }
+      const initialDecorations = editor.deltaDecorations([], [selectionDecoration])
       
       // Create React root for the input component
       const root = createRoot(domNode)
@@ -93,10 +116,10 @@ export function useAIAssist(onChange?: (value: string) => void): UseAIAssistRetu
         domNode,
         root,
         abortController,
-        decorationIds: [],
+        decorationIds: initialDecorations, // Store initial decoration
         widgets: [],
       }
-
+      
       // Handle submit - stream AI response
       const handleSubmit = async (instructions: string) => {
         setIsStreaming(true)
@@ -140,7 +163,18 @@ export function useAIAssist(onChange?: (value: string) => void): UseAIAssistRetu
           let lastExtractedCode = ''
           let currentLine = selection.lineNumbers.start
           let currentCol = 1
-          let decorationIds: string[] = []
+          let isFirstWrite = true
+          let decorationIds: string[] = [] // Reset implies we clear selection? 
+          // Actually, we want to clear the selection highlight when streaming starts?
+          // Or keep it? Cursor keeps it until replaced.
+          // My code below uses `removeDecorations(editor, decorationIds)` inside loop.
+          // This local `decorationIds` shadows the outer one? 
+          // No, I initialized `decorationIds` locally inside `handleSubmit`.
+          // The outer `initialDecorations` are in `activeZoneRef`.
+          // I should verify if `activeZoneRef.current.decorationIds` is used.
+          // Yes, `cleanupActiveZone` uses it.
+          // IF I overwrite `activeZoneRef.current.decorationIds` with streaming decorations, the selection highlight is lost.
+          // That is intended (context replaced by stream focus).
           
           // Stream loop
           for await (const delta of output) {
@@ -156,29 +190,59 @@ export function useAIAssist(onChange?: (value: string) => void): UseAIAssistRetu
               recentlyAddedTextLen: delta.content.length,
             })
             
-            // Write new content to editor
-            if (code && code !== lastExtractedCode) {
-              const newContent = code.substring(lastExtractedCode.length)
-              lastExtractedCode = code
-              
-              // Insert text at current position
-              editor.executeEdits('ai-stream', [{
-                range: new monacoInstance.Range(
-                  currentLine,
-                  currentCol,
-                  currentLine,
-                  currentCol
-                ),
-                text: newContent,
-                forceMoveMarkers: true,
-              }])
-              
-              // Update cursor position
-              const newlines = newContent.split('\n').length - 1
-              currentLine += newlines
-              currentCol = newlines > 0 
-                ? newContent.length - newContent.lastIndexOf('\n')
-                : currentCol + newContent.length
+              // Write new content to editor
+              if (code && code !== lastExtractedCode) {
+                const newContent = code.substring(lastExtractedCode.length)
+                lastExtractedCode = code
+                
+                if (isFirstWrite) {
+                  // On first write, we REPLACE the entire original selection
+                  // This ensures the old code doesn't stay "pushed down"
+                  const endLine = selection.lineNumbers.end
+                  const endCol = model.getLineMaxColumn(endLine)
+                  const replaceRange = new monacoInstance.Range(
+                    selection.lineNumbers.start,
+                    1,
+                    endLine,
+                    endCol
+                  )
+                  
+                  editor.executeEdits('ai-stream', [{
+                    range: replaceRange,
+                    text: newContent,
+                    forceMoveMarkers: true,
+                  }])
+                  
+                  isFirstWrite = false
+                  
+                  // Update cursor position from the START of the new block
+                  currentLine = selection.lineNumbers.start
+                  const newlines = newContent.split('\n').length - 1
+                  currentLine += newlines
+                  currentCol = newlines > 0 
+                    ? newContent.length - newContent.lastIndexOf('\n')
+                    : 1 + newContent.length
+                    
+                } else {
+                  // Subsequent writes APPEND to the current position
+                  editor.executeEdits('ai-stream', [{
+                    range: new monacoInstance.Range(
+                      currentLine,
+                      currentCol,
+                      currentLine,
+                      currentCol
+                    ),
+                    text: newContent,
+                    forceMoveMarkers: true,
+                  }])
+                  
+                  // Update cursor position
+                  const newlines = newContent.split('\n').length - 1
+                  currentLine += newlines
+                  currentCol = newlines > 0 
+                    ? newContent.length - newContent.lastIndexOf('\n')
+                    : currentCol + newContent.length
+                }
               
               // Update streaming decorations
               removeDecorations(editor, decorationIds)
@@ -313,13 +377,26 @@ export function useAIAssist(onChange?: (value: string) => void): UseAIAssistRetu
         }
       }
       
+      // Store zone object for height updates
+      let viewZone: editor.IViewZone | null = null;
+
+      // ... (inside handleHeightChange) ...
       // Height change handler for ViewZone resizing
       const handleHeightChange = (height: number) => {
-        editor.changeViewZones(accessor => {
-          if (viewZoneId) {
-            accessor.layoutZone(viewZoneId)
-          }
-        })
+        if (!viewZone) return
+        
+        // Update the zone height logic
+        // We add some buffer to prevent scrollbar flickering or tight fits
+        const newHeight = Math.max(height, 80)
+        
+        if (viewZone.heightInPx !== newHeight) {
+          viewZone.heightInPx = newHeight
+          editor.changeViewZones(accessor => {
+            if (viewZoneId) {
+              accessor.layoutZone(viewZoneId)
+            }
+          })
+        }
       }
       
       // Render React component
@@ -342,6 +419,7 @@ export function useAIAssist(onChange?: (value: string) => void): UseAIAssistRetu
           suppressMouseDown: false,
         }
         viewZoneId = accessor.addZone(zone)
+        viewZone = zone // Capture ref
         
         if (activeZoneRef.current) {
           activeZoneRef.current.viewZoneId = viewZoneId
