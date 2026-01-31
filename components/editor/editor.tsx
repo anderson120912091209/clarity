@@ -5,6 +5,7 @@ import { useAIAssist } from '@/features/agent'
 import { useEditorTheme } from './hooks/useEditorTheme'
 import { editorDefaultOptions } from './constants/editorDefaults'
 import { Loader2 } from 'lucide-react'
+import { historyService } from '@/services/agent/browser/historyService'
 
 interface CodeEditorProps {
   onChange: (value: string) => void
@@ -35,6 +36,14 @@ export const CodeEditor = ({ onChange, value, setIsStreaming }: CodeEditorProps)
         setTheme(monaco) // Initialize custom theme
         handleEditorDidMount(editor, monaco)
         handleAIAssist(editor, monaco, setIsStreaming, onChange)
+        
+        // Register undo/redo interception
+        console.log('[Editor] Registering HistoryService', historyService)
+        if (historyService && typeof historyService.register === 'function') {
+           historyService.register(editor)
+        } else {
+           console.error('[Editor] historyService.register is not a function', historyService)
+        }
         
         // Ensure layout updates if container changes (e.g. sidebar toggle)
         const resizeObserver = new ResizeObserver(() => {

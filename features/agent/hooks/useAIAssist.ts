@@ -31,6 +31,7 @@ import {
 import React from 'react'
 import { createRoot, Root } from 'react-dom/client'
 import { QuickEditContainer } from '../../../services/agent/browser/react/quick-edit'
+import { historyService } from '../../../services/agent/browser/historyService'
 
 // CSS will be imported at app level
 // import '../../../styles/agent/quick-edit.css'
@@ -360,6 +361,19 @@ export function useAIAssist(onChange?: (value: string) => void): UseAIAssistRetu
             activeZoneRef.current.widgets = widgets
           }
           
+          // Push snapshot (AI Applied state)
+          if (editor.getModel()) {
+             historyService.push(editor.getModel()!.uri.toString(), {
+                type: 'ai_state',
+                label: 'AI Generation',
+                snapshot: {
+                    text: editor.getValue(),
+                    versionId: editor.getModel()!.getVersionId(),
+                    aiState: { diffs }
+                }
+             })
+          }
+          
           // Cleanup the input zone (keep diffs visible)
           cleanupInputZone(editor, viewZoneId, root)
           
@@ -453,9 +467,89 @@ export function useAIAssist(onChange?: (value: string) => void): UseAIAssistRetu
       }, 100)
     })
     
-    // Return cleanup function - it's managed internally
+    // Listen for History Rewind events
+    const restoreListener = ({ uri, snapshot }: { uri: string, snapshot: any }) => {
+        // Verify this event is for the current editor
+        const currentModel = editor.getModel()
+        if (currentModel && currentModel.uri.toString() === uri) {
+            // Restore Diffs and Widgets
+            // 1. Clear existing
+            cleanupActiveZone(editor, activeZoneRef.current!) 
+            activeZoneRef.current = null
+
+            // 2. Re-apply diffs if they exist
+            if (snapshot.aiState && snapshot.aiState.diffs && snapshot.aiState.diffs.length > 0) {
+                 const diffs = snapshot.aiState.diffs
+                 const newDecorationIds: string[] = []
+                 const newWidgets: { widget: editor.IContentWidget, root: Root }[] = []
+                 
+                 for (const diff of diffs) {
+                    const ids = addDiffDecorations(editor, monacoInstance, diff)
+                    newDecorationIds.push(...ids)
+                    
+                    if (diff.type === 'deletion' || diff.type === 'edit') {
+                       addDeletedLinesViewZone(editor, diff, diff.startLine - 1)
+                    }
+
+                    const { widget, root: widgetRoot } = createAcceptRejectWidget(
+                        editor,
+                        monacoInstance,
+                        diff,
+                        async () => {
+                             // ON ACCEPT (Re-defined for restored widget)
+                             editor.deltaDecorations(ids, [])
+                             // ... (Cleanup ViewZones?)
+                             widgetRoot.unmount()
+                             editor.removeContentWidget(widget)
+                             
+                             // Push new snapshot (Accepted state)
+                             historyService.push(uri, {
+                                type: 'ai_state',
+                                label: 'Accept AI',
+                                snapshot: {
+                                    text: editor.getValue(),
+                                    versionId: editor.getModel()!.getVersionId(),
+                                    aiState: null // Clean
+                                }
+                             })
+                        },
+                        async () => {
+                             // ON REJECT (Re-defined)
+                             // Revert text ...
+                             // Push new snapshot (Rejected state)
+                             historyService.push(uri, {
+                                type: 'ai_state',
+                                label: 'Reject AI',
+                                snapshot: {
+                                    text: editor.getValue(), // After revert
+                                    versionId: editor.getModel()!.getVersionId(),
+                                    aiState: null
+                                }
+                             })
+                        }
+                    )
+                    newWidgets.push({ widget, root: widgetRoot })
+                 }
+                 
+                 // Manually populate activeZoneRef so we can clean it up later
+                 activeZoneRef.current = {
+                    viewZoneId: '', // Dummy if no input zone
+                    domNode: document.createElement('div'), // Dummy
+                    root: { render: () => {}, unmount: () => {} } as any, // Dummy
+                    abortController: new AbortController(),
+                    decorationIds: newDecorationIds,
+                    widgets: newWidgets
+                 }
+            }
+        }
+    }
+    
+    historyService.on('restore', restoreListener)
+
+    // Return cleanup function
     return () => {
       quickEditAction.dispose()
+      historyService.off('restore', restoreListener)
     }
   }, [])
   
