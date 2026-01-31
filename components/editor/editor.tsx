@@ -5,7 +5,7 @@ import { useAIAssist } from '@/features/agent'
 import { useEditorTheme } from './hooks/useEditorTheme'
 import { editorDefaultOptions } from './constants/editorDefaults'
 import { Loader2 } from 'lucide-react'
-import { historyService } from '@/services/agent/browser/historyService'
+import { historyService } from '@/services/agent/browser/history/historyService'
 
 interface CodeEditorProps {
   onChange: (value: string) => void

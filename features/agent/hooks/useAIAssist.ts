@@ -31,7 +31,7 @@ import {
 import React from 'react'
 import { createRoot, Root } from 'react-dom/client'
 import { QuickEditContainer } from '../../../services/agent/browser/react/quick-edit'
-import { historyService } from '../../../services/agent/browser/historyService'
+import { historyService } from '../../../services/agent/browser/history/historyService'
 
 // CSS will be imported at app level
 // import '../../../styles/agent/quick-edit.css'
@@ -172,16 +172,7 @@ export function useAIAssist(onChange?: (value: string) => void): UseAIAssistRetu
           let currentCol = 1
           let isFirstWrite = true
           let decorationIds: string[] = activeZoneRef.current?.decorationIds || [] 
-          // Actually, we want to clear the selection highlight when streaming starts?
-          // Or keep it? Cursor keeps it until replaced.
-          // My code below uses `removeDecorations(editor, decorationIds)` inside loop.
-          // This local `decorationIds` shadows the outer one? 
-          // No, I initialized `decorationIds` locally inside `handleSubmit`.
-          // The outer `initialDecorations` are in `activeZoneRef`.
-          // I should verify if `activeZoneRef.current.decorationIds` is used.
-          // Yes, `cleanupActiveZone` uses it.
-          // IF I overwrite `activeZoneRef.current.decorationIds` with streaming decorations, the selection highlight is lost.
-          // That is intended (context replaced by stream focus).
+          
           
           // Stream loop
           for await (const delta of output) {
@@ -483,12 +474,13 @@ export function useAIAssist(onChange?: (value: string) => void): UseAIAssistRetu
                  const newDecorationIds: string[] = []
                  const newWidgets: { widget: editor.IContentWidget, root: Root }[] = []
                  
-                 for (const diff of diffs) {
+                  for (const diff of diffs) {
                     const ids = addDiffDecorations(editor, monacoInstance, diff)
                     newDecorationIds.push(...ids)
                     
+                    let deletedViewZoneId: string | null = null
                     if (diff.type === 'deletion' || diff.type === 'edit') {
-                       addDeletedLinesViewZone(editor, diff, diff.startLine - 1)
+                       deletedViewZoneId = addDeletedLinesViewZone(editor, diff, diff.startLine - 1)
                     }
 
                     const { widget, root: widgetRoot } = createAcceptRejectWidget(
@@ -496,13 +488,16 @@ export function useAIAssist(onChange?: (value: string) => void): UseAIAssistRetu
                         monacoInstance,
                         diff,
                         async () => {
-                             // ON ACCEPT (Re-defined for restored widget)
+                             // ON ACCEPT
+                             // 1. Clear UI
                              editor.deltaDecorations(ids, [])
-                             // ... (Cleanup ViewZones?)
+                             if (deletedViewZoneId) {
+                                editor.changeViewZones(accessor => accessor.removeZone(deletedViewZoneId!))
+                             }
                              widgetRoot.unmount()
                              editor.removeContentWidget(widget)
                              
-                             // Push new snapshot (Accepted state)
+                             // 2. Push new snapshot (Accepted state)
                              historyService.push(uri, {
                                 type: 'ai_state',
                                 label: 'Accept AI',
@@ -514,14 +509,47 @@ export function useAIAssist(onChange?: (value: string) => void): UseAIAssistRetu
                              })
                         },
                         async () => {
-                             // ON REJECT (Re-defined)
-                             // Revert text ...
-                             // Push new snapshot (Rejected state)
+                             // ON REJECT
+                             // 1. Revert Text
+                             const model = editor.getModel()
+                             if (model) {
+                                const range = new monacoInstance.Range(
+                                    diff.startLine,
+                                    1,
+                                    diff.endLine,
+                                    model.getLineMaxColumn(diff.endLine)
+                                )
+                                
+                                // Logic from main handleAIAssist onReject
+                                if (diff.type === 'deletion') {
+                                     editor.executeEdits('ai-reject', [{
+                                        range: new monacoInstance.Range(diff.startLine, 1, diff.startLine, 1),
+                                        text: diff.originalCode + '\n',
+                                        forceMoveMarkers: true
+                                     }])
+                                } else {
+                                     editor.executeEdits('ai-reject', [{
+                                        range,
+                                        text: diff.type === 'insertion' ? '' : diff.originalCode,
+                                        forceMoveMarkers: true
+                                     }])
+                                }
+                             }
+
+                             // 2. Clear UI
+                             editor.deltaDecorations(ids, [])
+                             if (deletedViewZoneId) {
+                                editor.changeViewZones(accessor => accessor.removeZone(deletedViewZoneId!))
+                             }
+                             widgetRoot.unmount()
+                             editor.removeContentWidget(widget)
+                             
+                             // 3. Push new snapshot (Rejected state)
                              historyService.push(uri, {
                                 type: 'ai_state',
                                 label: 'Reject AI',
                                 snapshot: {
-                                    text: editor.getValue(), // After revert
+                                    text: editor.getValue(), 
                                     versionId: editor.getModel()!.getVersionId(),
                                     aiState: null
                                 }

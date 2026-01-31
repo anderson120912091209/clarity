@@ -1,5 +1,5 @@
 import * as monaco from 'monaco-editor'
-import type { ComputedDiff } from './quick-edit/types'
+import type { ComputedDiff } from '../quick-edit/types'
 import { EventEmitter } from 'events'
 
 // Types for History Items
