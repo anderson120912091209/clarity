@@ -92,8 +92,12 @@ export function useAIAssist(onChange?: (value: string) => void): UseAIAssistRetu
       const zoneId = generateId('qe-zone')
       const domNode = document.createElement('div')
       domNode.className = 'qe-viewzone-container'
-      domNode.style.paddingLeft = `${indentPixels + 60}px` // Indent + Gutter width approx
-      // Note: 60px is a rough gutter estimate. ideally we read layout info but this is safe for now.
+      
+      const layoutInfo = editor.getLayoutInfo()
+      // align with the code start (gutter width + indentation)
+      domNode.style.paddingLeft = `${indentPixels}px`
+      // allow some breathing room on the right
+      domNode.style.paddingRight = '24px'
       
       let viewZoneId: string = ''
       const abortController = new AbortController()

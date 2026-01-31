@@ -328,25 +328,46 @@ export function createAcceptRejectWidget(
 ): { widget: editor.IContentWidget, root: any } {
   const widgetId = `qe-widget-${diff.diffId}-${Date.now()}`
   const domNode = document.createElement('div')
-  domNode.className = 'qe-accept-reject-widget'
+  domNode.className = 'qe-accept-reject-widget-container'
+  
+  // Right padding as requested
+  domNode.style.paddingRight = '24px'
+  // Ensure it doesn't block clicks beneath it
+  domNode.style.pointerEvents = 'none'
+  // But allow clicks on the widget itself
+  domNode.style.display = 'flex'
+  domNode.style.justifyContent = 'flex-end'
   
   const root = createRoot(domNode)
-  root.render(
-    React.createElement(AcceptRejectWidget, {
-      diffId: diff.diffId,
-      onAccept,
-      onReject,
-      startLine: diff.startLine,
-    })
-  )
+  
+  // Wrap in a div that catches pointer events
+  const WidgetWrapper = () => 
+    React.createElement('div', { style: { pointerEvents: 'auto' } },
+      React.createElement(AcceptRejectWidget, {
+        diffId: diff.diffId,
+        onAccept,
+        onReject,
+        startLine: diff.startLine,
+      })
+    )
+
+  root.render(React.createElement(WidgetWrapper))
   
   const widget: editor.IContentWidget = {
     getId: () => widgetId,
     getDomNode: () => domNode,
-    getPosition: () => ({
-      position: { lineNumber: diff.startLine, column: 1 },
-      preference: [monacoInstance.editor.ContentWidgetPositionPreference.ABOVE],
-    }),
+    getPosition: () => {
+      // Position at the END of the diff
+      const model = editor.getModel()
+      const endLine = diff.endLine
+      const endCol = model ? model.getLineMaxColumn(endLine) : 1
+      
+      return {
+        position: { lineNumber: endLine, column: endCol },
+        // Show BELOW the line to avoid obscuring code
+        preference: [monacoInstance.editor.ContentWidgetPositionPreference.BELOW],
+      }
+    },
   }
   
   editor.addContentWidget(widget)
