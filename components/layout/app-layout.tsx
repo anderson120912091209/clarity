@@ -41,7 +41,7 @@ export function AppLayout({
           {showHeader && header && (
             <div 
               id="content-wrapper-header" 
-              className="flex items-center justify-between px-4 py-2.5 border-white/[0.12] border-b-[0.5px] shrink-0"
+              className="flex items-center justify-between px-4 py-2.5 shrink-0"
             >
               {header}
             </div>

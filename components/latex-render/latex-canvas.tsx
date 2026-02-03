@@ -1,3 +1,5 @@
+//PDF CANVAS on the RIGHT SIDE of the PRODUCT 
+
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area"
 import { Document, Page, pdfjs } from 'react-pdf'
 import { Skeleton } from "@/components/ui/skeleton"

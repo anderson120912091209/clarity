@@ -29,7 +29,7 @@ export const useEditorTheme = () => {
         { token: 'delimiter', foreground: 'D4D4D4' },
       ],
       colors: {
-        'editor.background': '#09090b', // Zinc 950
+        'editor.background': '#101011', // Zinc 950
         'editor.foreground': '#d4d4d4',
         'editor.lineHighlightBackground': '#18181b', // Zinc 900
         'editor.selectionBackground': '#264f78',

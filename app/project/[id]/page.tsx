@@ -57,8 +57,7 @@ function EditorLayout() {
         />
       </div>
       
-      {/* Separator */}
-      <div className="h-5 w-px bg-white/[0.08] mx-2" />
+
       
       {/* PDF controls */}
       <div className="flex items-center gap-2 flex-1 min-w-0">
@@ -78,7 +77,7 @@ function EditorLayout() {
       {/* Chat controls when visible */}
       {isChatVisible && (
         <>
-          <div className="h-5 w-px bg-white/[0.08] mx-2" />
+
           <div className="flex items-center">
             <ChatNavContent onToggle={() => setIsChatVisible(false)} />
           </div>
@@ -101,7 +100,9 @@ function EditorLayout() {
             isChatVisible={isChatVisible}
           />
         </ResizablePanel>
-        <ResizableHandle className="w-px bg-white/[0.08] hover:bg-white/[0.15] transition-colors" />
+        <ResizableHandle className="w-2 bg-transparent flex items-center justify-center group outline-none">
+          <div className="h-8 w-1 bg-zinc-700 rounded-full opacity-0 group-hover:opacity-100 transition-all" />
+        </ResizableHandle>
         <ResizablePanel defaultSize={50} minSize={20} collapsible={true}>
           <LatexRenderer 
             pdfUrl={pdfUrl}
@@ -111,7 +112,9 @@ function EditorLayout() {
         </ResizablePanel>
         {isChatVisible && (
           <>
-            <ResizableHandle className="w-px bg-white/[0.08] hover:bg-white/[0.15] transition-colors" />
+            <ResizableHandle className="w-2 bg-transparent flex items-center justify-center group outline-none">
+              <div className="h-8 w-1 bg-zinc-700 rounded-full opacity-0 group-hover:opacity-100 transition-all" />
+            </ResizableHandle>
             <ResizablePanel defaultSize={20} minSize={20} maxSize={45} collapsible={true}>
               <ChatPanel 
                 fileContent={fileContent}

@@ -3,7 +3,7 @@ import { editor } from 'monaco-editor'
 export const editorDefaultOptions: editor.IStandaloneEditorConstructionOptions = {
   wordWrap: 'on',
   folding: true,
-  lineNumbersMinChars: 3,
+  lineNumbersMinChars: 5,
   fontSize: 14,
   fontFamily: 'var(--font-mono), Menlo, Monaco, "Courier New", monospace',
   scrollBeyondLastLine: true,

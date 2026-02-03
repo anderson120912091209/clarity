@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { pdfjs } from 'react-pdf'
 import 'react-pdf/dist/Page/AnnotationLayer.css'
 import 'react-pdf/dist/Page/TextLayer.css'
@@ -135,12 +135,44 @@ interface LatexRendererProps {
   error: string | null
 }
 
+
 function LatexRenderer({ pdfUrl, isLoading, error }: LatexRendererProps) {
-  const { project: data } = useProject();
+  const { project: data, projectId } = useProject();
   const scale = data?.projectScale ?? 0.9;
+  const containerRef = useRef<HTMLDivElement>(null);
   
   const [numPages, setNumPages] = useState<number>(0)
   const [isDocumentReady, setIsDocumentReady] = useState(false)
+
+  // Trackpad zoom support
+  useEffect(() => {
+    const container = containerRef.current
+    if (!container) return
+
+    const handleWheel = (e: WheelEvent) => {
+      if (e.ctrlKey) {
+        e.preventDefault()
+        
+        // Calculate new scale
+        // Use a smaller step for finer control with trackpad
+        const delta = -e.deltaY
+        const factor = 0.01 
+        const newScale = Math.min(Math.max(0.5, scale + delta * factor), 3.0)
+        
+        // Simple throttling could be done here if needed, 
+        // but for now we'll rely on React's batching or rapid updates.
+        // We limit the update frequency to avoid flooding
+        updateProject(projectId, { projectScale: newScale })
+      }
+    }
+
+    // Add passive: false to allow preventDefault
+    container.addEventListener('wheel', handleWheel, { passive: false })
+
+    return () => {
+      container.removeEventListener('wheel', handleWheel)
+    }
+  }, [scale, projectId])
 
   const onDocumentLoadSuccess = ({ numPages }: { numPages: number }) => {
     setNumPages(numPages)
@@ -164,7 +196,8 @@ function LatexRenderer({ pdfUrl, isLoading, error }: LatexRendererProps) {
   }
 
   return (
-    <div className="flex flex-col h-full w-full bg-zinc-950/20">
+    <div ref={containerRef} className="flex flex-col h-[calc(100%-16px)] w-[calc(100%-16px)]
+     bg-zinc-950/40 m-2 rounded-xl border border-white/10 overflow-hidden shadow-sm">
       {isLoading && !pdfUrl ? (
         <LatexLoading />
       ) : error ? (
