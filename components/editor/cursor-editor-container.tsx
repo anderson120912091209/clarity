@@ -1,5 +1,4 @@
-'use client'
-
+import { EditorTabs } from './editor-tabs'
 import React, { useState, useCallback, useEffect, useRef } from 'react'
 import { CodeEditor } from './editor'
 import { useTheme } from 'next-themes'
@@ -31,26 +30,32 @@ const CursorEditorContainer: React.FC<CursorEditorContainerProps> = ({
   const { currentlyOpen, isFilesLoading, isProjectLoading } = useProject()
   const [isStreaming, setIsStreaming] = useState(false)
   const isStreamingRef = useRef(false)
+  
   const fileType = getFileExtension(currentlyOpen?.name || '')
-  const isImageFile = ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp', 'svg'].includes(fileType.toLowerCase())
+  const ext = fileType.toLowerCase()
+  const isImageFile = ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp', 'svg'].includes(ext)
+  const isPdfFile = ext === 'pdf'
 
+  // ... useEffect for content updates ...
   useEffect(() => {
     if (currentlyOpen && currentlyOpen.id !== openFile?.id) {
       setOpenFile(currentlyOpen)
       setLocalContent(currentlyOpen.content)
     }
-  }, [currentlyOpen?.id])
+  }, [currentlyOpen?.id, currentlyOpen?.content]) // Added content dep for safety
 
   const handleCodeChange = useCallback(
     (newCode: string) => {
-      if (newCode !== localContent && !isStreamingRef.current) {
+      // Only update if it's a text file (not image/pdf)
+      if (!isImageFile && !isPdfFile && newCode !== localContent && !isStreamingRef.current && openFile) {
         setLocalContent(newCode)
         db.transact([tx.files[openFile.id].update({ content: newCode })])
       }
     },
-    [localContent, openFile]
+    [localContent, openFile, isImageFile, isPdfFile]
   )
-
+  
+  // ... other handlers ...
   const handleIsStreamingChange = useCallback((streaming: boolean) => {
     setIsStreaming(streaming)
     isStreamingRef.current = streaming
@@ -68,39 +73,52 @@ const CursorEditorContainer: React.FC<CursorEditorContainerProps> = ({
 
   return (
     <div className="relative flex flex-col w-full h-full bg-background overflow-hidden group/editor">
+      {/* Editor Tabs at the top */}
+      <EditorTabs />
+
       {/* Editor Content Area */}
       {!currentlyOpen ? (
         <div className="flex-grow flex items-center justify-center bg-zinc-950/50">
+           {/* ... Empty State ... */}
            <div className="flex flex-col items-center gap-6 max-w-md w-full px-6 py-12 text-center">
              <div className="w-16 h-16 rounded-2xl bg-zinc-900 border border-white/5 flex items-center justify-center shadow-xl">
                <Command className="w-8 h-8 text-zinc-700" />
              </div>
-             
              <div className="space-y-1">
                <h3 className="text-lg font-medium text-zinc-200">No file is open</h3>
                <p className="text-sm text-zinc-500">
-                 Press <kbd className="font-sans px-1 text-zinc-400">Cmd+P</kbd> to search for files or select one from the sidebar.
+                 Select a file from the sidebar to start editing.
                </p>
-             </div>
-
-             <div className="grid grid-cols-2 gap-3 w-full max-w-[300px]">
-                <div className="col-span-2 p-3 rounded-lg border border-white/5 bg-white/[0.02] flex items-center justify-between group cursor-pointer hover:bg-white/[0.04] transition-colors">
-                   <span className="text-xs text-zinc-400">Search Files</span>
-                   <kbd className="text-[10px] font-mono text-zinc-600 group-hover:text-zinc-500 bg-zinc-900 px-1.5 py-0.5 rounded border border-white/5">⌘P</kbd>
-                </div>
-                <div className="col-span-2 p-3 rounded-lg border border-white/5 bg-white/[0.02] flex items-center justify-between group cursor-pointer hover:bg-white/[0.04] transition-colors">
-                   <span className="text-xs text-zinc-400">AI Command</span>
-                   <kbd className="text-[10px] font-mono text-zinc-600 group-hover:text-zinc-500 bg-zinc-900 px-1.5 py-0.5 rounded border border-white/5">⌘K</kbd>
-                </div>
              </div>
            </div>
         </div>
       ) : isImageFile ? (
-        <div className="flex-grow flex items-center justify-center bg-zinc-950/30 relative">
+        <div className="flex-grow flex items-center justify-center bg-zinc-950/30 relative h-[calc(100%-36px)] overflow-hidden">
           <div className="absolute inset-0 bg-[radial-gradient(#333_1px,transparent_1px)] [background-size:16px_16px] opacity-20" />
-          <div className="relative z-10 p-8 rounded-xl border border-white/10 bg-zinc-900/50 shadow-2xl">
-            <ImageViewer src={currentlyOpen?.content || ''} alt={currentlyOpen?.name || 'Image'} />
+          <div className="relative z-10 p-8 flex items-center justify-center h-full w-full">
+             {/* Use existing ImageViewer or simple img tag logic from previous step, assuming prop compatibility */}
+             {currentlyOpen.url ? (
+                <img 
+                  src={currentlyOpen.url} 
+                  alt={currentlyOpen.name} 
+                  className="max-w-full max-h-full object-contain shadow-2xl border border-white/10 rounded-lg"
+                />
+             ) : (
+                <div className="text-red-400">Image URL not found</div>
+             )}
           </div>
+        </div>
+      ) : isPdfFile ? (
+        <div className="flex-grow h-[calc(100%-36px)] bg-zinc-800">
+          {currentlyOpen.url ? (
+            <iframe 
+              src={currentlyOpen.url} 
+              className="w-full h-full border-0"
+              title={currentlyOpen.name}
+            />
+          ) : (
+            <div className="flex items-center justify-center h-full text-zinc-400">PDF URL not found</div>
+          )}
         </div>
       ) : (
         <div className="relative flex-grow h-full overflow-hidden">

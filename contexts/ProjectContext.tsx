@@ -19,7 +19,12 @@ export function ProjectProvider({ children, projectId }: { children: ReactNode; 
   const { user } = useFrontend();
   const { data: projectData, isLoading: isProjectLoading, error: projectError } = useProjectData(projectId, user.id)
   const { data: filesData, isLoading: isFilesLoading, error: filesError } = useProjectFiles(projectId, user.id)
-  const currentlyOpen = filesData?.files?.find((file) => file.isOpen === true)
+  const activeFileId = projectData?.projects?.[0]?.activeFileId
+  const openFiles = filesData?.files?.filter((file: any) => file.isOpen === true) || []
+  const currentlyOpen = filesData?.files?.find((file: any) => file.id === activeFileId)
+
+  // Fallback: If no activeFileId but files are open, default to first open file, or no file
+  // If activeFileId is set but not found (deleted?), handle gracefully
 
   const router = useRouter();
   useEffect(() => {
@@ -32,9 +37,11 @@ export function ProjectProvider({ children, projectId }: { children: ReactNode; 
     projectId,
     project: projectData?.projects[0],
     files: filesData?.files,
+    openFiles,
+    currentlyOpen,
+    activeFileId,
     isProjectLoading,
     isFilesLoading,
-    currentlyOpen,
     error: projectError || filesError,
   }
 

@@ -40,6 +40,7 @@ const _schema = i.schema({
       title: i.string().optional(),
       user_id: i.string().optional(),
       word_count: i.number().optional(),
+      activeFileId: i.string().optional(),
     }),
     users: i.entity({
       app_id: i.string().optional(),

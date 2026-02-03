@@ -206,10 +206,8 @@ export default function EditorSidebar() {
                 userId={user?.id || ''}
                 onOpenFile={(file: any) => {
                   db.transact([
-                    ...project.files
-                      .filter((f: any) => f.isOpen)
-                      .map((f: any) => tx.files[f.id].update({ isOpen: false })),
-                    tx.files[file.id].update({ isOpen: true })
+                    tx.files[file.id].update({ isOpen: true }),
+                    tx.projects[projectId].update({ activeFileId: file.id })
                   ])
                 }}
                 currentlyOpenId={currentlyOpen?.id}
