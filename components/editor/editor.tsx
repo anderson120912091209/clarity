@@ -58,7 +58,7 @@ export const CodeEditor = ({ onChange, value, setIsStreaming }: CodeEditorProps)
          fontSize: 13,
          lineHeight: 20,
          cursorBlinking: 'smooth',
-         cursorSmoothCaretAnimation: 'on',
+         cursorSmoothCaretAnimation: 'off',
          renderLineHighlight: 'line', // cleaner than 'all'
          guides: {
             indentation: true,

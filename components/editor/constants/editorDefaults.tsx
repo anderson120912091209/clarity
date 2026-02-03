@@ -20,7 +20,7 @@ export const editorDefaultOptions: editor.IStandaloneEditorConstructionOptions =
     horizontalScrollbarSize: 8,
   },
   overviewRulerBorder: false,
-  cursorSmoothCaretAnimation: 'on',
+  cursorSmoothCaretAnimation: 'off',
   cursorBlinking: 'smooth',
   cursorStyle: 'line',
   renderLineHighlight: 'all',
