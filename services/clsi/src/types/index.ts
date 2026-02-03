@@ -17,6 +17,7 @@ export interface Resource {
   content?: string;
   url?: string;
   modified?: number;
+  encoding?: 'utf-8' | 'base64';
 }
 
 export interface CompileResult {

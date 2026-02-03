@@ -30,7 +30,11 @@ export class ResourceManager {
 
       // Write content (URL support can be added later)
       if (resource.content) {
-        await fs.writeFile(safePath, resource.content, 'utf-8');
+        if (resource.encoding === 'base64') {
+          await fs.writeFile(safePath, Buffer.from(resource.content, 'base64'));
+        } else {
+          await fs.writeFile(safePath, resource.content, 'utf-8');
+        }
         resourceList.push(resource.path);
       } else if (resource.url) {
         // TODO: Implement URL downloading with caching

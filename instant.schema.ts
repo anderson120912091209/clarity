@@ -1,6 +1,6 @@
 // Docs: https://www.instantdb.com/docs/modeling-data
 
-import { i } from '@instantdb/react'
+import { i } from '@instantdb/core'
 
 const _schema = i.schema({
   // We inferred 24 attributes!
@@ -27,6 +27,7 @@ const _schema = i.schema({
       pathname: i.string().optional(),
       projectId: i.string().optional(),
       type: i.string().optional(),
+      url: i.string().optional(),
       user_id: i.string().optional(),
     }),
     projects: i.entity({

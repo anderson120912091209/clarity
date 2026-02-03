@@ -64,12 +64,49 @@ export async function fetchPdf(files: EditorFiles | EditorFiles[] | undefined | 
     throw new Error(`${errorData.error}: ${errorData.message}\n\nDetails: ${errorData.details}`)
   }
 
-  // Transform files into CLSI resource format
-  const resources = filesArray
+  // Create a map for quick lookups by ID
+  const fileMap = new Map<string, any>()
+  filesArray.forEach((f: any) => fileMap.set(f.id, f))
+
+  // Helper to construct full path
+  const getFullPath = (file: any): string => {
+    const parts = [file.name]
+    let current = file
+    while (current.parent_id && fileMap.has(current.parent_id)) {
+      current = fileMap.get(current.parent_id)
+      parts.unshift(current.name)
+    }
+    return parts.join('/')
+  }
+
+  // Transform files into CLSI resource format with async map
+  const resources = await Promise.all(filesArray
     .filter((file: any) => file.type === 'file')
-    .map((file: any) => ({
-      path: file.name,
-      content: file.content || ''
+    .map(async (file: any) => {
+      let content = file.content || ''
+      
+      // If content is empty but we have a URL (uploaded file), fetch it
+      if (!content && file.url) {
+        try {
+          const response = await fetch(file.url)
+          const arrayBuffer = await response.arrayBuffer()
+          // Convert to Base64
+          // Note context is browser here
+          const base64 = btoa(
+            new Uint8Array(arrayBuffer)
+              .reduce((data, byte) => data + String.fromCharCode(byte), '')
+          )
+          content = base64
+        } catch (e) {
+          console.error(`Failed to fetch content for ${file.name}`, e)
+        }
+      }
+
+      return {
+        path: getFullPath(file),
+        content,
+        encoding: (!content && file.url) ? 'base64' : 'utf-8'
+      }
     }))
 
   // CLSI endpoint (defaults to localhost for development)

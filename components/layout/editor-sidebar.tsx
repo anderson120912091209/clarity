@@ -11,7 +11,8 @@ import { useState } from 'react'
 import { useSidebar } from '@/contexts/SidebarContext'
 import { useProject } from '@/contexts/ProjectContext'
 import { Input } from '@/components/ui/input'
-import FileTree from '@/workbench/components/sidebar/file-tree'
+import { FileTree } from '@/components/file-tree/file-tree'
+import { tx } from '@instantdb/react'
 
 export default function EditorSidebar() {
   const router = useRouter()
@@ -19,7 +20,7 @@ export default function EditorSidebar() {
   const { user } = db.useAuth()
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const { isCollapsed } = useSidebar()
-  const { project, projectId } = useProject()
+  const { project, projectId, files, currentlyOpen } = useProject()
   const [query, setQuery] = useState('')
 
   const handleSignOut = () => {
@@ -199,7 +200,20 @@ export default function EditorSidebar() {
 
             {/* File Tree */}
             <div className="flex-1 overflow-auto px-1">
-              <FileTree projectId={projectId} query={query} />
+              <FileTree 
+                files={files || []} 
+                projectId={projectId} 
+                userId={user?.id || ''}
+                onOpenFile={(file: any) => {
+                  db.transact([
+                    ...project.files
+                      .filter((f: any) => f.isOpen)
+                      .map((f: any) => tx.files[f.id].update({ isOpen: false })),
+                    tx.files[file.id].update({ isOpen: true })
+                  ])
+                }}
+                currentlyOpenId={currentlyOpen?.id}
+              />
             </div>
           </div>
         )}
