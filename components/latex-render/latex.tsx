@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Switch } from '@/components/ui/switch'
 import LatexError from './latex-error'
 import { Label } from '@/components/ui/label'
-import { ZoomIn, ZoomOut, RotateCcw, Play, Loader2, Download, FileType } from 'lucide-react'
+import { ZoomIn, ZoomOut, RotateCcw, Play, Loader2, Download, FileType, RefreshCw } from 'lucide-react'
 import { savePdfToStorage, savePreviewToStorage } from '@/lib/utils/db-utils'
 import { useProject } from '@/contexts/ProjectContext'
 import { createPathname } from '@/lib/utils/client-utils'
@@ -230,6 +230,7 @@ function LatexRenderer({ pdfUrl, isLoading, error }: LatexRendererProps) {
   )
 }
 
+
 export function PDFNavContent({
   isLoading,
   autoFetch,
@@ -251,67 +252,93 @@ export function PDFNavContent({
   onResetZoom: () => void
   onDownload: () => void
 }) {
+  // Keyboard shortcut for compilation (Cmd+S)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 's') {
+        e.preventDefault()
+        onCompile()
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [onCompile])
+
   return (
     <>
-      <div className="flex items-center gap-3 flex-1 min-w-0">
-        <div className="flex items-center gap-2">
-          <span className="text-xs font-medium text-zinc-400">PDF Preview</span>
-        </div>
-        
-        <div className="h-4 w-px bg-white/10" />
+      <div className="flex items-center gap-2 flex-1 min-w-0">
+        {/* Spacer for left alignment if needed, or just empty to push right */}
+      </div>
 
+      {/* Right Side Actions */}
+      <div className="flex items-center gap-3 shrink-0">
+        
+        {/* Compile Button */}
         <Button 
-          variant="ghost" 
+          variant="default" 
           size="sm" 
           onClick={onCompile} 
           disabled={isLoading}
           className={cn(
-             "h-7 px-2.5 gap-2 text-xs font-medium hover:bg-green-500/10 hover:text-green-400 transition-colors",
-             isLoading ? "opacity-70 cursor-wait" : ""
+             "h-7 pl-2.5 pr-1 gap-1.5 text-xs font-medium bg-[#6D78E7] hover:bg-[#5b65d6] text-white border-0 transition-all rounded-md shadow-sm group",
+             isLoading ? "opacity-90 cursor-wait" : ""
           )}
         >
           {isLoading ? (
-            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+            <Loader2 className="w-3.5 h-3.5 animate-spin text-white/70" />
           ) : (
-            <Play className="w-3.5 h-3.5 fill-current" />
+            <RefreshCw className="w-3.5 h-3.5" />
           )}
           <span>Compile</span>
+          
+          <div className="flex items-center justify-center bg-white/20 rounded px-1.5 py-0.5 ml-1">
+             <span className="text-[9px] font-semibold text-white/90">⌘+S</span>
+          </div>
         </Button>
 
-        <div className="flex items-center gap-2">
-          <Switch 
-             id="auto-compile"
-             checked={autoFetch} 
-             onCheckedChange={(checked) => updateProject(projectId, { isAutoFetching: checked })} 
-             className="scale-75 data-[state=checked]:bg-green-600"
-          />
-          <Label htmlFor="auto-compile" className="text-[10px] uppercase tracking-wider font-semibold text-zinc-500 cursor-pointer">Auto</Label>
-        </div>
-      </div>
-
-      <div className="flex items-center gap-1 shrink-0">
-        <div className="flex items-center bg-white/5 rounded-lg p-0.5 border border-white/5 mr-2">
-          <Button variant="ghost" size="icon" onClick={onZoomOut} className="h-6 w-6 rounded-md hover:bg-white/10 text-zinc-400">
-            <ZoomOut className="h-3 w-3" />
+        {/* View Controls */}
+        <div className="flex items-center gap-0.5 shrink-0">
+          <Button 
+             variant="ghost" 
+             size="icon" 
+             onClick={onZoomOut} 
+             className="h-7 w-7 rounded-md text-zinc-400 hover:text-[#6D78E7] hover:bg-[#6D78E7]/10 transition-colors"
+          >
+            <ZoomOut className="h-3.5 w-3.5" />
           </Button>
-          <span className="w-8 text-center text-[10px] tabular-nums text-zinc-400">{Math.round(scale * 100)}%</span>
-          <Button variant="ghost" size="icon" onClick={onZoomIn} className="h-6 w-6 rounded-md hover:bg-white/10 text-zinc-400">
-            <ZoomIn className="h-3 w-3" />
+          
+          <span 
+            className="w-8 text-center text-[10px] font-medium text-zinc-500 select-none cursor-pointer hover:text-zinc-300 transition-colors" 
+            onClick={onResetZoom}
+          >
+            {Math.round(scale * 100)}%
+          </span>
+          
+          <Button 
+             variant="ghost" 
+             size="icon" 
+             onClick={onZoomIn} 
+             className="h-7 w-7 rounded-md text-zinc-400 hover:text-[#6D78E7] hover:bg-[#6D78E7]/10 transition-colors"
+          >
+            <ZoomIn className="h-3.5 w-3.5" />
+          </Button>
+          
+          <div className="w-px h-3.5 bg-white/10 mx-1.5" />
+
+          <Button 
+            size="icon" 
+            variant="ghost" 
+            onClick={onDownload} 
+            className="h-7 w-7 rounded-md text-zinc-400 hover:text-[#6D78E7] hover:bg-[#6D78E7]/10 transition-colors"
+          >
+            <Download className="h-3.5 w-3.5" />
           </Button>
         </div>
-
-        <Button size="icon" variant="ghost" onClick={onResetZoom} className="h-7 w-7 rounded-md hover:bg-white/10 text-zinc-400">
-          <RotateCcw className="h-3.5 w-3.5" />
-        </Button>
-        
-        <div className="h-4 w-px bg-white/10 mx-1" />
-        
-        <Button size="icon" variant="ghost" onClick={onDownload} className="h-7 w-7 rounded-md hover:bg-blue-500/10 hover:text-blue-400 text-zinc-400 transition-colors">
-          <Download className="h-4 w-4" />
-        </Button>
       </div>
     </>
   )
 }
+
 
 export default LatexRenderer

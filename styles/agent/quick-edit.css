@@ -76,7 +76,7 @@
   border-radius: 8px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
   width: 100%;
-  max-width: 600px;
+  max-width: 500px;
   font-family: var(--vscode-font-family, system-ui, -apple-system, sans-serif);
   position: relative;
   z-index: 1000; /* Ensure it stays on top of editor content */
@@ -110,13 +110,13 @@
 
 .qe-input-textarea {
   width: 100%;
-  min-height: 40px;
+  min-height: 28px;
   max-height: 200px;
   padding: 12px;
   background: transparent;
   border: none;
   color: var(--vscode-input-foreground, #e4e4e7);
-  font-size: 13px;
+  font-size: 12px;
   line-height: 1.5;
   resize: none;
   outline: none !important; /* Force remove blue border */
@@ -211,7 +211,7 @@
   font-size: 11px; /* Smaller, cleaner */
   font-weight: 500;
   border-radius: 4px; /* Slightly rounded */
-  background: var(--vscode-button-background, #0e639c);
+  background: #6D78E7;
   color: var(--vscode-button-foreground, #ffffff);
   border: 1px solid transparent; 
   cursor: pointer;
@@ -219,7 +219,7 @@
 }
 
 .qe-action-btn-primary:hover:not(:disabled) {
-  background: var(--vscode-button-hoverBackground, #1177bb);
+  background: #5b65d6;
 }
 
 .qe-action-btn-primary:disabled {
@@ -272,12 +272,12 @@
 }
 
 .qe-btn-primary {
-  background: var(--vscode-button-background, #0e639c);
+  background: #6D78E7;
   color: var(--vscode-button-foreground, #ffffff);
 }
 
 .qe-btn-primary:hover:not(:disabled) {
-  background: var(--vscode-button-hoverBackground, #1177bb);
+  background: #5b65d6;
 }
 
 .qe-btn-secondary {

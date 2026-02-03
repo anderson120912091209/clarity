@@ -167,32 +167,7 @@ export function EditorNavContent({
         )}
       </div>
       
-      <div className="flex items-center gap-2 shrink-0">
-        <div 
-          className="flex items-center gap-1.5 px-2 py-1 rounded bg-muted/30 border border-border/50 text-muted-foreground hover:bg-muted/50 transition-colors cursor-pointer group/cmd"
-          onClick={() => {
-             // Trigger AI command logic if implemented
-          }}
-        >
-          <Command className="h-3 w-3 group-hover/cmd:text-foreground transition-colors" />
-          <span className="text-[10px] font-mono font-medium group-hover/cmd:text-foreground transition-colors">K</span>
-        </div>
-        
-        {onChatToggle && (
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={onChatToggle}
-            className={cn(
-              "h-7 px-2.5 gap-2 text-xs font-normal text-muted-foreground hover:text-foreground hover:bg-muted/50 rounded-md transition-all",
-              isChatVisible && "bg-primary/10 text-primary hover:bg-primary/20 hover:text-primary"
-            )}
-          >
-            <MessageSquare className={cn("h-3.5 w-3.5", isChatVisible && "fill-current")} />
-            <span className="hidden sm:inline">Chat</span>
-          </Button>
-        )}
-      </div>
+
     </>
   )
 }

@@ -4,7 +4,7 @@ export const editorDefaultOptions: editor.IStandaloneEditorConstructionOptions =
   wordWrap: 'on',
   folding: true,
   lineNumbersMinChars: 5,
-  fontSize: 14,
+  fontSize: 12,
   fontFamily: 'var(--font-mono), Menlo, Monaco, "Courier New", monospace',
   scrollBeyondLastLine: true,
   scrollBeyondLastColumn: 5,

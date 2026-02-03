@@ -27,7 +27,7 @@ export default function Home() {
 }
 
 function EditorLayout() {
-  const [isChatVisible, setIsChatVisible] = useState(true)
+  const [isChatVisible, setIsChatVisible] = useState(false)
   const { currentlyOpen } = useProject()
   const fileContent = currentlyOpen?.content || ''
 
@@ -93,7 +93,7 @@ function EditorLayout() {
       showHeader={true}
     >
       {/* Content Panels */}
-      <ResizablePanelGroup direction="horizontal" className="flex-1">
+      <ResizablePanelGroup direction="horizontal" className="flex-1" autoSaveId="project-editor-layout">
         <ResizablePanel defaultSize={50} minSize={25}>
           <CursorEditorContainer 
             onChatToggle={() => setIsChatVisible(!isChatVisible)}
