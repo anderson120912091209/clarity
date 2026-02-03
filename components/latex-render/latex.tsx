@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Switch } from '@/components/ui/switch'
 import LatexError from './latex-error'
 import { Label } from '@/components/ui/label'
-import { ZoomIn, ZoomOut, RotateCcw, Play, Loader2, Download, FileType, RefreshCw } from 'lucide-react'
+import { ZoomIn, ZoomOut, RotateCcw, Play, Loader2, Download, FileType, RefreshCw, ScrollText } from 'lucide-react'
 import { savePdfToStorage, savePreviewToStorage } from '@/lib/utils/db-utils'
 import { useProject } from '@/contexts/ProjectContext'
 import { createPathname } from '@/lib/utils/client-utils'
@@ -28,6 +28,7 @@ export function useLatex() {
   const { project: data, isLoading: isDataLoading, projectId, files } = useProject()
   const [pdfUrl, setPdfUrl] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
+  const [logs, setLogs] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   
   const scale = data?.projectScale ?? 0.9
@@ -51,17 +52,22 @@ export function useLatex() {
     
     setIsLoading(true)
     setError(null)
+    setLogs(null)
     
     try {
-      const blob = await fetchPdf(files);
+      const { blob, logs } = await fetchPdf(files) as any;
       const pathname = createPathname(user.id, projectId)
       await savePdfToStorage(blob, pathname + 'main.pdf', projectId)
       await savePreviewToStorage(blob, pathname + 'preview.webp', projectId)
       const url = URL.createObjectURL(blob)
       setPdfUrl(url)
-    } catch (error) {
+      setLogs(logs)
+    } catch (error: any) {
       console.error('Error fetching PDF:', error);
       setError(error instanceof Error ? error.message : String(error))
+      if (error.logs) {
+        setLogs(error.logs)
+      }
     } finally {
       setIsLoading(false)
     }
@@ -125,18 +131,41 @@ export function useLatex() {
     handleZoomIn,
     handleZoomOut,
     handleResetZoom,
-    handleDownload
+    handleDownload,
+    logs
   }
+}
+
+function LogsPanel({ logs, error }: { logs: string | null, error: string | null }) {
+  return (
+    <div className="flex flex-col h-full w-full bg-[#090909] text-zinc-300 font-mono text-xs overflow-hidden">
+      <div className="flex items-center justify-between px-4 py-2 border-b border-white/5 bg-white/[0.02]">
+        <div className="flex items-center gap-2">
+          <ScrollText className="w-3.5 h-3.5 text-zinc-400" />
+          <span className="font-medium">Compilation Logs</span>
+        </div>
+      </div>
+      
+      <div className="flex-1 overflow-auto p-4 space-y-6">
+        {/* Actual Logs */}
+        <div className="whitespace-pre-wrap leading-relaxed opacity-80">
+          {logs || error || "No logs available."}
+        </div>
+      </div>
+    </div>
+  )
 }
 
 interface LatexRendererProps {
   pdfUrl: string | null
   isLoading: boolean
   error: string | null
+  logs?: string | null
+  showLogs?: boolean
 }
 
 
-function LatexRenderer({ pdfUrl, isLoading, error }: LatexRendererProps) {
+function LatexRenderer({ pdfUrl, isLoading, error, logs, showLogs }: LatexRendererProps) {
   const { project: data, projectId } = useProject();
   const scale = data?.projectScale ?? 0.9;
   const containerRef = useRef<HTMLDivElement>(null);
@@ -198,7 +227,9 @@ function LatexRenderer({ pdfUrl, isLoading, error }: LatexRendererProps) {
   return (
     <div ref={containerRef} className="flex flex-col h-[calc(100%-16px)] w-[calc(100%-16px)]
      bg-zinc-950/40 m-2 rounded-xl border border-white/10 overflow-hidden shadow-sm">
-      {isLoading && !pdfUrl ? (
+      {showLogs ? (
+        <LogsPanel logs={logs ?? null} error={error} />
+      ) : isLoading && !pdfUrl ? (
         <LatexLoading />
       ) : error ? (
         <div className="flex justify-center items-start w-full h-full p-4 overflow-auto">
@@ -240,7 +271,9 @@ export function PDFNavContent({
   onZoomIn,
   onZoomOut,
   onResetZoom,
-  onDownload
+  onDownload,
+  onToggleLogs,
+  showLogs
 }: {
   isLoading: boolean
   autoFetch: boolean
@@ -251,6 +284,8 @@ export function PDFNavContent({
   onZoomOut: () => void
   onResetZoom: () => void
   onDownload: () => void
+  onToggleLogs: () => void
+  showLogs: boolean
 }) {
   // Keyboard shortcut for compilation (Cmd+S)
   useEffect(() => {
@@ -296,6 +331,19 @@ export function PDFNavContent({
              <span className="text-[9px] font-semibold text-white/90">⌘+S</span>
           </div>
         </Button>
+
+        <Button 
+           variant={showLogs ? "secondary" : "ghost"}
+           size="sm"
+           onClick={onToggleLogs}
+           title="View Logs"
+           className={cn(
+             "h-7 w-7 p-0 rounded-md transition-all ml-1",
+             showLogs ? "bg-white/10 text-white" : "text-zinc-400 hover:text-white hover:bg-white/5"
+           )}
+         >
+           <ScrollText className="w-3.5 h-3.5" />
+         </Button>
 
         {/* View Controls */}
         <div className="flex items-center gap-0.5 shrink-0">

@@ -155,23 +155,35 @@ export async function fetchPdf(files: EditorFiles | EditorFiles[] | undefined | 
   
   console.log('[CLSI] Compile result:', compileResult)
 
+  // Helper to fetch log
+  const fetchLog = async (logFile: any) => {
+    if (!logFile?.url) return null
+    try {
+      const res = await fetch(`${CLSI_URL}${logFile.url}`)
+      if (res.ok) return await res.text()
+    } catch (e) {
+      console.warn('Failed to fetch logs', e)
+    }
+    return null
+  }
+
+  const logFile = compileResult.outputFiles?.find((f: any) => f.path === 'output.log')
+  const logs = await fetchLog(logFile)
+
   // Handle compilation errors
   if (compileResult.status !== 'success') {
     let errorMessage = compileResult.message || 'LaTeX compilation failed'
-    
-    // Add link to log file if available
-    const logFile = compileResult.outputFiles?.find((f: any) => f.path === 'output.log')
-    if (logFile) {
-      errorMessage += `\n\nView compilation log: ${CLSI_URL}${logFile.url}`
-    }
-    
-    throw new Error(errorMessage)
+    const error = new Error(errorMessage) as any
+    error.logs = logs
+    throw error
   }
 
   // Extract PDF URL from successful compilation
   const pdfFile = compileResult.outputFiles?.find((f: any) => f.path === 'output.pdf')
   if (!pdfFile || !pdfFile.url) {
-    throw new Error('CLSI compilation succeeded but no PDF was generated')
+    const error = new Error('CLSI compilation succeeded but no PDF was generated') as any
+    error.logs = logs
+    throw error
   }
 
   console.log('[CLSI] Downloading PDF from:', `${CLSI_URL}${pdfFile.url}`)
@@ -182,7 +194,8 @@ export async function fetchPdf(files: EditorFiles | EditorFiles[] | undefined | 
     if (!pdfResponse.ok) {
       throw new Error(`Failed to download PDF: ${pdfResponse.status} ${pdfResponse.statusText}`)
     }
-    return await pdfResponse.blob()
+    const blob = await pdfResponse.blob()
+    return { blob, logs }
   } catch (blobError: any) {
     throw new Error(
       `Failed to download compiled PDF.\n\n` +

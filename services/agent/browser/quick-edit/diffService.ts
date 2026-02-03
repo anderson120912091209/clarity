@@ -481,6 +481,7 @@ export function findTextInCode(
   
   const startIdx = startingAtLine ? startingAtLine - 1 : 0
   
+  // Try exact match first
   for (let i = startIdx; i <= lines.length - textLines.length; i++) {
     let match = true
     for (let j = 0; j < textLines.length; j++) {
@@ -491,7 +492,27 @@ export function findTextInCode(
     }
     if (match) {
       return {
-        startLine: i + 1,  // 1-indexed
+        startLine: i + 1,
+        endLine: i + textLines.length,
+      }
+    }
+  }
+
+  // Fallback: Try match ignoring whitespace (trim)
+  for (let i = startIdx; i <= lines.length - textLines.length; i++) {
+    let match = true
+    for (let j = 0; j < textLines.length; j++) {
+      // Allow empty lines to match anything empty-ish
+      if (textLines[j].trim() === '' && lines[i + j].trim() === '') continue
+      
+      if (lines[i + j].trim() !== textLines[j].trim()) {
+        match = false
+        break
+      }
+    }
+    if (match) {
+      return {
+        startLine: i + 1,
         endLine: i + textLines.length,
       }
     }

@@ -67,6 +67,7 @@ export const CodeEditor = ({ onChange, value, setIsStreaming }: CodeEditorProps)
          minimap: {
             enabled: false // Minimalist
          }
+         
       }}
       loading={<EditorLoading />}
     />

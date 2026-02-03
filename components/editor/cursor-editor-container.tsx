@@ -73,8 +73,7 @@ const CursorEditorContainer: React.FC<CursorEditorContainerProps> = ({
 
   return (
     <div className="relative flex flex-col w-full h-full bg-background overflow-hidden group/editor">
-      {/* Editor Tabs at the top */}
-      <EditorTabs />
+
 
       {/* Editor Content Area */}
       {!currentlyOpen ? (

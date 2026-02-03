@@ -12,6 +12,7 @@ import { ProjectProvider } from '@/contexts/ProjectContext'
 import { useParams } from 'next/navigation'
 import { useProject } from '@/contexts/ProjectContext'
 import { EditorNavContent } from '@/components/editor/cursor-editor-container'
+import { EditorTabs } from '@/components/editor/editor-tabs'
 import { PDFNavContent, useLatex } from '@/components/latex-render/latex'
 
 export const maxDuration = 30
@@ -41,8 +42,11 @@ function EditorLayout() {
     handleZoomIn, 
     handleZoomOut, 
     handleResetZoom, 
-    handleDownload 
+    handleDownload,
+    logs
   } = useLatex()
+  
+  const [showLogs, setShowLogs] = useState(false)
 
   // Header content for the workspace navigation
   const headerContent = (
@@ -50,11 +54,7 @@ function EditorLayout() {
       {/* Left side - Toggle & Editor controls */}
       <div className="flex items-center gap-3 flex-1 min-w-0">
         <SidebarToggle />
-        <EditorNavContent 
-          currentlyOpen={currentlyOpen}
-          onChatToggle={() => setIsChatVisible(!isChatVisible)}
-          isChatVisible={isChatVisible}
-        />
+        <EditorTabs />
       </div>
       
 
@@ -71,6 +71,8 @@ function EditorLayout() {
           onZoomOut={handleZoomOut}
           onResetZoom={handleResetZoom}
           onDownload={handleDownload}
+          onToggleLogs={() => setShowLogs(!showLogs)}
+          showLogs={showLogs}
         />
       </div>
       
@@ -108,6 +110,8 @@ function EditorLayout() {
             pdfUrl={pdfUrl}
             isLoading={isLoading}
             error={error}
+            logs={logs}
+            showLogs={showLogs}
           />
         </ResizablePanel>
         {isChatVisible && (
