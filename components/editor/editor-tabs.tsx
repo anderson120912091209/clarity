@@ -59,7 +59,7 @@ export function EditorTabs() {
   if (!openFiles || openFiles.length === 0) return null
 
   return (
-    <div className="flex items-center w-full h-9 bg-[#101011] border-b border-white/5 overflow-x-auto no-scrollbar">
+    <div className="flex items-center w-full h-9 bg-[#101011] overflow-x-auto no-scrollbar">
       {openFiles.map((file: any) => {
         const isActive = file.id === activeFileId
         const ext = getFileExtension(file.name).toLowerCase()

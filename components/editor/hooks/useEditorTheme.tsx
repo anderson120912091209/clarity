@@ -11,35 +11,41 @@ export const useEditorTheme = () => {
       base: 'vs-dark',
       inherit: true,
       rules: [
-        { token: '', foreground: 'D4D4D4' },
-        { token: 'comment', foreground: '6A9955', fontStyle: 'italic' },
-        { token: 'keyword', foreground: 'C586C0', fontStyle: 'bold' },
-        { token: 'keyword.control', foreground: 'C586C0' },
-        { token: 'operator', foreground: 'D4D4D4' },
-        { token: 'string', foreground: 'CE9178' },
-        { token: 'number', foreground: 'B5CEA8' },
-        { token: 'regexp', foreground: 'D16969' },
-        { token: 'type', foreground: '4EC9B0' },
-        { token: 'class', foreground: '4EC9B0' },
-        { token: 'function', foreground: 'DCDCAA' },
-        { token: 'variable', foreground: '9CDCFE' },
-        { token: 'variable.parameter', foreground: '9CDCFE' },
-        { token: 'tag', foreground: '569CD6' },
-        { token: 'attribute.name', foreground: '9CDCFE' },
-        { token: 'delimiter', foreground: 'D4D4D4' },
+        { token: '', foreground: 'd4d4d8' }, // Default text (zinc-300)
+        { token: 'comment', foreground: '71717a', fontStyle: 'italic' }, // Zinc-500
+        { token: 'keyword', foreground: 'c4b5fd', fontStyle: 'bold' }, // Violet-300 - Soft Purple
+        { token: 'keyword.control', foreground: 'c4b5fd' },
+        
+        // Distinct coloring for delimiters
+        { token: 'delimiter.curly', foreground: 'fde047' }, // Yellow-300 - Curly Braces {}
+        { token: 'delimiter.square', foreground: 'e879f9' }, // Fuchsia-400 - Square Brackets []
+        { token: 'delimiter.parenthesis', foreground: 'e879f9' }, // Fuchsia-400 - Parentheses ()
+        { token: 'delimiter', foreground: 'fde047' }, // Fallback for other delimiters
+        
+        { token: 'operator', foreground: '93c5fd' }, // Blue-300 - Operators
+        { token: 'string', foreground: '86efac' }, // Green-300 - Pastel Green
+        { token: 'number', foreground: 'fdba74' }, // Orange-300 - Pastel Orange
+        { token: 'regexp', foreground: 'f9a8d4' }, // Pink-300
+        { token: 'type', foreground: '5eead4' }, // Teal-300
+        { token: 'class', foreground: '5eead4' },
+        { token: 'function', foreground: '7dd3fc' }, // Sky-300 - Pastel Blue
+        { token: 'variable', foreground: 'd4d4d8' }, // Variables
+        { token: 'variable.parameter', foreground: 'd4d4d8' },
+        { token: 'tag', foreground: 'fca5a5' }, // Red-300
+        { token: 'attribute.name', foreground: '7dd3fc' },
       ],
       colors: {
         'editor.background': '#101011', // Zinc 950
-        'editor.foreground': '#d4d4d4',
+        'editor.foreground': '#d4d4d8', // Zinc 300
         'editor.lineHighlightBackground': '#18181b', // Zinc 900
-        'editor.selectionBackground': '#264f78',
-        'editor.inactiveSelectionBackground': '#3a3d41',
-        'editorCursor.foreground': '#3b82f6', // Blue cursor
-        'editorWhitespace.foreground': '#3f3f46',
+        'editor.selectionBackground': '#3b82f626', // Blue with lower opacity (~15%)
+        'editor.inactiveSelectionBackground': '#27272a',
+        'editorCursor.foreground': '#7dd3fc', // Sky 300 cursor
+        'editorWhitespace.foreground': '#27272a',
         'editorIndentGuide.background': '#27272a', // Zinc 800
         'editorIndentGuide.activeBackground': '#52525b', // Zinc 600
         'editorLineNumber.foreground': '#52525b',
-        'editorLineNumber.activeForeground': '#e4e4e7', // Zinc 200
+        'editorLineNumber.activeForeground': '#a1a1aa', // Zinc 400
         'editor.border': '#00000000',
         'editorWidget.background': '#18181b',
         'editorWidget.border': '#27272a',
