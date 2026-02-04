@@ -58,9 +58,11 @@ export function EditorTabs() {
   // If no files open, don't show tabs? Or show empty? usually don't show tabs if no files.
   if (!openFiles || openFiles.length === 0) return null
 
+  // Tabs are h-9 (36px). Container is h-[38px] to leave 2px for scrollbar at the bottom.
+  // The scrollbar acts as the separator.
   return (
-    <div className="flex items-center w-full h-9 bg-[#101011] overflow-x-auto no-scrollbar">
-      {openFiles.map((file: any) => {
+    <div className="flex items-start w-full h-[38px] bg-[#101011] overflow-x-auto [&::-webkit-scrollbar]:h-[2px] [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-white/10 hover:[&::-webkit-scrollbar-thumb]:bg-white/20"> {
+        openFiles.map((file: any) => {
         const isActive = file.id === activeFileId
         const ext = getFileExtension(file.name).toLowerCase()
         const isImage = ['png', 'jpg', 'jpeg', 'gif', 'svg'].includes(ext)

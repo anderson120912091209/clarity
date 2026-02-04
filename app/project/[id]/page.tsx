@@ -48,51 +48,50 @@ function EditorLayout() {
   
   const [showLogs, setShowLogs] = useState(false)
 
-  // Header content for the workspace navigation
-  const headerContent = (
-    <>
-      {/* Left side - Toggle & Editor controls */}
-      <div className="flex items-center gap-3 flex-1 min-w-0">
-        <SidebarToggle />
-        <EditorTabs />
-      </div>
-      
+  // Header content for the editor pane
+  const editorHeader = (
+    <div className="flex items-center w-full h-full gap-3 overflow-hidden">
+        <div className="pl-2 flex items-center">
+            <SidebarToggle />
+        </div>
+        <div className="flex-1 min-w-0 overflow-hidden pl-2">
+           <EditorTabs />
+        </div>
+    </div>
+  )
 
-      
-      {/* PDF controls */}
-      <div className="flex items-center gap-2 flex-1 min-w-0">
-        <PDFNavContent 
-          isLoading={isLoading}
-          autoFetch={autoFetch}
-          scale={scale}
-          projectId={currentlyOpen?.projectId || ''}
-          onCompile={compile}
-          onZoomIn={handleZoomIn}
-          onZoomOut={handleZoomOut}
-          onResetZoom={handleResetZoom}
-          onDownload={handleDownload}
-          onToggleLogs={() => setShowLogs(!showLogs)}
-          showLogs={showLogs}
-        />
-      </div>
-      
-      {/* Chat controls when visible */}
-      {isChatVisible && (
-        <>
-
-          <div className="flex items-center">
-            <ChatNavContent onToggle={() => setIsChatVisible(false)} />
-          </div>
-        </>
-      )}
-    </>
+  // Header content for the PDF pane
+  const pdfHeader = (
+    <div className="flex items-center justify-between w-full h-full overflow-hidden">
+        <div className="flex-1 min-w-0 flex items-center justify-end gap-2 pr-1">
+          <PDFNavContent 
+            isLoading={isLoading}
+            autoFetch={autoFetch}
+            scale={scale}
+            projectId={currentlyOpen?.projectId || ''}
+            onCompile={compile}
+            onZoomIn={handleZoomIn}
+            onZoomOut={handleZoomOut}
+            onResetZoom={handleResetZoom}
+            onDownload={handleDownload}
+            onToggleLogs={() => setShowLogs(!showLogs)}
+            showLogs={showLogs}
+          />
+        </div>
+        {/* Chat controls when visible */}
+        {isChatVisible && (
+           <div className="flex items-center ml-2 border-l border-white/10 pl-2 shrink-0">
+             <ChatNavContent onToggle={() => setIsChatVisible(false)} />
+           </div>
+         )}
+    </div>
   )
 
   return (
     <AppLayout
       sidebar={<EditorSidebar />}
-      header={headerContent}
-      showHeader={true}
+      header={null}
+      showHeader={false}
     >
       {/* Content Panels */}
       <ResizablePanelGroup direction="horizontal" className="flex-1" autoSaveId="project-editor-layout">
@@ -100,6 +99,7 @@ function EditorLayout() {
           <CursorEditorContainer 
             onChatToggle={() => setIsChatVisible(!isChatVisible)}
             isChatVisible={isChatVisible}
+            header={editorHeader}
           />
         </ResizablePanel>
         <ResizableHandle className="w-2 bg-transparent flex items-center justify-center group outline-none">
@@ -112,6 +112,7 @@ function EditorLayout() {
             error={error}
             logs={logs}
             showLogs={showLogs}
+            header={pdfHeader}
           />
         </ResizablePanel>
         {isChatVisible && (

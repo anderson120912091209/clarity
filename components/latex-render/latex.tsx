@@ -162,10 +162,11 @@ interface LatexRendererProps {
   error: string | null
   logs?: string | null
   showLogs?: boolean
+  header?: React.ReactNode
 }
 
 
-function LatexRenderer({ pdfUrl, isLoading, error, logs, showLogs }: LatexRendererProps) {
+function LatexRenderer({ pdfUrl, isLoading, error, logs, showLogs, header }: LatexRendererProps) {
   const { project: data, projectId } = useProject();
   const scale = data?.projectScale ?? 0.9;
   const containerRef = useRef<HTMLDivElement>(null);
@@ -218,16 +219,30 @@ function LatexRenderer({ pdfUrl, isLoading, error, logs, showLogs }: LatexRender
 
   if (isLoading && !pdfUrl) {
     return (
-      <div className="flex justify-center items-center w-full h-full bg-zinc-950/50">
-        <LatexLoading />
+      <div className="flex flex-col w-full h-full bg-zinc-950/50">
+        {header && (
+          <div className="flex items-center justify-between px-4 py-2.5 shrink-0 bg-[#101011]">
+            {header}
+          </div>
+        )}
+        <div className="flex-1 flex justify-center items-center">
+           <LatexLoading />
+        </div>
       </div>
     )
   }
 
   return (
-    <div ref={containerRef} className="flex flex-col h-[calc(100%-16px)] w-[calc(100%-16px)]
-     bg-zinc-950/40 m-2 rounded-xl border border-white/10 overflow-hidden shadow-sm">
-      {showLogs ? (
+    <div className="flex flex-col w-full h-full bg-[#101011]">
+        {header && (
+          <div className="flex items-center justify-between px-4 py-2.5 shrink-0 bg-[#101011]">
+            {header}
+          </div>
+        )}
+        
+        <div ref={containerRef} className="flex-1 w-[calc(100%-16px)]
+        bg-zinc-950/40 m-2 rounded-xl border border-white/10 overflow-hidden shadow-sm flex flex-col relative">
+          {showLogs ? (
         <LogsPanel logs={logs ?? null} error={error} />
       ) : isLoading && !pdfUrl ? (
         <LatexLoading />
@@ -257,6 +272,7 @@ function LatexRenderer({ pdfUrl, isLoading, error, logs, showLogs }: LatexRender
            <p className="text-sm">Ready to compile</p>
         </div>
       )}
+        </div>
     </div>
   )
 }
@@ -306,8 +322,8 @@ export function PDFNavContent({
         {/* Spacer for left alignment if needed, or just empty to push right */}
       </div>
 
-      {/* Right Side Actions */}
-      <div className="flex items-center gap-3 shrink-0">
+      {/* Right Side Actions - Scrollable if too narrow */}
+      <div className="flex items-center gap-3 shrink-0 overflow-x-auto no-scrollbar max-w-full pl-2">
         
         {/* Compile Button */}
         <Button 
@@ -316,7 +332,7 @@ export function PDFNavContent({
           onClick={onCompile} 
           disabled={isLoading}
           className={cn(
-             "h-7 pl-2.5 pr-1 gap-1.5 text-xs font-medium bg-[#6D78E7] hover:bg-[#5b65d6] text-white border-0 transition-all rounded-md shadow-sm group",
+             "h-7 pl-2.5 pr-1 gap-1.5 text-xs font-medium bg-[#6D78E7] hover:bg-[#5b65d6] text-white border-0 transition-all rounded-md shadow-sm group shrink-0",
              isLoading ? "opacity-90 cursor-wait" : ""
           )}
         >
@@ -338,7 +354,7 @@ export function PDFNavContent({
            onClick={onToggleLogs}
            title="View Logs"
            className={cn(
-             "h-7 w-7 p-0 rounded-md transition-all ml-1",
+             "h-7 w-7 p-0 rounded-md transition-all ml-1 shrink-0",
              showLogs ? "bg-white/10 text-white" : "text-zinc-400 hover:text-white hover:bg-white/5"
            )}
          >
@@ -357,7 +373,7 @@ export function PDFNavContent({
           </Button>
           
           <span 
-            className="w-8 text-center text-[10px] font-medium text-zinc-500 select-none cursor-pointer hover:text-zinc-300 transition-colors" 
+            className="w-8 text-center text-[10px] font-medium text-zinc-500 select-none cursor-pointer hover:text-zinc-300 transition-colors shrink-0" 
             onClick={onResetZoom}
           >
             {Math.round(scale * 100)}%

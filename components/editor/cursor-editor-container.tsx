@@ -18,11 +18,13 @@ const isMac = typeof window !== 'undefined' && navigator.userAgent.includes('Mac
 interface CursorEditorContainerProps {
   onChatToggle?: () => void
   isChatVisible?: boolean
+  header?: React.ReactNode
 }
 
 const CursorEditorContainer: React.FC<CursorEditorContainerProps> = ({ 
   onChatToggle, 
-  isChatVisible = false 
+  isChatVisible = false,
+  header
 }) => {
   const { theme, systemTheme } = useTheme()
   const [localContent, setLocalContent] = useState('')
@@ -73,7 +75,12 @@ const CursorEditorContainer: React.FC<CursorEditorContainerProps> = ({
 
   return (
     <div className="relative flex flex-col w-full h-full bg-background overflow-hidden group/editor">
-
+      {/* Split Header, The left Side Panel Header  */}
+      {header && (
+        <div className="flex items-center justify-between shrink-0 bg-[#101011]">
+          {header}
+        </div>
+      )}
 
       {/* Editor Content Area */}
       {!currentlyOpen ? (

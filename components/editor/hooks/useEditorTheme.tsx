@@ -40,7 +40,7 @@ export const useEditorTheme = () => {
         'editor.lineHighlightBackground': '#18181b', // Zinc 900
         'editor.selectionBackground': '#3b82f626', // Blue with lower opacity (~15%)
         'editor.inactiveSelectionBackground': '#27272a',
-        'editorCursor.foreground': '#7dd3fc', // Sky 300 cursor
+        'editorCursor.foreground': '#ffffffff', // Sky 300 cursor
         'editorWhitespace.foreground': '#27272a',
         'editorIndentGuide.background': '#27272a', // Zinc 800
         'editorIndentGuide.activeBackground': '#52525b', // Zinc 600
