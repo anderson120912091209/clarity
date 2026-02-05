@@ -1,10 +1,9 @@
 'use client'
 
-import React, { useMemo, useState, useRef } from 'react'
+import React, { useMemo, useRef } from 'react'
 import { FileSystemNode, useFileSystem } from '@/hooks/useFileSystem'
 import { FileTreeItem } from './file-tree-item'
 import { FilePlus, FolderPlus, Upload } from 'lucide-react'
-import { Button } from '@/components/ui/button'
 import { db } from '@/lib/constants'
 import { tx } from '@instantdb/react'
 
@@ -20,9 +19,6 @@ export function FileTree({ files, projectId, userId, onOpenFile, currentlyOpenId
   const { createFile, createFolder, deleteNode, renameNode, uploadFile } = useFileSystem(projectId, userId)
   const fileInputRef = useRef<HTMLInputElement>(null)
   
-  // Local state for expansion (could be persisted in DB too, but local is fine for MVP)
-  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
-
   // Convert flat list to tree
   const treeData = useMemo(() => {
     if (!files) return []
@@ -58,10 +54,6 @@ export function FileTree({ files, projectId, userId, onOpenFile, currentlyOpenId
     return roots
   }, [files])
 
-  const handleToggleExpand = (node: FileSystemNode) => {
-    // ... logic for toggling local state or DB state ...
-  }
-
   const handleUploadClick = () => {
     fileInputRef.current?.click()
   }
@@ -83,22 +75,40 @@ export function FileTree({ files, projectId, userId, onOpenFile, currentlyOpenId
         onChange={handleFileChange} 
         className="hidden" 
       />
-      <div className="flex items-center justify-between p-2 pb-1 text-xs text-muted-foreground font-medium">
-         <span>FILES</span>
-         <div className="flex gap-2">
-             <div role="button" onClick={() => createFile('new-file.tex')} className="hover:text-foreground cursor-pointer" title="New File">
-                <FilePlus className="w-3.5 h-3.5" />
-             </div>
-             <div role="button" onClick={() => createFolder('New Folder')} className="hover:text-foreground cursor-pointer" title="New Folder">
-                <FolderPlus className="w-3.5 h-3.5" />
-             </div>
-             <div role="button" onClick={handleUploadClick} className="hover:text-foreground cursor-pointer" title="Upload File">
-                <Upload className="w-3.5 h-3.5" />
-             </div>
-         </div>
+      <div className="flex items-center justify-between px-1.5 pb-2 text-[12px] text-white/60 font-medium">
+        <span>Files</span>
+        <div className="flex gap-1.5">
+          <button
+            type="button"
+            onClick={() => createFile('new-file.tex')}
+            className="w-6 h-6 rounded-md inline-flex items-center justify-center text-white/50 hover:text-white hover:bg-white/5 transition-colors"
+            title="New File"
+            aria-label="New File"
+          >
+            <FilePlus className="w-3.5 h-3.5" />
+          </button>
+          <button
+            type="button"
+            onClick={() => createFolder('New Folder')}
+            className="w-6 h-6 rounded-md inline-flex items-center justify-center text-white/50 hover:text-white hover:bg-white/5 transition-colors"
+            title="New Folder"
+            aria-label="New Folder"
+          >
+            <FolderPlus className="w-3.5 h-3.5" />
+          </button>
+          <button
+            type="button"
+            onClick={handleUploadClick}
+            className="w-6 h-6 rounded-md inline-flex items-center justify-center text-white/50 hover:text-white hover:bg-white/5 transition-colors"
+            title="Upload File"
+            aria-label="Upload File"
+          >
+            <Upload className="w-3.5 h-3.5" />
+          </button>
+        </div>
       </div>
       
-      <div className="flex-1 overflow-y-auto py-1">
+      <div className="flex-1 overflow-y-auto pb-1">
          {treeData.map(node => (
             <FileTreeItem
                key={node.id}

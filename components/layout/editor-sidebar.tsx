@@ -2,80 +2,54 @@
 
 import React from 'react'
 import Link from 'next/link'
-import Image from 'next/image'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
-import { User, Menu, X, Search, Pencil, ChevronDown, ChevronRight, Files, ArrowLeft } from 'lucide-react'
+import { User, Search, Pencil, ChevronDown, ArrowLeft, Settings, ChevronRight, Palette } from 'lucide-react'
 import { db } from '@/lib/constants'
-import { useRouter, usePathname } from 'next/navigation'
+import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 import { useSidebar } from '@/contexts/SidebarContext'
 import { useProject } from '@/contexts/ProjectContext'
-import { Input } from '@/components/ui/input'
 import { FileTree } from '@/components/file-tree/file-tree'
 import { tx } from '@instantdb/react'
+import { SidebarShell } from '@/components/layout/sidebar-shell'
+import { Button } from '@/components/ui/button'
+import type { EditorSyntaxTheme } from '@/components/editor/types'
 
-export default function EditorSidebar() {
+interface EditorSidebarProps {
+  syntaxTheme: EditorSyntaxTheme
+  onSyntaxThemeChange: (theme: EditorSyntaxTheme) => void
+}
+
+export default function EditorSidebar({ syntaxTheme, onSyntaxThemeChange }: EditorSidebarProps) {
   const router = useRouter()
-  const pathname = usePathname()
   const { user } = db.useAuth()
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false)
+  const [settingsView, setSettingsView] = useState<'root' | 'theme'>('root')
   const { isCollapsed } = useSidebar()
-  const { project, projectId, files, currentlyOpen } = useProject()
-  const [query, setQuery] = useState('')
+  const { projectId, files, currentlyOpen } = useProject()
 
   const handleSignOut = () => {
     db.auth.signOut()
     router.push('/')
   }
 
-  const projectTitle = project?.title || 'Untitled Project'
-  const projectInitials = projectTitle
-    .split(' ')
-    .map((word: string) => word[0]?.toUpperCase() || '')
-    .join('')
-    .slice(0, 2) || 'UP'
-
   return (
-    <>
-      {/* Mobile Header */}
-      <div className="lg:hidden fixed top-0 left-0 right-0 z-50 h-12 bg-[#090909] 
-      border-b border-white/[0.08] flex items-center justify-between px-4">
-        <Link href="/projects" className="flex items-center gap-2">
-          <Image
-            src="/logos/claritylogogreen.svg"
-            alt="Clarity"
-            width={20}
-            height={17}
-            className="h-4 w-auto"
-          />
-        </Link>
-        <button
-          onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-          className="w-8 h-8 rounded-[2px] flex items-center justify-center 
-          text-zinc-400 hover:text-white hover:bg-white/5 transition-colors"
-          aria-label="Toggle menu"
-        >
-          {isMobileMenuOpen ? <X className="w-4 h-4" /> : <Menu className="w-4 h-4" />}
-        </button>
-      </div>
-
-      {/* Sidebar */}
-      <aside
-        className={`
-          fixed lg:sticky top-0 left-0 h-screen bg-[#090909] flex flex-col z-40
-          transition-all duration-300 ease-out pt-12 lg:pt-3
-          ${isCollapsed ? 'w-0 overflow-hidden' : 'w-48'}
-          ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
-        `}
-      >
+    <SidebarShell
+      logoHref="/projects"
+      isCollapsed={isCollapsed}
+      isMobileMenuOpen={isMobileMenuOpen}
+      onToggleMobileMenu={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+      onCloseMobileMenu={() => setIsMobileMenuOpen(false)}
+    >
 
         {/* Top Header with User Profile - Same as Dashboard */}
-        <div className={`h-12 flex items-center ${isCollapsed ? 'justify-center px-2' : 'justify-between px-3'}`}>
+        <div className={`h-12 flex items-center ${isCollapsed ? 'justify-center px-2' : 'justify-between px-3'} border-b border-white/[0.06]`}>
           {/* User Profile with Dropdown */}
           <Popover>
             <PopoverTrigger asChild>
               <button
-                className={`flex items-center group outline-none focus-visible:ring-2 focus-visible:ring-white/20 focus-visible:ring-offset-2 focus-visible:ring-offset-[#090909] rounded-sm py-1 hover:bg-white/5 transition-colors ${isCollapsed ? 'justify-center px-1' : 'gap-2 px-1 min-w-0 flex-1'}`}
+                className={`flex items-center group outline-none focus-visible:ring-2 focus-visible:ring-white/20 focus-visible:ring-offset-2 focus-visible:ring-offset-[#0A0B0D] rounded-md py-1 hover:bg-white/5 transition-colors ${isCollapsed ? 'justify-center px-1' : 'gap-2 px-1.5 min-w-0 flex-1'}`}
                 aria-label="User menu"
               >
                 <div className="w-6 h-6 rounded-md flex items-center justify-center text-[9px] 
@@ -84,36 +58,17 @@ export default function EditorSidebar() {
                 </div>
                 {!isCollapsed && (
                   <>
-                    <span className="text-[12px] font-medium text-white/90 group-hover:text-white transition-colors truncate">{user?.email || 'User'}</span>
+                    <span className="text-[12px] font-medium text-white/85 group-hover:text-white transition-colors truncate">{user?.email || 'User'}</span>
                     <ChevronDown className="h-3 w-3 text-white/50 group-hover:text-white/70 transition-colors shrink-0" />
                   </>
                 )}
               </button>
             </PopoverTrigger>
-            <PopoverContent align="start" side="right" className="w-56 p-1 bg-[#090909] border-white/10 text-white shadow-2xl shadow-black/50 rounded-sm">
+            <PopoverContent align="start" side="right" className="w-56 p-1 bg-[#0A0B0D] border-white/10 text-white shadow-2xl shadow-black/50 rounded-md">
               <div className="flex flex-col gap-0.5">
-                <button className="flex items-center justify-between px-2 py-1.5 hover:bg-white/5 rounded-sm cursor-pointer transition-colors group text-left w-full">
-                  <span className="text-[12px] text-white group-hover:text-white">Settings</span>
-                  <span className="text-[11px] text-white/40 font-mono">G then S</span>
-                </button>
-                <button className="px-2 py-1.5 hover:bg-white/5 rounded-sm cursor-pointer transition-colors text-left">
-                  <span className="text-[12px] text-white">Invite and manage members</span>
-                </button>
-                <div className="h-[1px] bg-white/5 my-1" />
-                <button className="px-2 py-1.5 hover:bg-white/5 rounded-sm cursor-pointer transition-colors text-left">
-                  <span className="text-[12px] text-white">Download desktop app</span>
-                </button>
-                <div className="h-[1px] bg-white/5 my-1" />
-                <button className="flex items-center justify-between px-2 py-1.5 hover:bg-white/5 rounded-sm cursor-pointer transition-colors group text-left w-full">
-                  <span className="text-[12px] text-white group-hover:text-white">Switch workspace</span>
-                  <div className="flex items-center gap-1">
-                    <span className="text-[11px] text-white/40 font-mono">O then W</span>
-                    <ChevronRight className="w-3 h-3 text-white/40" />
-                  </div>
-                </button>
                 <button
                   onClick={handleSignOut}
-                  className="flex items-center justify-between px-2 py-1.5 hover:bg-red-500/10 rounded-sm text-left w-full transition-colors group"
+                  className="flex items-center justify-between px-2 py-1.5 hover:bg-white/5 rounded-sm cursor-pointer transition-colors group text-left w-full"
                 >
                   <span className="text-[12px] text-white/80 group-hover:text-white">Log out</span>
                   <div className="flex items-center gap-0.5">
@@ -130,14 +85,14 @@ export default function EditorSidebar() {
           {!isCollapsed && (
             <div className="flex items-center gap-1 shrink-0">
               <button
-                className="w-7 h-7 flex items-center justify-center text-white/70 hover:text-white hover:bg-white/5 rounded-sm transition-colors outline-none focus-visible:ring-2 focus-visible:ring-white/20"
+                className="w-7 h-7 flex items-center justify-center text-white/70 hover:text-white hover:bg-white/5 rounded-md transition-colors outline-none focus-visible:ring-2 focus-visible:ring-white/20"
                 aria-label="Search"
               >
                 <Search className="w-4 h-4" />
               </button>
               <Link
                 href="/new"
-                className="w-7 h-7 flex items-center justify-center text-white/70 hover:text-white hover:bg-white/5 rounded-sm transition-colors outline-none focus-visible:ring-2 focus-visible:ring-white/20"
+                className="w-7 h-7 flex items-center justify-center text-white/70 hover:text-white hover:bg-white/5 rounded-md transition-colors outline-none focus-visible:ring-2 focus-visible:ring-white/20"
                 aria-label="New document"
                 onClick={() => setIsMobileMenuOpen(false)}
               >
@@ -154,7 +109,7 @@ export default function EditorSidebar() {
             className={`group flex items-center text-[12px] font-medium 
             rounded-md outline-none focus-visible:ring-2 focus-visible:ring-white/20 transition-colors
             ${isCollapsed ? 'justify-center py-1' : 'gap-2 px-2 py-1.5'}
-            text-[#E3E4E5] hover:bg-[#151619]`}
+            text-white/80 hover:text-white hover:bg-white/5`}
             onClick={() => setIsMobileMenuOpen(false)}
             title={isCollapsed ? 'Back to Projects' : undefined}
           >
@@ -163,43 +118,11 @@ export default function EditorSidebar() {
           </Link>
         </nav>
 
-        {/* Project Header */}
-        {!isCollapsed && (
-          <div className="px-3 py-2 border-t border-white/[0.05]">
-            <div className="flex items-center gap-2 px-2">
-              <div className="w-5 h-5 rounded-sm bg-blue-600 flex items-center justify-center flex-shrink-0 text-[10px] font-bold text-white">
-                {projectInitials}
-              </div>
-              <span className="font-medium text-white/90 truncate text-[12px]">
-                {projectTitle}
-              </span>
-            </div>
-          </div>
-        )}
-
         {/* Files Section */}
         {!isCollapsed && (
           <div className="flex-1 flex flex-col overflow-hidden">
-            {/* Files Header */}
-            <div className="px-3 py-2 flex items-center justify-between">
-              <span className="text-[11px] font-medium text-white/50 uppercase tracking-wider">Files</span>
-            </div>
-
-            {/* File Search */}
-            <div className="px-3 mb-2">
-              <div className="relative group">
-                <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3 text-white/40 group-focus-within:text-white/60 transition-colors" />
-                <Input 
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                  placeholder="Filter files..."
-                  className="h-7 pl-7 bg-white/[0.03] border-white/[0.08] text-[11px] text-white/90 focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:border-white/20 placeholder:text-white/40"
-                />
-              </div>
-            </div>
-
             {/* File Tree */}
-            <div className="flex-1 overflow-auto px-1">
+            <div className="flex-1 overflow-auto px-2 pb-3">
               <FileTree 
                 files={files || []} 
                 projectId={projectId} 
@@ -215,15 +138,84 @@ export default function EditorSidebar() {
             </div>
           </div>
         )}
-      </aside>
 
-      {/* Mobile Overlay */}
-      {isMobileMenuOpen && (
-        <div
-          className="fixed inset-0 bg-black/50 z-30 lg:hidden"
-          onClick={() => setIsMobileMenuOpen(false)}
-        />
-      )}
-    </>
+        {!isCollapsed && (
+          <div className="px-3 py-2">
+            <Popover
+              open={isSettingsOpen}
+              onOpenChange={(open) => {
+                setIsSettingsOpen(open)
+                if (!open) setSettingsView('root')
+              }}
+            >
+              <PopoverTrigger asChild>
+                <button
+                  className="w-full h-8 rounded-md hover:bg-white/5 transition-colors flex items-center gap-2 px-2 text-white/70 hover:text-white"
+                  aria-label="Open settings"
+                >
+                  <Settings className="w-3.5 h-3.5 text-white/50" />
+                  <span className="text-[12px] font-medium">Settings</span>
+                </button>
+              </PopoverTrigger>
+              <PopoverContent
+                align="start"
+                side="right"
+                className="w-52 p-2 bg-[#0A0B0D] border-white/10 text-white shadow-2xl shadow-black/50 rounded-md"
+              >
+                {settingsView === 'root' ? (
+                  <div className="flex flex-col gap-1">
+                    <button
+                      onClick={() => setSettingsView('theme')}
+                      className="flex items-center justify-between px-2 py-1.5 rounded-md hover:bg-white/5 transition-colors"
+                    >
+                      <div className="flex items-center gap-2">
+                        <Palette className="w-3.5 h-3.5 text-white/60" />
+                        <span className="text-[11px] text-white/80">Theme</span>
+                      </div>
+                      <ChevronRight className="w-3 h-3 text-white/40" />
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex flex-col gap-2.5">
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => setSettingsView('root')}
+                        className="w-6 h-6 rounded-md hover:bg-white/5 flex items-center justify-center"
+                        aria-label="Back"
+                      >
+                        <ArrowLeft className="w-3.5 h-3.5 text-white/60" />
+                      </button>
+                      <div className="text-[12px] font-medium text-white/85">Theme</div>
+                    </div>
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-[12px] text-white/60">Syntax theme</span>
+                      <div className="flex items-center gap-1 border border-white/10 bg-zinc-950/40 rounded-md p-0.5">
+                        <Button
+                          type="button"
+                          variant={syntaxTheme === 'default' ? 'secondary' : 'ghost'}
+                          size="sm"
+                          className="h-5 px-2 text-[10px] font-medium"
+                          onClick={() => onSyntaxThemeChange('default')}
+                        >
+                          Default
+                        </Button>
+                        <Button
+                          type="button"
+                          variant={syntaxTheme === 'shiki' ? 'secondary' : 'ghost'}
+                          size="sm"
+                          className="h-5 px-2 text-[10px] font-medium"
+                          onClick={() => onSyntaxThemeChange('shiki')}
+                        >
+                          Shiki
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </PopoverContent>
+            </Popover>
+          </div>
+        )}
+    </SidebarShell>
   )
 }

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@/components/ui/resizable'
 import { AppLayout } from '@/components/layout/app-layout'
 import EditorSidebar from '@/components/layout/editor-sidebar'
@@ -11,9 +11,9 @@ import { ChatPanel, ChatNavContent } from '@/features/agent'
 import { ProjectProvider } from '@/contexts/ProjectContext'
 import { useParams } from 'next/navigation'
 import { useProject } from '@/contexts/ProjectContext'
-import { EditorNavContent } from '@/components/editor/cursor-editor-container'
 import { EditorTabs } from '@/components/editor/editor-tabs'
 import { PDFNavContent, useLatex } from '@/components/latex-render/latex'
+import { DEFAULT_EDITOR_SYNTAX_THEME, type EditorSyntaxTheme } from '@/components/editor/types'
 
 export const maxDuration = 30
 
@@ -31,6 +31,28 @@ function EditorLayout() {
   const [isChatVisible, setIsChatVisible] = useState(false)
   const { currentlyOpen } = useProject()
   const fileContent = currentlyOpen?.content || ''
+  const pdfScrollNonceRef = useRef(0)
+  const hasMountedRef = useRef(false)
+  const [editorSyntaxTheme, setEditorSyntaxTheme] = useState<EditorSyntaxTheme>(DEFAULT_EDITOR_SYNTAX_THEME)
+
+  useEffect(() => {
+    try {
+      const saved = window.localStorage.getItem('editor.syntaxTheme')
+      if (saved === 'shiki' || saved === 'default') {
+        setEditorSyntaxTheme(saved)
+      }
+    } catch {}
+  }, [])
+
+  useEffect(() => {
+    if (!hasMountedRef.current) {
+      hasMountedRef.current = true
+      return
+    }
+    try {
+      window.localStorage.setItem('editor.syntaxTheme', editorSyntaxTheme)
+    } catch {}
+  }, [editorSyntaxTheme])
 
   const { 
     pdfUrl, 
@@ -47,6 +69,20 @@ function EditorLayout() {
   } = useLatex()
   
   const [showLogs, setShowLogs] = useState(false)
+  const [pdfScrollRequest, setPdfScrollRequest] = useState<{ ratio: number; nonce: number } | null>(null)
+
+  const handleEditorCursorClick = useCallback(
+    ({ lineNumber, lineCount }: { lineNumber: number; column: number; lineCount: number }) => {
+      // Keep it simple for now: map source line position to a scroll ratio.
+      const safeLineCount = Math.max(1, lineCount)
+      const ratio =
+        safeLineCount <= 1 ? 0 : Math.min(1, Math.max(0, (lineNumber - 1) / (safeLineCount - 1)))
+
+      pdfScrollNonceRef.current += 1
+      setPdfScrollRequest({ ratio, nonce: pdfScrollNonceRef.current })
+    },
+    []
+  )
 
   // Header content for the editor pane
   const editorHeader = (
@@ -89,7 +125,7 @@ function EditorLayout() {
 
   return (
     <AppLayout
-      sidebar={<EditorSidebar />}
+      sidebar={<EditorSidebar syntaxTheme={editorSyntaxTheme} onSyntaxThemeChange={setEditorSyntaxTheme} />}
       header={null}
       showHeader={false}
     >
@@ -100,6 +136,8 @@ function EditorLayout() {
             onChatToggle={() => setIsChatVisible(!isChatVisible)}
             isChatVisible={isChatVisible}
             header={editorHeader}
+            onCursorClick={handleEditorCursorClick}
+            syntaxTheme={editorSyntaxTheme}
           />
         </ResizablePanel>
         <ResizableHandle className="w-2 bg-transparent flex items-center justify-center group outline-none">
@@ -113,6 +151,7 @@ function EditorLayout() {
             logs={logs}
             showLogs={showLogs}
             header={pdfHeader}
+            scrollRequest={pdfScrollRequest}
           />
         </ResizablePanel>
         {isChatVisible && (

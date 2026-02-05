@@ -87,7 +87,7 @@ export default function ProjectsPage() {
           >
             <Link href="/new">
               <PlusIcon className="mr-1.5 h-3.5 w-3.5" />
-              NewProject
+              New Project
             </Link>
           </Button>
         </div>

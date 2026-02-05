@@ -130,10 +130,14 @@ export function useAIAssist(onChange?: (value: string) => void): UseAIAssistRetu
       // Handle submit - stream AI response
       const handleSubmit = async (instructions: string) => {
         setIsStreaming(true)
-        
+
+        let suspendUri: string | null = null
+
         try {
           const model = editor.getModel()
           if (!model) throw new Error('No editor model')
+          suspendUri = model.uri.toString()
+          historyService.suspend(suspendUri)
           
           const fullFileText = model.getValue()
           const language = getLanguageFromFile(model.uri.path) || 'latex'
@@ -311,28 +315,34 @@ export function useAIAssist(onChange?: (value: string) => void): UseAIAssistRetu
                 // Revert changes
                 const model = editor.getModel()
                 if (model) {
-                   editor.executeEdits('ai-reject', [{
-                    range: new monacoInstance.Range(
-                      diff.startLine,
-                      1,
-                      diff.endLine,
-                      model.getLineMaxColumn(diff.endLine)
-                    ),
-                    text: diff.type === 'insertion' ? '' : (diff.type === 'edit' ? diff.originalCode : ''), // Insert->Empty, Edit->Original. Deletion is tricky logic here, simplification.
-                    forceMoveMarkers: true,
-                  }])
-                  
-                  // For deletion, we need to re-insert. computeDiffs logic:
-                  // Deletion: startLine is where it WAS.
-                  // Wait, if I deleted lines, the startLine in diff refers to the line currently there.
-                  // If I 'rejected' a deletion, I insert originalCode at startLine.
-                   if (diff.type === 'deletion') {
-                        editor.executeEdits('ai-reject', [{
+                  const uri = model.uri.toString()
+                  historyService.suspend(uri)
+                  try {
+                    editor.executeEdits('ai-reject', [{
+                      range: new monacoInstance.Range(
+                        diff.startLine,
+                        1,
+                        diff.endLine,
+                        model.getLineMaxColumn(diff.endLine)
+                      ),
+                      text: diff.type === 'insertion' ? '' : (diff.type === 'edit' ? diff.originalCode : ''), // Insert->Empty, Edit->Original. Deletion is tricky logic here, simplification.
+                      forceMoveMarkers: true,
+                    }])
+                    
+                    // For deletion, we need to re-insert. computeDiffs logic:
+                    // Deletion: startLine is where it WAS.
+                    // Wait, if I deleted lines, the startLine in diff refers to the line currently there.
+                    // If I 'rejected' a deletion, I insert originalCode at startLine.
+                    if (diff.type === 'deletion') {
+                      editor.executeEdits('ai-reject', [{
                         range: new monacoInstance.Range(diff.startLine, 1, diff.startLine, 1),
                         text: diff.originalCode + '\n',
                         forceMoveMarkers: true
-                        }])
-                   }
+                      }])
+                    }
+                  } finally {
+                    historyService.resume(uri)
+                  }
                 }
 
                 // Clear UI
@@ -379,6 +389,10 @@ export function useAIAssist(onChange?: (value: string) => void): UseAIAssistRetu
           if (activeZoneRef.current) {
             cleanupActiveZone(editor, activeZoneRef.current)
             activeZoneRef.current = null
+          }
+        } finally {
+          if (suspendUri) {
+            historyService.resume(suspendUri)
           }
         }
       }
@@ -513,6 +527,9 @@ export function useAIAssist(onChange?: (value: string) => void): UseAIAssistRetu
                              // 1. Revert Text
                              const model = editor.getModel()
                              if (model) {
+                               const uri = model.uri.toString()
+                               historyService.suspend(uri)
+                               try {
                                 const range = new monacoInstance.Range(
                                     diff.startLine,
                                     1,
@@ -534,6 +551,9 @@ export function useAIAssist(onChange?: (value: string) => void): UseAIAssistRetu
                                         forceMoveMarkers: true
                                      }])
                                 }
+                               } finally {
+                                 historyService.resume(uri)
+                               }
                              }
 
                              // 2. Clear UI

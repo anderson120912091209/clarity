@@ -3,12 +3,13 @@
 import React from 'react'
 import Link from 'next/link'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
-import { User, Menu, X, Search, Pencil, ChevronDown, ChevronRight } from 'lucide-react'
+import { User, Search, Pencil, ChevronDown } from 'lucide-react'
 import { db } from '@/lib/constants'
 import { useRouter, usePathname } from 'next/navigation'
 import { useState } from 'react'
-import Image from 'next/image'
 import { useSidebar } from '@/contexts/SidebarContext'
+import { SidebarShell } from '@/components/layout/sidebar-shell'
+import Image from 'next/image'
 
 export default function DashboardSidebar() {
   const router = useRouter()
@@ -25,38 +26,13 @@ export default function DashboardSidebar() {
   }
 
   return (
-    <>
-      {/* Mobile Header */}
-      <div className="lg:hidden fixed top-0 left-0 right-0 z-50 h-12 bg-[#090909] 
-      border-b border-white/[0.08] flex items-center justify-between px-4">
-        <Link href="/" className="flex items-center gap-2">
-          <Image
-            src="/logos/claritylogogreen.svg"
-            alt="Clarity"
-            width={20}
-            height={17}
-            className="h-4 w-auto"
-          />
-        </Link>
-        <button
-          onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-          className="w-8 h-8 rounded-[2px] flex items-center justify-center 
-          text-zinc-400 hover:text-white hover:bg-white/5 transition-colors"
-          aria-label="Toggle menu"
-        >
-          {isMobileMenuOpen ? <X className="w-4 h-4" /> : <Menu className="w-4 h-4" />}
-        </button>
-      </div>
-
-      {/* Sidebar */}
-      <aside
-        className={`
-          fixed lg:sticky top-0 left-0 h-screen bg-[#090909] flex flex-col z-40
-          transition-all duration-300 ease-out pt-12 lg:pt-3
-          ${isCollapsed ? 'w-0 overflow-hidden' : 'w-48'}
-          ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
-        `}
-      >
+    <SidebarShell
+      logoHref="/"
+      isCollapsed={isCollapsed}
+      isMobileMenuOpen={isMobileMenuOpen}
+      onToggleMobileMenu={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+      onCloseMobileMenu={() => setIsMobileMenuOpen(false)}
+    >
 
         {/* Top Header with User Profile */}
         <div className={`h-12 flex items-center ${isCollapsed ? 'justify-center px-2' : 'justify-between px-3'}`}>
@@ -81,25 +57,6 @@ export default function DashboardSidebar() {
             </PopoverTrigger>
             <PopoverContent align="start" side="right" className="w-56 p-1 bg-[#090909] border-white/10 text-white shadow-2xl shadow-black/50 rounded-sm">
               <div className="flex flex-col gap-0.5">
-                <button className="flex items-center justify-between px-2 py-1.5 hover:bg-white/5 rounded-sm cursor-pointer transition-colors group text-left w-full">
-                  <span className="text-[12px] text-white group-hover:text-white">Settings</span>
-                  <span className="text-[11px] text-white/40 font-mono">G then S</span>
-                </button>
-                <button className="px-2 py-1.5 hover:bg-white/5 rounded-sm cursor-pointer transition-colors text-left">
-                  <span className="text-[12px] text-white">Invite and manage members</span>
-                </button>
-                <div className="h-[1px] bg-white/5 my-1" />
-                <button className="px-2 py-1.5 hover:bg-white/5 rounded-sm cursor-pointer transition-colors text-left">
-                  <span className="text-[12px] text-white">Download desktop app</span>
-                </button>
-                <div className="h-[1px] bg-white/5 my-1" />
-                <button className="flex items-center justify-between px-2 py-1.5 hover:bg-white/5 rounded-sm cursor-pointer transition-colors group text-left w-full">
-                  <span className="text-[12px] text-white group-hover:text-white">Switch workspace</span>
-                  <div className="flex items-center gap-1">
-                    <span className="text-[11px] text-white/40 font-mono">O then W</span>
-                    <ChevronRight className="w-3 h-3 text-white/40" />
-                  </div>
-                </button>
                 <button
                   onClick={handleSignOut}
                   className="flex items-center justify-between px-2 py-1.5 hover:bg-red-500/10 rounded-sm text-left w-full transition-colors group"
@@ -162,15 +119,6 @@ export default function DashboardSidebar() {
             {!isCollapsed && <span>Projects</span>}
           </Link>
         </nav>
-      </aside>
-
-      {/* Mobile Overlay */}
-      {isMobileMenuOpen && (
-        <div
-          className="fixed inset-0 bg-black/50 z-30 lg:hidden"
-          onClick={() => setIsMobileMenuOpen(false)}
-        />
-      )}
-    </>
+    </SidebarShell>
   )
 }

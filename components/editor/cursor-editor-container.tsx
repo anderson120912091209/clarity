@@ -10,8 +10,7 @@ import { getFileExtension } from '@/lib/utils/client-utils'
 import ImageViewer from './image-viewer'
 import { Sparkles, MessageSquare, Command, ChevronRight, File } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { cn } from '@/lib/utils'
-import { Button } from '@/components/ui/button'
+import type { EditorSyntaxTheme } from '@/components/editor/types'
 
 const isMac = typeof window !== 'undefined' && navigator.userAgent.includes('Macintosh')
 
@@ -19,12 +18,16 @@ interface CursorEditorContainerProps {
   onChatToggle?: () => void
   isChatVisible?: boolean
   header?: React.ReactNode
+  onCursorClick?: (payload: { lineNumber: number; column: number; lineCount: number }) => void
+  syntaxTheme?: EditorSyntaxTheme
 }
 
 const CursorEditorContainer: React.FC<CursorEditorContainerProps> = ({ 
   onChatToggle, 
   isChatVisible = false,
-  header
+  header,
+  onCursorClick,
+  syntaxTheme
 }) => {
   const { theme, systemTheme } = useTheme()
   const [localContent, setLocalContent] = useState('')
@@ -132,6 +135,8 @@ const CursorEditorContainer: React.FC<CursorEditorContainerProps> = ({
             onChange={handleCodeChange}
             setIsStreaming={handleIsStreamingChange}
             value={localContent}
+            onCursorClick={onCursorClick}
+            syntaxTheme={syntaxTheme}
             key={`${theme || systemTheme}-${openFile?.id}`}
           />
 

@@ -6,6 +6,16 @@ export const useEditorTheme = () => {
   const { theme, systemTheme } = useTheme()
 
   const setTheme = (monacoInstance: typeof monaco) => {
+    const safeSetTheme = (themeId: string) => {
+      try {
+        monacoInstance.editor.setTheme(themeId)
+        return true
+      } catch (error) {
+        console.warn(`[EditorTheme] Failed to set theme "${themeId}"`, error)
+        return false
+      }
+    }
+
     // Define a refined "Cursor-like" dark theme
     monacoInstance.editor.defineTheme('cursor-dark', {
       base: 'vs-dark',
@@ -55,7 +65,15 @@ export const useEditorTheme = () => {
     })
 
     const isDark = theme === 'dark' || (theme === 'system' && systemTheme === 'dark')
-    monacoInstance.editor.setTheme(isDark ? 'cursor-dark' : 'vs')
+    const preferredTheme = isDark ? 'cursor-dark' : 'vs'
+    if (safeSetTheme(preferredTheme)) return
+
+    // If Shiki patched Monaco's setTheme, fall back to known Shiki themes.
+    const shikiFallback = isDark ? 'vitesse-dark' : 'vitesse-light'
+    if (safeSetTheme(shikiFallback)) return
+
+    // Final fallback to built-in Monaco themes.
+    safeSetTheme(isDark ? 'vs-dark' : 'vs')
   }
 
   return { setTheme }

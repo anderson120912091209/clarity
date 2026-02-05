@@ -163,10 +163,11 @@ interface LatexRendererProps {
   logs?: string | null
   showLogs?: boolean
   header?: React.ReactNode
+  scrollRequest?: { ratio: number; nonce: number } | null
 }
 
 
-function LatexRenderer({ pdfUrl, isLoading, error, logs, showLogs, header }: LatexRendererProps) {
+function LatexRenderer({ pdfUrl, isLoading, error, logs, showLogs, header, scrollRequest }: LatexRendererProps) {
   const { project: data, projectId } = useProject();
   const scale = data?.projectScale ?? 0.9;
   const containerRef = useRef<HTMLDivElement>(null);
@@ -262,6 +263,7 @@ function LatexRenderer({ pdfUrl, isLoading, error, logs, showLogs, header }: Lat
                 isDocumentReady={isDocumentReady}
                 numPages={numPages}
                 scale={scale}
+                scrollRequest={scrollRequest}
              />
         </div>
       ) : (

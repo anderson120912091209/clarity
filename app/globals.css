@@ -204,6 +204,22 @@ code, kbd, samp, pre {
   background-color: #60a5fa;
 }
 
+/* Monaco Editor: Inline chat hint on empty lines */
+.monaco-editor .inline-chat-hint {
+  color: rgba(148, 163, 184, 0.6);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 20px;
+  padding-left: 4px;
+  pointer-events: none;
+  user-select: none;
+  white-space: nowrap;
+}
+
+.dark .monaco-editor .inline-chat-hint {
+  color: rgba(148, 163, 184, 0.55);
+}
+
 /* Monaco Editor: Diff Visualization */
 /* Green for additions, Red for deletions */
 

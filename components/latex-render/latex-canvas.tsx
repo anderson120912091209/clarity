@@ -3,7 +3,7 @@
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area"
 import { Document, Page, pdfjs } from 'react-pdf'
 import { Skeleton } from "@/components/ui/skeleton"
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 // Ensure worker is initialized
 if (typeof window !== 'undefined') {
@@ -16,7 +16,8 @@ export default function LatexCanvas({
   options,
   isDocumentReady,
   numPages,
-  scale
+  scale,
+  scrollRequest
 }: {
   pdfUrl: string;
   onDocumentLoadSuccess: (result: { numPages: number }) => void;
@@ -24,9 +25,11 @@ export default function LatexCanvas({
   isDocumentReady: boolean;
   numPages: number;
   scale: number;
+  scrollRequest?: { ratio: number; nonce: number } | null;
 }) {
   const [workerReady, setWorkerReady] = useState(false)
   const [documentError, setDocumentError] = useState<string | null>(null)
+  const scrollAreaRef = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
     // Ensure worker is ready before rendering
@@ -45,6 +48,21 @@ export default function LatexCanvas({
     }
   }, [])
 
+  useEffect(() => {
+    if (!scrollRequest) return
+    if (!workerReady || !isDocumentReady || numPages <= 0) return
+
+    const root = scrollAreaRef.current
+    const viewport = root?.querySelector('[data-radix-scroll-area-viewport]') as HTMLElement | null
+    if (!viewport) return
+
+    const ratio = Math.min(1, Math.max(0, scrollRequest.ratio))
+    const maxScrollTop = viewport.scrollHeight - viewport.clientHeight
+    if (maxScrollTop <= 0) return
+
+    viewport.scrollTo({ top: maxScrollTop * ratio, behavior: 'smooth' })
+  }, [scrollRequest?.nonce, workerReady, isDocumentReady, numPages])
+
   if (!workerReady) {
     return (
       <div className="flex justify-center items-center w-full h-full">
@@ -54,7 +72,7 @@ export default function LatexCanvas({
   }
 
   return (
-    <ScrollArea className="flex-grow w-full h-full bg-foreground/5">
+    <ScrollArea ref={scrollAreaRef} className="flex-grow w-full h-full bg-foreground/5">
       <Document
         file={pdfUrl}
         onLoadSuccess={(pdf) => {

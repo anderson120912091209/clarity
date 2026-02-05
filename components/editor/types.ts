@@ -18,3 +18,6 @@ export type Range = monaco.Range
 export type Editor = editor.IStandaloneCodeEditor
 
 export type StreamableValue = {}
+
+export type EditorSyntaxTheme = 'default' | 'shiki'
+export const DEFAULT_EDITOR_SYNTAX_THEME: EditorSyntaxTheme = 'shiki'
