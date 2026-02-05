@@ -53,4 +53,20 @@ export async function setupShikiMonaco(monacoInstance: typeof monaco): Promise<v
 
   // Re-apply tokenization on every call to keep switching stable.
   shikiToMonaco(highlighter, monacoInstance)
+
+  // Map common Monaco theme names to Shiki themes so patched setTheme doesn't throw.
+  const editorAny = monacoInstance.editor as any
+  if (!editorAny.__shikiThemeAliasApplied) {
+    const baseSetTheme = monacoInstance.editor.setTheme.bind(monacoInstance.editor)
+    monacoInstance.editor.setTheme = (themeName: string) => {
+      const mapped =
+        themeName === 'light' || themeName === 'vs'
+          ? 'vitesse-light'
+          : themeName === 'dark' || themeName === 'vs-dark'
+            ? 'vitesse-dark'
+            : themeName
+      return baseSetTheme(mapped)
+    }
+    editorAny.__shikiThemeAliasApplied = true
+  }
 }

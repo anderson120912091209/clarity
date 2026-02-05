@@ -124,6 +124,15 @@ export const CodeEditor = ({
       height="100%"
       width="100%"
       value={value}
+      theme={
+        syntaxTheme === 'shiki'
+          ? isDark
+            ? 'vitesse-dark'
+            : 'vitesse-light'
+          : isDark
+            ? 'vs-dark'
+            : 'vs'
+      }
       className="bg-transparent" // Let Monaco handle bg
       onMount={(editor, monaco) => {
         monacoRef.current = monaco
