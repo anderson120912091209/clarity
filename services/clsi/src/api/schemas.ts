@@ -15,7 +15,7 @@ const resourceSchema = z.object({
 );
 
 export const compileRequestSchema = z.object({
-  compiler: z.enum(['pdflatex', 'xelatex', 'lualatex']).default('pdflatex'),
+  compiler: z.enum(['pdflatex', 'xelatex', 'lualatex', 'typst']).default('pdflatex'),
   rootResourcePath: z.string().min(1),
   timeout: z.number().min(1000).max(300000).optional(), // 1s to 5min
   draft: z.boolean().optional(),

@@ -4,10 +4,13 @@ import { fileURLToPath } from 'node:url';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 interface CLSISettings {
+  host: string;
   port: number;
   compileDir: string;
   outputDir: string;
   texliveImage: string;
+  typstImage: string;
+  typstAllowNetwork: boolean;
   compileTimeout: number;
   maxCompileSize: number;
   cacheAge: number;
@@ -15,8 +18,15 @@ interface CLSISettings {
   seccompProfilePath: string;
 }
 
+const parseBoolean = (value: string | undefined, defaultValue: boolean): boolean => {
+  if (value === undefined) return defaultValue;
+  const normalized = value.trim().toLowerCase();
+  return normalized === '1' || normalized === 'true' || normalized === 'yes' || normalized === 'on';
+};
+
 const settings: CLSISettings = {
   // Server configuration
+  host: process.env.HOST || '0.0.0.0',
   port: parseInt(process.env.PORT || '3013', 10),
   
   // Directory paths
@@ -25,6 +35,8 @@ const settings: CLSISettings = {
   
   // Docker configuration
   texliveImage: process.env.TEXLIVE_IMAGE || 'texlive/texlive:latest',
+  typstImage: process.env.TYPST_IMAGE || 'ghcr.io/typst/typst:latest',
+  typstAllowNetwork: parseBoolean(process.env.TYPST_ALLOW_NETWORK, false),
   
   // Compilation limits
   compileTimeout: parseInt(process.env.COMPILE_TIMEOUT || '60000', 10),

@@ -1,6 +1,6 @@
 # Clarity CLSI Service
 
-Common LaTeX Service Interface - A production-grade, sandboxed LaTeX compilation service inspired by Overleaf's architecture.
+Common LaTeX Service Interface - A production-grade, sandboxed document compilation service inspired by Overleaf's architecture.
 
 ## Features
 
@@ -14,6 +14,7 @@ Common LaTeX Service Interface - A production-grade, sandboxed LaTeX compilation
 - **Smart Caching**: Automatic caching of compiled PDFs with age and count-based expiry
 - **Concurrency Control**: Project-level locks prevent compilation race conditions
 - **Multiple Compilers**: Supports pdflatex, xelatex, and lualatex
+- **Typst Support**: Supports Typst compilation via the official Typst CLI image
 - **LaTeX Tools**: Uses latexmk for automatic reference/bibliography handling
 
 ## Quick Start
@@ -23,6 +24,7 @@ Common LaTeX Service Interface - A production-grade, sandboxed LaTeX compilation
 - Node.js 20+
 - Docker (running and accessible)
 - TeX Live Docker image: `docker pull texlive/texlive:latest`
+- Typst Docker image: `docker pull ghcr.io/typst/typst:latest`
 
 ### Installation
 
@@ -62,7 +64,7 @@ curl http://localhost:3013/project/test-123/build/{buildId}/output/output.pdf > 
 
 ### POST /project/:projectId/compile
 
-Compile a LaTeX project.
+Compile a document project (LaTeX or Typst).
 
 **Request:**
 
@@ -76,6 +78,21 @@ Compile a LaTeX project.
     {
       "path": "main.tex",
       "content": "LaTeX content here"
+    }
+  ]
+}
+```
+
+Typst request example:
+
+```json
+{
+  "compiler": "typst",
+  "rootResourcePath": "main.typ",
+  "resources": [
+    {
+      "path": "main.typ",
+      "content": "#set page(width: auto, height: auto)\n= Hello Typst"
     }
   ]
 }
@@ -116,10 +133,14 @@ Environment variables:
 
 | Variable          | Description            | Default                  |
 | ----------------- | ---------------------- | ------------------------ |
+| `HOST`            | Service bind host      | `0.0.0.0`                |
 | `PORT`            | Service port           | 3013                     |
 | `COMPILE_DIR`     | Compilation directory  | `/tmp/clsi/compiles`     |
 | `OUTPUT_DIR`      | Output cache directory | `/tmp/clsi/output`       |
 | `TEXLIVE_IMAGE`   | Docker image           | `texlive/texlive:latest` |
+| `TYPST_IMAGE`     | Docker image           | `ghcr.io/typst/typst:latest` |
+| `TYPST_ALLOW_NETWORK` | Allow Typst package downloads in compile container | `false` |
+| `FRONTEND_URL`    | Allowed frontend origin(s) for CORS (comma-separated) | `http://localhost:3000` |
 | `COMPILE_TIMEOUT` | Max compile time (ms)  | 60000                    |
 | `CACHE_AGE`       | Cache expiry time (ms) | 5400000 (90min)          |
 | `CACHE_LIMIT`     | Max builds per project | 2                        |
@@ -148,16 +169,21 @@ Environment variables:
 │ResourceManager│  │LatexRunner │
 └──────────────┘  └─────┬──────┘
                         │
-                        ▼
-                 ┌──────────────┐
-                 │DockerExecutor│
-                 └──────┬───────┘
                         │
-                        ▼
-              ┌──────────────────┐
-              │ Docker Container │
-              │  (TeX Live)      │
-              └──────────────────┘
+                        │      ┌────────────┐
+                        └─────▶│TypstRunner │
+                               └─────┬──────┘
+                                     │
+                                     ▼
+                              ┌──────────────┐
+                              │DockerExecutor│
+                              └──────┬───────┘
+                                     │
+                                     ▼
+                           ┌──────────────────┐
+                           │ Docker Container │
+                           │ TeX Live / Typst │
+                           └──────────────────┘
 ```
 
 ## Security
@@ -166,6 +192,9 @@ Environment variables:
 - **Seccomp Profile**: Whitelist-based syscall filtering
 - **Container Isolation**: No network, no capabilities, resource limits
 - **Timeout Protection**: Automatic container termination after timeout
+
+Note on Typst packages:
+- If your Typst file imports `@preview/...` packages, set `TYPST_ALLOW_NETWORK=true` so Typst can fetch packages from `packages.typst.org`.
 
 ## License
 

@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import { DockerExecutor } from './core/DockerExecutor.js';
 import { LatexRunner } from './core/LatexRunner.js';
+import { TypstRunner } from './core/TypstRunner.js';
 import { LockManager } from './core/LockManager.js';
 import { ResourceManager } from './core/ResourceManager.js';
 import { CacheManager } from './core/CacheManager.js';
@@ -24,11 +25,13 @@ async function main() {
     const lockManager = new LockManager();
     const resourceManager = new ResourceManager();
     const latexRunner = new LatexRunner(dockerExecutor);
+    const typstRunner = new TypstRunner(dockerExecutor);
     const cacheManager = new CacheManager();
     const compileManager = new CompileManager(
       lockManager,
       resourceManager,
       latexRunner,
+      typstRunner,
       cacheManager
     );
 
@@ -36,8 +39,33 @@ async function main() {
     const app = express();
 
     // CORS - Allow frontend to communicate with CLSI
+    const configuredOrigins = (process.env.FRONTEND_URL || 'http://localhost:3000')
+      .split(',')
+      .map(origin => origin.trim())
+      .filter(Boolean);
+    const isProduction = process.env.NODE_ENV === 'production';
+
     app.use(cors({
-      origin: process.env.FRONTEND_URL || 'http://localhost:3000',
+      origin: (origin, callback) => {
+        // Allow requests without Origin (e.g. curl, server-to-server checks)
+        if (!origin) {
+          callback(null, true);
+          return;
+        }
+
+        // In local development, avoid CORS breakage when frontend runs on a dynamic host/port.
+        if (!isProduction) {
+          callback(null, true);
+          return;
+        }
+
+        if (configuredOrigins.includes(origin)) {
+          callback(null, true);
+          return;
+        }
+
+        callback(new Error(`CORS blocked for origin: ${origin}`));
+      },
       credentials: true
     }));
 
@@ -52,9 +80,10 @@ async function main() {
     app.use(errorHandler);
 
     // Start server
-    const server = app.listen(settings.port, () => {
+    const server = app.listen(settings.port, settings.host, () => {
       logger.info(
         {
+          host: settings.host,
           port: settings.port,
           compileDir: settings.compileDir,
           outputDir: settings.outputDir,

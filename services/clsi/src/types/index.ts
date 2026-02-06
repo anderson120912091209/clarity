@@ -4,7 +4,7 @@
 
 export interface CompileRequest {
   projectId: string;
-  compiler: 'pdflatex' | 'xelatex' | 'lualatex';
+  compiler: 'pdflatex' | 'xelatex' | 'lualatex' | 'typst';
   rootResourcePath: string;
   timeout?: number;
   draft?: boolean;
@@ -42,6 +42,12 @@ export interface LatexOptions {
   stopOnFirstError?: boolean;
 }
 
+export interface TypstOptions {
+  directory: string;
+  mainFile: string;
+  timeout: number;
+}
+
 export interface DockerRunOptions {
   projectId: string;
   command: string[];
@@ -49,6 +55,7 @@ export interface DockerRunOptions {
   image: string;
   timeout: number;
   environment: Record<string, string>;
+  networkDisabled?: boolean;
 }
 
 export interface DockerResult {

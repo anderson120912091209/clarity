@@ -33,7 +33,9 @@ export function useLatex() {
   
   const scale = data?.projectScale ?? 0.9
   const autoFetch = data?.isAutoFetching ?? false
-  const latex = files?.find((f: any) => f.name === 'main.tex')?.content
+  const compileSourceContent =
+    files?.find((f: any) => f.name === 'main.tex')?.content ??
+    files?.find((f: any) => f.name === 'main.typ')?.content
 
   // Initial load of cached PDF
   useEffect(() => {
@@ -79,14 +81,14 @@ export function useLatex() {
     const resetTimer = () => {
       clearTimeout(debounceTimer)
       debounceTimer = setTimeout(() => {
-        if (autoFetch && latex && latex.trim() !== '') {
+        if (autoFetch && compileSourceContent && compileSourceContent.trim() !== '') {
           compile()
         }
       }, 1000)
     }
     resetTimer()
     return () => clearTimeout(debounceTimer)
-  }, [latex, autoFetch, isDataLoading, user])
+  }, [compileSourceContent, autoFetch, isDataLoading, user])
 
   const handleZoomIn = () => {
     const newScale = Math.min(scale + 0.1, 2.0)

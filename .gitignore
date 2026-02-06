@@ -15,6 +15,7 @@ node_modules
 
 # production
 /build
+/services/clsi/dist
 
 # misc
 .DS_Store
@@ -37,5 +38,4 @@ next-env.d.ts
 
 # cloned repositories
 /references
-
 

@@ -41,6 +41,19 @@ interface EditorFiles {
   [key: string]: any
 }
 
+function buildClsiCandidates(configuredUrl: string): string[] {
+  const cleanedConfiguredUrl = configuredUrl.replace(/\/+$/, '')
+  const candidates = [cleanedConfiguredUrl]
+
+  if (cleanedConfiguredUrl.includes('localhost')) {
+    candidates.push(cleanedConfiguredUrl.replace('localhost', '127.0.0.1'))
+  } else if (cleanedConfiguredUrl.includes('127.0.0.1')) {
+    candidates.push(cleanedConfiguredUrl.replace('127.0.0.1', 'localhost'))
+  }
+
+  return Array.from(new Set(candidates))
+}
+
 export async function fetchPdf(files: EditorFiles | EditorFiles[] | undefined | null) {
   // Validate files parameter
   if (!files) {
@@ -54,15 +67,30 @@ export async function fetchPdf(files: EditorFiles | EditorFiles[] | undefined | 
     throw new Error('Files array is empty or invalid. Please add files to your project.')
   }
   
-  if (!filesArray.some((file: any) => file?.name === 'main.tex')) {
+  const hasMainTex = filesArray.some((file: any) => file?.name === 'main.tex')
+  const hasMainTyp = filesArray.some((file: any) => file?.name === 'main.typ')
+
+  if (!hasMainTex && !hasMainTyp) {
     const errorData = {
       error: 'Missing File',
-      message: 'No main.tex file found',
-      details: 'The main.tex file is required for LaTeX compilation.',
+      message: 'No main.tex or main.typ file found',
+      details: 'A main.tex (LaTeX) or main.typ (Typst) file is required for compilation.',
     }
     console.error('Error fetching PDF:', errorData)
     throw new Error(`${errorData.error}: ${errorData.message}\n\nDetails: ${errorData.details}`)
   }
+
+  const compileTarget = hasMainTex
+    ? {
+        compiler: 'pdflatex' as const,
+        rootResourcePath: 'main.tex',
+        label: 'LaTeX',
+      }
+    : {
+        compiler: 'typst' as const,
+        rootResourcePath: 'main.typ',
+        label: 'Typst',
+      }
 
   // Create a map for quick lookups by ID
   const fileMap = new Map<string, any>()
@@ -110,31 +138,48 @@ export async function fetchPdf(files: EditorFiles | EditorFiles[] | undefined | 
     }))
 
   // CLSI endpoint (defaults to localhost for development)
-  const CLSI_URL = process.env.NEXT_PUBLIC_CLSI_URL || 'http://localhost:3013'
+  const configuredClsiUrl = process.env.NEXT_PUBLIC_CLSI_URL || 'http://localhost:3013'
+  const clsiCandidates = buildClsiCandidates(configuredClsiUrl)
   
-  console.log('[CLSI] Compiling with CLSI service:', CLSI_URL)
+  console.log('[CLSI] Compiling with CLSI service candidates:', clsiCandidates)
+  console.log('[CLSI] Compiler:', compileTarget.compiler)
+  console.log('[CLSI] Root file:', compileTarget.rootResourcePath)
   console.log('[CLSI] Resources:', resources.map(r => r.path))
 
   // Call CLSI compilation API
-  let compileResponse: Response
-  try {
-    compileResponse = await fetch(`${CLSI_URL}/project/user-project/compile`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        compiler: 'pdflatex',
-        rootResourcePath: 'main.tex',
-        resources
+  let compileResponse: Response | null = null
+  let activeClsiUrl = clsiCandidates[0]
+  let lastNetworkError: any = null
+
+  for (const candidateUrl of clsiCandidates) {
+    try {
+      const response = await fetch(`${candidateUrl}/project/user-project/compile`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          compiler: compileTarget.compiler,
+          rootResourcePath: compileTarget.rootResourcePath,
+          resources
+        })
       })
-    })
-  } catch (networkError: any) {
+
+      compileResponse = response
+      activeClsiUrl = candidateUrl
+      break
+    } catch (networkError: any) {
+      lastNetworkError = networkError
+    }
+  }
+
+  if (!compileResponse) {
     throw new Error(
       `Failed to connect to CLSI service.\n\n` +
       `Please check:\n` +
       `1. CLSI service is running (npm run dev in services/clsi)\n` +
-      `2. The service is accessible at: ${CLSI_URL}\n` +
-      `3. Your network connection is working\n\n` +
-      `Original error: ${networkError?.message || String(networkError)}`
+      `2. The service is accessible at: ${clsiCandidates.join(' or ')}\n` +
+      `3. Your network connection is working\n` +
+      `4. If this is a browser CORS issue, restart CLSI and frontend dev servers\n\n` +
+      `Original error: ${lastNetworkError?.message || String(lastNetworkError)}`
     )
   }
 
@@ -159,7 +204,7 @@ export async function fetchPdf(files: EditorFiles | EditorFiles[] | undefined | 
   const fetchLog = async (logFile: any) => {
     if (!logFile?.url) return null
     try {
-      const res = await fetch(`${CLSI_URL}${logFile.url}`)
+      const res = await fetch(`${activeClsiUrl}${logFile.url}`)
       if (res.ok) return await res.text()
     } catch (e) {
       console.warn('Failed to fetch logs', e)
@@ -172,7 +217,7 @@ export async function fetchPdf(files: EditorFiles | EditorFiles[] | undefined | 
 
   // Handle compilation errors
   if (compileResult.status !== 'success') {
-    let errorMessage = compileResult.message || 'LaTeX compilation failed'
+    let errorMessage = compileResult.message || `${compileTarget.label} compilation failed`
     const error = new Error(errorMessage) as any
     error.logs = logs
     throw error
@@ -186,11 +231,11 @@ export async function fetchPdf(files: EditorFiles | EditorFiles[] | undefined | 
     throw error
   }
 
-  console.log('[CLSI] Downloading PDF from:', `${CLSI_URL}${pdfFile.url}`)
+  console.log('[CLSI] Downloading PDF from:', `${activeClsiUrl}${pdfFile.url}`)
 
   // Fetch the compiled PDF
   try {
-    const pdfResponse = await fetch(`${CLSI_URL}${pdfFile.url}`)
+    const pdfResponse = await fetch(`${activeClsiUrl}${pdfFile.url}`)
     if (!pdfResponse.ok) {
       throw new Error(`Failed to download PDF: ${pdfResponse.status} ${pdfResponse.statusText}`)
     }
@@ -207,4 +252,8 @@ export async function fetchPdf(files: EditorFiles | EditorFiles[] | undefined | 
 
 export function containsMainTex(files: File[]): boolean {
   return files.some((file) => file.name === 'main.tex')
+}
+
+export function containsMainTyp(files: File[]): boolean {
+  return files.some((file) => file.name === 'main.typ')
 }

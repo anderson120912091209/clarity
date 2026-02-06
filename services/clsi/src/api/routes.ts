@@ -12,7 +12,7 @@ export function createRoutes(
 
   /**
    * POST /project/:projectId/compile
-   * Compile a LaTeX project
+   * Compile a document project
    */
   router.post('/project/:projectId/compile', async (req: Request, res: Response, next) => {
     try {

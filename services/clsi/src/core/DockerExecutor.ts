@@ -27,9 +27,10 @@ export class DockerExecutor {
    */
   async run(options: DockerRunOptions): Promise<DockerResult> {
     const containerName = `clarity-compile-${options.projectId}-${Date.now()}`;
+    const networkDisabled = options.networkDisabled ?? true;
     
     logger.info(
-      { projectId: options.projectId, command: options.command },
+      { projectId: options.projectId, command: options.command, networkDisabled },
       'Starting Docker compilation'
     );
 
@@ -43,7 +44,7 @@ export class DockerExecutor {
       WorkingDir: '/compile',
       
       // SECURITY: Disable all network access
-      NetworkDisabled: true,
+      NetworkDisabled: networkDisabled,
       
       // Run as root (TeX Live image doesn't have 'tex' user)
       // Still secure due to container isolation
