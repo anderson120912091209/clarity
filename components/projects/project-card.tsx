@@ -236,7 +236,7 @@ export default function ProjectCard({ project, detailed = false, loading = false
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="h-7 w-7 rounded-md bg-black/70 backdrop-blur-sm text-zinc-400 hover:bg-black/90 hover:text-white border border-white/10 shadow-lg"
+                    className="h-7 w-7 rounded-md text-zinc-600 hover:text-white"
                     aria-label="More options"
                   >
                     <MoreHorizontal className="h-4 w-4" />
@@ -244,23 +244,23 @@ export default function ProjectCard({ project, detailed = false, loading = false
                 </DropdownMenuTrigger>
                 <DropdownMenuContent
                   align="end"
-                  className="w-48 bg-[#090909]/98 backdrop-blur-xl border border-white/10 text-zinc-400 p-1 shadow-xl"
+                  className="w-40 bg-[#0F0F0F] border border-white/10 text-zinc-400 p-1 shadow-xl"
                 >
-                  <DropdownMenuItem className="focus:bg-white/10 focus:text-white rounded-md cursor-pointer text-[13px] font-medium py-2" onClick={handleEdit}>
-                    <Edit2Icon className="mr-2 h-3.5 w-3.5" />
+                  <DropdownMenuItem className="focus:bg-white/10 focus:text-white rounded-md cursor-pointer text-[12px] font-medium py-1.5 px-2" onClick={handleEdit}>
+                    <Edit2Icon className="mr-2 h-3 w-3" />
                     <span>Rename</span>
                   </DropdownMenuItem>
-                  <DropdownMenuItem className="focus:bg-white/10 focus:text-white rounded-md cursor-pointer text-[13px] font-medium py-2" onClick={handleDuplicate}>
-                    <CopyIcon className="mr-2 h-3.5 w-3.5" />
+                  <DropdownMenuItem className="focus:bg-white/10 focus:text-white rounded-md cursor-pointer text-[12px] font-medium py-1.5 px-2" onClick={handleDuplicate}>
+                    <CopyIcon className="mr-2 h-3 w-3" />
                     <span>Duplicate</span>
                   </DropdownMenuItem>
-                  <DropdownMenuItem className="focus:bg-white/10 focus:text-white rounded-md cursor-pointer text-[13px] font-medium py-2" onClick={handleDownload}>
-                    <DownloadIcon className="mr-2 h-3.5 w-3.5" />
+                  <DropdownMenuItem className="focus:bg-white/10 focus:text-white rounded-md cursor-pointer text-[12px] font-medium py-1.5 px-2" onClick={handleDownload}>
+                    <DownloadIcon className="mr-2 h-3 w-3" />
                     <span>Download PDF</span>
                   </DropdownMenuItem>
                   <div className="h-[1px] bg-white/5 my-1" />
-                  <DropdownMenuItem className="focus:bg-red-500/10 focus:text-red-400 text-red-400/80 rounded-md cursor-pointer text-[13px] font-medium py-2" onClick={handleDelete}>
-                    <XIcon className="mr-2 h-3.5 w-3.5" />
+                  <DropdownMenuItem className="focus:bg-red-500/10 focus:text-red-400 text-red-400/80 rounded-md cursor-pointer text-[12px] font-medium py-1.5 px-2" onClick={handleDelete}>
+                    <XIcon className="mr-2 h-3 w-3" />
                     <span>Delete Project</span>
                   </DropdownMenuItem>
                 </DropdownMenuContent>
