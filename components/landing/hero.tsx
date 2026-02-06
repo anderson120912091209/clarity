@@ -11,12 +11,13 @@ export function Hero() {
         
         {/* Headline */}
         <h1 className="text-3xl md:text-[38px] leading-[1.2] font-semibold tracking-tight text-zinc-300 mb-5 max-w-3xl">
-          Collaborative AI-Powered LaTeX Editor.<br />
+          Collaborative AI-Powered Scientific Editor.<br />
         </h1>
 
         {/* Subtext */}
         <p className="max-w-xl text-base md:text-lg text-zinc-400 mb-8 leading-relaxed font-normal">
           Clarity helps researchers, professors and students to compose and collaborate on their research papers faster. 
+          (Supports LaTeX & Typst) 
         </p>
 
         {/* CTA */}
@@ -46,7 +47,7 @@ export function Hero() {
                  <div className="relative z-10 shadow-2xl rounded-t-xl 
                  overflow-hidden border border-black/70 mx-auto max-w-[1100px] bg-white translate-y-1">
                      <img 
-                        src="/landing/screenshot.png"
+                        src="/landing/screenshot2.png"
                         alt="Jules Editor Interface"
                         className="w-full h-auto block"
                      />

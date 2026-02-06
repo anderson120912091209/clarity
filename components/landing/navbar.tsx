@@ -9,7 +9,7 @@ export function Navbar({ minimal = false }: { minimal?: boolean }) {
       <div className="max-w-5xl mx-auto flex items-center justify-between">
         <Link href="/" className="flex items-center gap-2.5">
            <img 
-              src="/landing/claritylogoitalics.png" 
+              src="/landing/claritylogopurple.png" 
               alt="Clarity" 
               className="h-8 w-auto"
            />

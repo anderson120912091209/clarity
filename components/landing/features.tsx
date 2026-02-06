@@ -58,27 +58,47 @@ export function Features() {
                 </div>
              </div>
 
-             {/* Smart Citations */}
-             <div className="md:col-span-2 group relative overflow-hidden rounded-2xl bg-[#0c0c0e] border border-white/5 p-8 transition-colors flex flex-col md:flex-row items-center gap-8">
-                 <div className="flex-1">
-                    <div className="w-12 h-12 rounded-lg bg-white/5 flex items-center justify-center mb-6 text-zinc-200">
-                        <Quote className="w-6 h-6" />
+             {/* Smart Preview */}
+             <div className="md:col-span-2 group relative overflow-hidden rounded-2xl bg-[#0c0c0e] border border-white/5 h-[400px]">
+                 <div className="absolute inset-0">
+                    <img 
+                        src="/landing/feature-showcase-1.png" 
+                        alt="Smart Preview"
+                        className="w-full h-full object-cover opacity-50 block"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-[#0c0c0e] via-[#0c0c0e]/80 to-transparent" />
+                 </div>
+                 
+                 <div className="relative z-10 h-full flex flex-col justify-end p-8">
+                    <div className="w-12 h-12 rounded-lg bg-white/10 backdrop-blur-sm flex items-center justify-center mb-4 text-zinc-200 border border-white/10">
+                        <Zap className="w-6 h-6" />
                     </div>
-                    <h3 className="text-lg font-bold text-white mb-2">Smart Citations</h3>
-                    <p className="text-zinc-400 text-sm leading-relaxed">
-                        Seamlessly integrate with Zotero. Search your library and insert perfectly formatted citations with a single keystroke.
+                    <h3 className="text-2xl font-bold text-white mb-3">Smart Preview</h3>
+                    <p className="text-zinc-300 text-base leading-relaxed max-w-lg">
+                        See your document come to life as you type. Instant compilation with zero lag, powered by our cloud infrastructure.
                     </p>
                  </div>
-                 <div className="w-full md:w-1/3 bg-black/20 rounded-lg border border-white/5 h-32 md:h-full p-4 flex flex-col gap-2 relative overflow-hidden">
-                     {/* Citation Mock */}
-                     <div className="bg-[#1a1a1c] p-2 rounded border border-white/5 text-[10px] text-zinc-400 flex items-center gap-2">
-                        <span className="text-zinc-200">@article</span>
-                        <span className="text-zinc-500">vaswani2017attention</span>
-                     </div>
-                     <div className="bg-[#1a1a1c] p-2 rounded border border-white/5 text-[10px] text-zinc-400 flex items-center gap-2">
-                         <span className="text-zinc-200">@book</span>
-                         <span className="text-zinc-500">knuth1984texbook</span>
-                     </div>
+             </div>
+
+             {/* Fast and Precise Edit */}
+             <div className="md:col-span-2 group relative overflow-hidden rounded-2xl bg-[#0c0c0e] border border-white/5 h-[400px]">
+                 <div className="absolute inset-0">
+                    <img 
+                        src="/landing/feature-showcase-2.png" 
+                        alt="Fast and Precise Edit"
+                        className="w-full h-full object-cover opacity-50 block"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-[#0c0c0e] via-[#0c0c0e]/80 to-transparent" />
+                 </div>
+
+                 <div className="relative z-10 h-full flex flex-col justify-end p-8">
+                    <div className="w-12 h-12 rounded-lg bg-white/10 backdrop-blur-sm flex items-center justify-center mb-4 text-zinc-200 border border-white/10">
+                        <Quote className="w-6 h-6" />
+                    </div>
+                    <h3 className="text-2xl font-bold text-white mb-3">Fast and Precise Edit</h3>
+                    <p className="text-zinc-300 text-base leading-relaxed max-w-lg">
+                        Make changes with confidence. Powerful editor with intelligent autocomplete, syntax highlighting, and real-time error detection.
+                    </p>
                  </div>
              </div>
 
