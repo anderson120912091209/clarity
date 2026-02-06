@@ -11,6 +11,7 @@ import { useFrontend } from '@/contexts/FrontendContext'
 import { getAllProjects } from '@/hooks/data'
 import { ViewToggle } from '@/components/projects/view-toggle'
 import ProjectListItem from '@/components/projects/project-list-item'
+import { initializeDefaultProjects } from '@/lib/utils/init-default-projects'
 
 export default function ProjectsPage() {
   const { user, isLoading: userLoading } = useFrontend()
@@ -33,6 +34,24 @@ export default function ProjectsPage() {
   }, [])
 
   const projects = data?.projects || []
+
+  // Initialize default projects for new users
+  useEffect(() => {
+    const initDefaults = async () => {
+      // Only initialize if user is loaded, not currently loading projects, and has zero projects
+      if (user && !isLoading && projects.length === 0) {
+        try {
+          await initializeDefaultProjects(user.id)
+        } catch (error) {
+          console.error('Failed to initialize default projects:', error)
+        }
+      }
+    }
+
+    initDefaults()
+  }, [user, isLoading, projects.length])
+
+
   const isPageLoading = !minLoadTimeElapsed || userLoading || !user || isLoading
   const filteredProjects = projects.filter((project) => 
     project.title.toLowerCase().includes(searchTerm.toLowerCase())
