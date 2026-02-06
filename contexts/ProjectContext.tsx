@@ -40,6 +40,7 @@ export function ProjectProvider({ children, projectId }: { children: ReactNode; 
     openFiles,
     currentlyOpen,
     activeFileId,
+    isLoading: isProjectLoading || isFilesLoading,
     isProjectLoading,
     isFilesLoading,
     error: projectError || filesError,

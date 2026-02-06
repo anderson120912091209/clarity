@@ -1,0 +1,28 @@
+"use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+const node_path_1 = __importDefault(require("node:path"));
+const node_url_1 = require("node:url");
+const __dirname = node_path_1.default.dirname((0, node_url_1.fileURLToPath)(import.meta.url));
+const settings = {
+    // Server configuration
+    port: parseInt(process.env.PORT || '3013', 10),
+    // Directory paths
+    compileDir: process.env.COMPILE_DIR || '/tmp/clsi/compiles',
+    outputDir: process.env.OUTPUT_DIR || '/tmp/clsi/output',
+    // Docker configuration
+    texliveImage: process.env.TEXLIVE_IMAGE || 'texlive/texlive:latest',
+    typstImage: process.env.TYPST_IMAGE || 'ghcr.io/typst/typst:latest',
+    // Compilation limits
+    compileTimeout: parseInt(process.env.COMPILE_TIMEOUT || '60000', 10),
+    maxCompileSize: parseInt(process.env.MAX_COMPILE_SIZE || '52428800', 10), // 50MB
+    // Cache configuration
+    cacheAge: parseInt(process.env.CACHE_AGE || '5400000', 10), // 90 minutes
+    cacheLimit: parseInt(process.env.CACHE_LIMIT || '2', 10),
+    // Security
+    seccompProfilePath: node_path_1.default.join(__dirname, 'seccomp.json'),
+};
+exports.default = settings;
+//# sourceMappingURL=settings.js.map

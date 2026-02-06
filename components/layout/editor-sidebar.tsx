@@ -3,7 +3,7 @@
 import React from 'react'
 import Link from 'next/link'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
-import { User, Search, Pencil, ChevronDown, ArrowLeft, Settings, ChevronRight, Palette } from 'lucide-react'
+import { User, Search, Pencil, ChevronDown, ArrowLeft, Settings, ChevronRight, Palette, MousePointer2 } from 'lucide-react'
 import { db } from '@/lib/constants'
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
@@ -13,6 +13,7 @@ import { FileTree } from '@/components/file-tree/file-tree'
 import { tx } from '@instantdb/react'
 import { SidebarShell } from '@/components/layout/sidebar-shell'
 import { Button } from '@/components/ui/button'
+import { Switch } from '@/components/ui/switch'
 import type { EditorSyntaxTheme } from '@/components/editor/types'
 
 interface EditorSidebarProps {
@@ -25,13 +26,22 @@ export default function EditorSidebar({ syntaxTheme, onSyntaxThemeChange }: Edit
   const { user } = db.useAuth()
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
-  const [settingsView, setSettingsView] = useState<'root' | 'theme'>('root')
+  const [settingsView, setSettingsView] = useState<'root' | 'theme' | 'preview'>('root')
   const { isCollapsed } = useSidebar()
-  const { projectId, files, currentlyOpen } = useProject()
+  const { projectId, project, files, currentlyOpen } = useProject()
+  const isPdfCaretNavigationEnabled = project?.isPdfCaretNavigationEnabled ?? true
 
   const handleSignOut = () => {
     db.auth.signOut()
     router.push('/')
+  }
+
+  const handlePdfCaretNavigationChange = (enabled: boolean) => {
+    db.transact([
+      tx.projects[projectId].update({
+        isPdfCaretNavigationEnabled: enabled,
+      }),
+    ])
   }
 
   return (
@@ -127,7 +137,7 @@ export default function EditorSidebar({ syntaxTheme, onSyntaxThemeChange }: Edit
                 files={files || []} 
                 projectId={projectId} 
                 userId={user?.id || ''}
-                onOpenFile={(file: any) => {
+                onOpenFile={(file: { id: string }) => {
                   db.transact([
                     tx.files[file.id].update({ isOpen: true }),
                     tx.projects[projectId].update({ activeFileId: file.id })
@@ -174,8 +184,18 @@ export default function EditorSidebar({ syntaxTheme, onSyntaxThemeChange }: Edit
                       </div>
                       <ChevronRight className="w-3 h-3 text-white/40" />
                     </button>
+                    <button
+                      onClick={() => setSettingsView('preview')}
+                      className="flex items-center justify-between px-2 py-1.5 rounded-md hover:bg-white/5 transition-colors"
+                    >
+                      <div className="flex items-center gap-2">
+                        <MousePointer2 className="w-3.5 h-3.5 text-white/60" />
+                        <span className="text-[11px] text-white/80">PDF Navigation</span>
+                      </div>
+                      <ChevronRight className="w-3 h-3 text-white/40" />
+                    </button>
                   </div>
-                ) : (
+                ) : settingsView === 'theme' ? (
                   <div className="flex flex-col gap-2.5">
                     <div className="flex items-center gap-2">
                       <button
@@ -209,6 +229,30 @@ export default function EditorSidebar({ syntaxTheme, onSyntaxThemeChange }: Edit
                           Shiki
                         </Button>
                       </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex flex-col gap-2.5">
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => setSettingsView('root')}
+                        className="w-6 h-6 rounded-md hover:bg-white/5 flex items-center justify-center"
+                        aria-label="Back"
+                      >
+                        <ArrowLeft className="w-3.5 h-3.5 text-white/60" />
+                      </button>
+                      <div className="text-[12px] font-medium text-white/85">PDF Navigation</div>
+                    </div>
+                    <div className="flex items-center justify-between gap-3 rounded-md border border-white/10 bg-zinc-950/40 px-2 py-2">
+                      <div className="space-y-0.5">
+                        <div className="text-[11px] text-white/85">Navigate PDF from caret</div>
+                        <div className="text-[10px] text-white/50">Scroll preview when your cursor moves in editor</div>
+                      </div>
+                      <Switch
+                        checked={isPdfCaretNavigationEnabled}
+                        onCheckedChange={handlePdfCaretNavigationChange}
+                        aria-label="Toggle PDF navigation from caret"
+                      />
                     </div>
                   </div>
                 )}

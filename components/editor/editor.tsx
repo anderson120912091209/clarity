@@ -42,6 +42,7 @@ export const CodeEditor = ({
   const monacoRef = useRef<any>(null)
   const originalSetThemeRef = useRef<((theme: string) => void) | null>(null)
   const defaultTokensDisposableRef = useRef<{ dispose: () => void } | null>(null)
+  const onCursorClickRef = useRef(onCursorClick)
   const applySeqRef = useRef(0)
   const isMac =
     typeof navigator !== 'undefined' && navigator.userAgent.includes('Macintosh')
@@ -117,6 +118,10 @@ export const CodeEditor = ({
   useEffect(() => {
     applySyntaxTheme()
   }, [applySyntaxTheme])
+
+  useEffect(() => {
+    onCursorClickRef.current = onCursorClick
+  }, [onCursorClick])
 
   return (
     <Editor
@@ -196,18 +201,17 @@ export const CodeEditor = ({
           updateInlineChatHint()
         })
 
-        if (onCursorClick) {
-          editor.onMouseDown((e) => {
-            const position = e.target.position
-            const model = editor.getModel()
-            if (!position || !model) return
-            onCursorClick({
-              lineNumber: position.lineNumber,
-              column: position.column,
-              lineCount: model.getLineCount(),
-            })
+        editor.onMouseDown((e) => {
+          const position = e.target.position
+          const model = editor.getModel()
+          const cursorClickHandler = onCursorClickRef.current
+          if (!position || !model || !cursorClickHandler) return
+          cursorClickHandler({
+            lineNumber: position.lineNumber,
+            column: position.column,
+            lineCount: model.getLineCount(),
           })
-        }
+        })
 
         editor.onDidChangeCursorPosition(() => {
           updateInlineChatHint()

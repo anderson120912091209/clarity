@@ -41,6 +41,10 @@ interface EditorFiles {
   [key: string]: any
 }
 
+interface FetchPdfOptions {
+  signal?: AbortSignal
+}
+
 function buildClsiCandidates(configuredUrl: string): string[] {
   const cleanedConfiguredUrl = configuredUrl.replace(/\/+$/, '')
   const candidates = [cleanedConfiguredUrl]
@@ -54,7 +58,34 @@ function buildClsiCandidates(configuredUrl: string): string[] {
   return Array.from(new Set(candidates))
 }
 
-export async function fetchPdf(files: EditorFiles | EditorFiles[] | undefined | null) {
+function shouldAllowTypstNetwork(resources: Array<{ path: string; content?: string; encoding?: string }>): boolean {
+  const packageImportPattern = /@preview\/[A-Za-z0-9_-]+:[A-Za-z0-9.+-]+/
+
+  for (const resource of resources) {
+    if (!resource.path.endsWith('.typ')) continue
+    if (!resource.content) continue
+
+    let text = resource.content
+    if (resource.encoding === 'base64') {
+      try {
+        text = atob(resource.content)
+      } catch {
+        text = resource.content
+      }
+    }
+
+    if (packageImportPattern.test(text)) {
+      return true
+    }
+  }
+
+  return false
+}
+
+export async function fetchPdf(
+  files: EditorFiles | EditorFiles[] | undefined | null,
+  options: FetchPdfOptions = {}
+) {
   // Validate files parameter
   if (!files) {
     throw new Error('No files provided. Please ensure you have files in your project.')
@@ -145,29 +176,69 @@ export async function fetchPdf(files: EditorFiles | EditorFiles[] | undefined | 
   console.log('[CLSI] Compiler:', compileTarget.compiler)
   console.log('[CLSI] Root file:', compileTarget.rootResourcePath)
   console.log('[CLSI] Resources:', resources.map(r => r.path))
+  const typstAllowNetwork = compileTarget.compiler === 'typst' ? shouldAllowTypstNetwork(resources) : false
+
+  const requestVariants =
+    compileTarget.compiler === 'typst'
+      ? [
+          {
+            endpointPath: '/project/user-project/typst/live/preview',
+            payload: {
+              rootResourcePath: compileTarget.rootResourcePath,
+              allowNetwork: typstAllowNetwork,
+              resources,
+            },
+          },
+          {
+            endpointPath: '/project/user-project/compile',
+            payload: {
+              compiler: compileTarget.compiler,
+              rootResourcePath: compileTarget.rootResourcePath,
+              allowNetwork: typstAllowNetwork,
+              resources,
+            },
+          },
+        ]
+      : [
+          {
+            endpointPath: '/project/user-project/compile',
+            payload: {
+              compiler: compileTarget.compiler,
+              rootResourcePath: compileTarget.rootResourcePath,
+              resources,
+            },
+          },
+        ]
 
   // Call CLSI compilation API
   let compileResponse: Response | null = null
   let activeClsiUrl = clsiCandidates[0]
   let lastNetworkError: any = null
 
-  for (const candidateUrl of clsiCandidates) {
-    try {
-      const response = await fetch(`${candidateUrl}/project/user-project/compile`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          compiler: compileTarget.compiler,
-          rootResourcePath: compileTarget.rootResourcePath,
-          resources
+  outer: for (const candidateUrl of clsiCandidates) {
+    for (const requestVariant of requestVariants) {
+      try {
+        const response = await fetch(`${candidateUrl}${requestVariant.endpointPath}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(requestVariant.payload),
+          signal: options.signal,
         })
-      })
 
-      compileResponse = response
-      activeClsiUrl = candidateUrl
-      break
-    } catch (networkError: any) {
-      lastNetworkError = networkError
+        if (
+          compileTarget.compiler === 'typst' &&
+          response.status === 404 &&
+          requestVariant.endpointPath === '/project/user-project/typst/live/preview'
+        ) {
+          continue
+        }
+
+        compileResponse = response
+        activeClsiUrl = candidateUrl
+        break outer
+      } catch (networkError: any) {
+        lastNetworkError = networkError
+      }
     }
   }
 
@@ -177,8 +248,9 @@ export async function fetchPdf(files: EditorFiles | EditorFiles[] | undefined | 
       `Please check:\n` +
       `1. CLSI service is running (npm run dev in services/clsi)\n` +
       `2. The service is accessible at: ${clsiCandidates.join(' or ')}\n` +
-      `3. Your network connection is working\n` +
-      `4. If this is a browser CORS issue, restart CLSI and frontend dev servers\n\n` +
+      `3. Typst live preview endpoint is available for Typst files\n` +
+      `4. Your network connection is working\n` +
+      `5. If this is a browser CORS issue, restart CLSI and frontend dev servers\n\n` +
       `Original error: ${lastNetworkError?.message || String(lastNetworkError)}`
     )
   }
@@ -204,7 +276,9 @@ export async function fetchPdf(files: EditorFiles | EditorFiles[] | undefined | 
   const fetchLog = async (logFile: any) => {
     if (!logFile?.url) return null
     try {
-      const res = await fetch(`${activeClsiUrl}${logFile.url}`)
+      const res = await fetch(`${activeClsiUrl}${logFile.url}`, {
+        signal: options.signal,
+      })
       if (res.ok) return await res.text()
     } catch (e) {
       console.warn('Failed to fetch logs', e)
@@ -235,7 +309,9 @@ export async function fetchPdf(files: EditorFiles | EditorFiles[] | undefined | 
 
   // Fetch the compiled PDF
   try {
-    const pdfResponse = await fetch(`${activeClsiUrl}${pdfFile.url}`)
+    const pdfResponse = await fetch(`${activeClsiUrl}${pdfFile.url}`, {
+      signal: options.signal,
+    })
     if (!pdfResponse.ok) {
       throw new Error(`Failed to download PDF: ${pdfResponse.status} ${pdfResponse.statusText}`)
     }

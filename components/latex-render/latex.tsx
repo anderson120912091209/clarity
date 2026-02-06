@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect, useMemo, useRef } from 'react'
+import { useCallback, useState, useEffect, useMemo, useRef } from 'react'
 import { pdfjs } from 'react-pdf'
 import 'react-pdf/dist/Page/AnnotationLayer.css'
 import 'react-pdf/dist/Page/TextLayer.css'
@@ -22,34 +22,165 @@ if (typeof window !== 'undefined') {
   pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.mjs`
 }
 
+const AUTO_PERSIST_IDLE_MS = 1200
+
 // Hook for managing LaTeX compilation state
-export function useLatex() {
+export function useLatex(liveFileContentOverrides: Record<string, string> = {}) {
   const { user } = useFrontend()
   const { project: data, isLoading: isDataLoading, projectId, files } = useProject()
   const [pdfUrl, setPdfUrl] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [logs, setLogs] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const compileRunRef = useRef(0)
+  const activeAutoCompileAbortRef = useRef<AbortController | null>(null)
+  const objectUrlRef = useRef<string | null>(null)
+  const hasHydratedCachedPdfRef = useRef(false)
+  const lastAutoCompileFingerprintRef = useRef('')
+  const persistTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const pendingPersistRef = useRef<{
+    blob: Blob
+    pathname: string
+    projectId: string
+  } | null>(null)
+  const isPersistingRef = useRef(false)
   
   const scale = data?.projectScale ?? 0.9
   const autoFetch = data?.isAutoFetching ?? false
-  const compileSourceContent =
-    files?.find((f: any) => f.name === 'main.tex')?.content ??
-    files?.find((f: any) => f.name === 'main.typ')?.content
+  const effectiveFiles = useMemo(() => {
+    if (!Array.isArray(files)) return files
+    if (Object.keys(liveFileContentOverrides).length === 0) return files
 
-  // Initial load of cached PDF
+    return files.map((file: any) => {
+      const fileId = typeof file?.id === 'string' ? file.id : null
+      if (!fileId) return file
+
+      const overrideContent = liveFileContentOverrides[fileId]
+      if (overrideContent === undefined || overrideContent === file.content) return file
+
+      return { ...file, content: overrideContent }
+    })
+  }, [files, liveFileContentOverrides])
+  const hasMainTyp = effectiveFiles?.some((f: any) => f.name === 'main.typ') ?? false
+  const shouldAutoPreview = autoFetch || hasMainTyp
+  const compileSourceContent =
+    effectiveFiles?.find((f: any) => f.name === 'main.tex')?.content ??
+    effectiveFiles?.find((f: any) => f.name === 'main.typ')?.content
+  const autoCompileFingerprint = useMemo(() => {
+    if (!Array.isArray(effectiveFiles)) return ''
+
+    return effectiveFiles
+      .filter((file: any) => file?.type === 'file')
+      .map((file: any) => `${file.id ?? file.path ?? file.name}:${file.content ?? ''}`)
+      .join('\u0001')
+  }, [effectiveFiles])
+
   useEffect(() => {
-    if (!isDataLoading && data?.cachedPdfUrl) {
+    hasHydratedCachedPdfRef.current = false
+    lastAutoCompileFingerprintRef.current = ''
+    setPdfUrl(null)
+    setLogs(null)
+    setError(null)
+
+    if (persistTimeoutRef.current) {
+      clearTimeout(persistTimeoutRef.current)
+      persistTimeoutRef.current = null
+    }
+    pendingPersistRef.current = null
+  }, [projectId])
+
+  // Hydrate cached PDF once per project load.
+  useEffect(() => {
+    if (isDataLoading || hasHydratedCachedPdfRef.current) {
+      return
+    }
+
+    hasHydratedCachedPdfRef.current = true
+    if (data?.cachedPdfUrl) {
+      if (objectUrlRef.current) {
+        URL.revokeObjectURL(objectUrlRef.current)
+        objectUrlRef.current = null
+      }
       setPdfUrl(data.cachedPdfUrl)
     }
-  }, [isDataLoading, data])
+  }, [isDataLoading, data?.cachedPdfUrl])
 
-  const compile = async () => {
+  const flushPendingPersist = useCallback(async () => {
+    if (isPersistingRef.current) return
+
+    const pending = pendingPersistRef.current
+    if (!pending) return
+
+    pendingPersistRef.current = null
+    isPersistingRef.current = true
+
+    try {
+      const results = await Promise.allSettled([
+        savePdfToStorage(pending.blob, `${pending.pathname}main.pdf`, pending.projectId),
+        savePreviewToStorage(pending.blob, `${pending.pathname}preview.webp`, pending.projectId),
+      ])
+      results.forEach((result, index) => {
+        if (result.status === 'rejected') {
+          const target = index === 0 ? 'PDF' : 'preview'
+          console.warn(`Failed to persist compiled ${target} artifact:`, result.reason)
+        }
+      })
+    } catch (storageError) {
+      console.warn('Failed to persist compiled artifacts:', storageError)
+    } finally {
+      isPersistingRef.current = false
+      if (pendingPersistRef.current) {
+        void flushPendingPersist()
+      }
+    }
+  }, [])
+
+  const queuePersist = useCallback(
+    (blob: Blob, pathname: string, persistProjectId: string) => {
+      pendingPersistRef.current = {
+        blob,
+        pathname,
+        projectId: persistProjectId,
+      }
+
+      if (persistTimeoutRef.current) {
+        clearTimeout(persistTimeoutRef.current)
+      }
+
+      persistTimeoutRef.current = setTimeout(() => {
+        persistTimeoutRef.current = null
+        void flushPendingPersist()
+      }, AUTO_PERSIST_IDLE_MS)
+    },
+    [flushPendingPersist]
+  )
+
+  useEffect(
+    () => () => {
+      if (persistTimeoutRef.current) {
+        clearTimeout(persistTimeoutRef.current)
+      }
+      if (objectUrlRef.current) {
+        URL.revokeObjectURL(objectUrlRef.current)
+      }
+      activeAutoCompileAbortRef.current?.abort()
+    },
+    []
+  )
+
+  const compile = useCallback(async ({ mode = 'manual' }: { mode?: 'manual' | 'auto' } = {}) => {
     if (isDataLoading || !user) return
     
-    if (!files || (Array.isArray(files) && files.length === 0)) {
+    if (!effectiveFiles || (Array.isArray(effectiveFiles) && effectiveFiles.length === 0)) {
       setError('No files available to compile.')
       return
+    }
+
+    const runId = ++compileRunRef.current
+    const abortController = new AbortController()
+    if (mode === 'auto') {
+      activeAutoCompileAbortRef.current?.abort()
+      activeAutoCompileAbortRef.current = abortController
     }
     
     setIsLoading(true)
@@ -57,38 +188,71 @@ export function useLatex() {
     setLogs(null)
     
     try {
-      const { blob, logs } = await fetchPdf(files) as any;
-      const pathname = createPathname(user.id, projectId)
-      await savePdfToStorage(blob, pathname + 'main.pdf', projectId)
-      await savePreviewToStorage(blob, pathname + 'preview.webp', projectId)
+      const { blob, logs } = await fetchPdf(effectiveFiles, {
+        signal: abortController.signal,
+      }) as any
+      if (runId !== compileRunRef.current) return
+
       const url = URL.createObjectURL(blob)
+      if (objectUrlRef.current) {
+        URL.revokeObjectURL(objectUrlRef.current)
+      }
+      objectUrlRef.current = url
       setPdfUrl(url)
       setLogs(logs)
+
+      const pathname = createPathname(user.id, projectId)
+
+      // Persist only after the stream settles to avoid preview/DB race churn.
+      queuePersist(blob, pathname, projectId)
     } catch (error: any) {
+      if (abortController.signal.aborted || error?.name === 'AbortError') {
+        return
+      }
+      if (runId !== compileRunRef.current) return
       console.error('Error fetching PDF:', error);
       setError(error instanceof Error ? error.message : String(error))
       if (error.logs) {
         setLogs(error.logs)
       }
     } finally {
-      setIsLoading(false)
+      if (runId === compileRunRef.current) {
+        setIsLoading(false)
+      }
+      if (mode === 'auto' && activeAutoCompileAbortRef.current === abortController) {
+        activeAutoCompileAbortRef.current = null
+      }
     }
-  }
+  }, [isDataLoading, user, effectiveFiles, projectId, queuePersist])
 
   // Auto-compile effect
   useEffect(() => {
-    let debounceTimer: NodeJS.Timeout
-    const resetTimer = () => {
-      clearTimeout(debounceTimer)
-      debounceTimer = setTimeout(() => {
-        if (autoFetch && compileSourceContent && compileSourceContent.trim() !== '') {
-          compile()
-        }
-      }, 1000)
+    if (!shouldAutoPreview || !compileSourceContent || compileSourceContent.trim() === '') {
+      return
     }
-    resetTimer()
-    return () => clearTimeout(debounceTimer)
-  }, [compileSourceContent, autoFetch, isDataLoading, user])
+
+    if (!autoCompileFingerprint) {
+      return
+    }
+
+    if (lastAutoCompileFingerprintRef.current === autoCompileFingerprint) {
+      return
+    }
+
+    const autoCompileDelayMs = hasMainTyp ? 600 : 1000
+    const debounceTimer = setTimeout(() => {
+      if (lastAutoCompileFingerprintRef.current === autoCompileFingerprint) {
+        return
+      }
+      lastAutoCompileFingerprintRef.current = autoCompileFingerprint
+      void compile({ mode: 'auto' })
+    }, autoCompileDelayMs)
+
+    return () => {
+      clearTimeout(debounceTimer)
+      activeAutoCompileAbortRef.current?.abort()
+    }
+  }, [autoCompileFingerprint, compileSourceContent, shouldAutoPreview, hasMainTyp, compile])
 
   const handleZoomIn = () => {
     const newScale = Math.min(scale + 0.1, 2.0)
@@ -175,7 +339,7 @@ function LatexRenderer({ pdfUrl, isLoading, error, logs, showLogs, header, scrol
   const containerRef = useRef<HTMLDivElement>(null);
   
   const [numPages, setNumPages] = useState<number>(0)
-  const [isDocumentReady, setIsDocumentReady] = useState(false)
+  const [loadedPdfUrl, setLoadedPdfUrl] = useState<string | null>(null)
 
   // Trackpad zoom support
   useEffect(() => {
@@ -207,10 +371,17 @@ function LatexRenderer({ pdfUrl, isLoading, error, logs, showLogs, header, scrol
     }
   }, [scale, projectId])
 
+  useEffect(() => {
+    setNumPages(0)
+    setLoadedPdfUrl(null)
+  }, [pdfUrl])
+
   const onDocumentLoadSuccess = ({ numPages }: { numPages: number }) => {
     setNumPages(numPages)
-    setIsDocumentReady(true)
+    setLoadedPdfUrl(pdfUrl)
   }
+
+  const isDocumentReady = Boolean(pdfUrl && loadedPdfUrl === pdfUrl && numPages > 0)
 
   const options = useMemo(
     () => ({

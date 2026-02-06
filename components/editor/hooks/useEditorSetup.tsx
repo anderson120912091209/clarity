@@ -1,5 +1,5 @@
 'use client'
-import { useRef } from 'react'
+import { useEffect, useRef } from 'react'
 import { editor } from 'monaco-editor'
 import * as monaco from 'monaco-editor'
 import { createMathPreview, MathPreviewExtension } from '@/features/source-editor/extensions/math-preview'
@@ -9,11 +9,16 @@ export function useEditorSetup(onChange: (value: string) => void, value: string)
   const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null)
   const mathPreviewRef = useRef<MathPreviewExtension | null>(null)
   const autoCloseDisposableRef = useRef<monaco.IDisposable | null>(null)
+  const onChangeRef = useRef(onChange)
+
+  useEffect(() => {
+    onChangeRef.current = onChange
+  }, [onChange])
 
   const handleEditorDidMount = (editor: editor.IStandaloneCodeEditor, monacoInstance: typeof monaco) => {
     editorRef.current = editor
     editor.onDidChangeModelContent(() => {
-      onChange(editor.getValue())
+      onChangeRef.current(editor.getValue())
     })
     editor.getModel()?.updateOptions({ tabSize: 4, insertSpaces: true })
     editor.setScrollTop(1)

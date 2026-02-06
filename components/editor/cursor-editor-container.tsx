@@ -20,6 +20,7 @@ interface CursorEditorContainerProps {
   header?: React.ReactNode
   onCursorClick?: (payload: { lineNumber: number; column: number; lineCount: number }) => void
   syntaxTheme?: EditorSyntaxTheme
+  onFileContentChange?: (fileId: string, content: string) => void
 }
 
 const CursorEditorContainer: React.FC<CursorEditorContainerProps> = ({ 
@@ -27,7 +28,8 @@ const CursorEditorContainer: React.FC<CursorEditorContainerProps> = ({
   isChatVisible = false,
   header,
   onCursorClick,
-  syntaxTheme
+  syntaxTheme,
+  onFileContentChange
 }) => {
   const { theme, systemTheme } = useTheme()
   const [localContent, setLocalContent] = useState('')
@@ -35,29 +37,93 @@ const CursorEditorContainer: React.FC<CursorEditorContainerProps> = ({
   const { currentlyOpen, isFilesLoading, isProjectLoading } = useProject()
   const [isStreaming, setIsStreaming] = useState(false)
   const isStreamingRef = useRef(false)
+  const localContentRef = useRef('')
+  const persistTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const pendingPersistRef = useRef<{ fileId: string; content: string } | null>(null)
+  const isPersistingRef = useRef(false)
   
   const fileType = getFileExtension(currentlyOpen?.name || '')
   const ext = fileType.toLowerCase()
   const isImageFile = ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp', 'svg'].includes(ext)
   const isPdfFile = ext === 'pdf'
 
+  const flushPendingPersist = useCallback(async () => {
+    if (isPersistingRef.current) return
+
+    const pending = pendingPersistRef.current
+    if (!pending) return
+
+    pendingPersistRef.current = null
+    isPersistingRef.current = true
+
+    try {
+      await db.transact([tx.files[pending.fileId].update({ content: pending.content })])
+    } catch (error) {
+      console.error('Failed to persist editor content:', error)
+    } finally {
+      isPersistingRef.current = false
+      if (pendingPersistRef.current) {
+        void flushPendingPersist()
+      }
+    }
+  }, [])
+
+  const schedulePersist = useCallback(
+    (fileId: string, content: string) => {
+      pendingPersistRef.current = { fileId, content }
+
+      if (persistTimeoutRef.current) {
+        clearTimeout(persistTimeoutRef.current)
+      }
+
+      persistTimeoutRef.current = setTimeout(() => {
+        persistTimeoutRef.current = null
+        void flushPendingPersist()
+      }, 180)
+    },
+    [flushPendingPersist]
+  )
+
+  useEffect(() => {
+    localContentRef.current = localContent
+  }, [localContent])
+
+  useEffect(() => {
+    return () => {
+      if (persistTimeoutRef.current) {
+        clearTimeout(persistTimeoutRef.current)
+      }
+      void flushPendingPersist()
+    }
+  }, [flushPendingPersist])
+
   // ... useEffect for content updates ...
   useEffect(() => {
     if (currentlyOpen && currentlyOpen.id !== openFile?.id) {
+      if (persistTimeoutRef.current) {
+        clearTimeout(persistTimeoutRef.current)
+        persistTimeoutRef.current = null
+      }
+      void flushPendingPersist()
       setOpenFile(currentlyOpen)
-      setLocalContent(currentlyOpen.content)
+      const initialContent = currentlyOpen.content ?? ''
+      setLocalContent(initialContent)
+      localContentRef.current = initialContent
     }
-  }, [currentlyOpen?.id, currentlyOpen?.content]) // Added content dep for safety
+  }, [currentlyOpen?.id, currentlyOpen?.content, openFile?.id, flushPendingPersist])
 
   const handleCodeChange = useCallback(
     (newCode: string) => {
       // Only update if it's a text file (not image/pdf)
-      if (!isImageFile && !isPdfFile && newCode !== localContent && !isStreamingRef.current && openFile) {
-        setLocalContent(newCode)
-        db.transact([tx.files[openFile.id].update({ content: newCode })])
-      }
+      if (isImageFile || isPdfFile || isStreamingRef.current || !openFile) return
+      if (newCode === localContentRef.current) return
+
+      localContentRef.current = newCode
+      setLocalContent(newCode)
+      onFileContentChange?.(openFile.id, newCode)
+      schedulePersist(openFile.id, newCode)
     },
-    [localContent, openFile, isImageFile, isPdfFile]
+    [openFile, isImageFile, isPdfFile, onFileContentChange, schedulePersist]
   )
   
   // ... other handlers ...

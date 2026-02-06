@@ -1,0 +1,1 @@
+{"version":3,"file":"LockManager.d.ts","sourceRoot":"","sources":["../../src/core/LockManager.ts"],"names":[],"mappings":"AAAA,OAAO,KAAK,EAAE,IAAI,EAAE,MAAM,mBAAmB,CAAC;AAG9C;;;;;GAKG;AACH,qBAAa,WAAW;IACtB,OAAO,CAAC,KAAK,CAAoC;IAEjD;;OAEG;IACG,OAAO,CAAC,SAAS,EAAE,MAAM,GAAG,OAAO,CAAC,IAAI,CAAC;CA2BhD"}

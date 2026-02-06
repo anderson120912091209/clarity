@@ -29,11 +29,13 @@ export default function Home() {
 
 function EditorLayout() {
   const [isChatVisible, setIsChatVisible] = useState(false)
-  const { currentlyOpen } = useProject()
+  const { currentlyOpen, project, files } = useProject()
   const fileContent = currentlyOpen?.content || ''
+  const isPdfCaretNavigationEnabled = project?.isPdfCaretNavigationEnabled ?? true
   const pdfScrollNonceRef = useRef(0)
   const hasMountedRef = useRef(false)
   const [editorSyntaxTheme, setEditorSyntaxTheme] = useState<EditorSyntaxTheme>(DEFAULT_EDITOR_SYNTAX_THEME)
+  const [liveFileContentOverrides, setLiveFileContentOverrides] = useState<Record<string, string>>({})
 
   useEffect(() => {
     try {
@@ -54,6 +56,48 @@ function EditorLayout() {
     } catch {}
   }, [editorSyntaxTheme])
 
+  useEffect(() => {
+    if (!Array.isArray(files) || files.length === 0) {
+      setLiveFileContentOverrides({})
+      return
+    }
+
+    const contentById = new Map<string, string>()
+    for (const file of files) {
+      if (!file?.id) continue
+      contentById.set(file.id, file.content ?? '')
+    }
+
+    setLiveFileContentOverrides((prev) => {
+      let changed = false
+      const next: Record<string, string> = {}
+
+      for (const [fileId, content] of Object.entries(prev)) {
+        const persisted = contentById.get(fileId)
+        if (persisted === undefined) {
+          changed = true
+          continue
+        }
+
+        if (persisted === content) {
+          changed = true
+          continue
+        }
+
+        next[fileId] = content
+      }
+
+      return changed ? next : prev
+    })
+  }, [files])
+
+  const handleLiveFileContentChange = useCallback((fileId: string, content: string) => {
+    setLiveFileContentOverrides((prev) => {
+      if (prev[fileId] === content) return prev
+      return { ...prev, [fileId]: content }
+    })
+  }, [])
+
   const { 
     pdfUrl, 
     isLoading, 
@@ -66,13 +110,17 @@ function EditorLayout() {
     handleResetZoom, 
     handleDownload,
     logs
-  } = useLatex()
+  } = useLatex(liveFileContentOverrides)
   
   const [showLogs, setShowLogs] = useState(false)
   const [pdfScrollRequest, setPdfScrollRequest] = useState<{ ratio: number; nonce: number } | null>(null)
 
   const handleEditorCursorClick = useCallback(
     ({ lineNumber, lineCount }: { lineNumber: number; column: number; lineCount: number }) => {
+      if (!isPdfCaretNavigationEnabled) {
+        return
+      }
+
       // Keep it simple for now: map source line position to a scroll ratio.
       const safeLineCount = Math.max(1, lineCount)
       const ratio =
@@ -81,7 +129,7 @@ function EditorLayout() {
       pdfScrollNonceRef.current += 1
       setPdfScrollRequest({ ratio, nonce: pdfScrollNonceRef.current })
     },
-    []
+    [isPdfCaretNavigationEnabled]
   )
 
   // Header content for the editor pane
@@ -138,6 +186,7 @@ function EditorLayout() {
             header={editorHeader}
             onCursorClick={handleEditorCursorClick}
             syntaxTheme={editorSyntaxTheme}
+            onFileContentChange={handleLiveFileContentChange}
           />
         </ResizablePanel>
         <ResizableHandle className="w-2 bg-transparent flex items-center justify-center group outline-none">

@@ -32,6 +32,10 @@ export default function LatexCanvas({
   const scrollAreaRef = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
+    setDocumentError(null)
+  }, [pdfUrl])
+
+  useEffect(() => {
     // Ensure worker is ready before rendering
     if (typeof window !== 'undefined') {
       // Set worker source if not already set
@@ -74,6 +78,7 @@ export default function LatexCanvas({
   return (
     <ScrollArea ref={scrollAreaRef} className="flex-grow w-full h-full bg-foreground/5">
       <Document
+        key={pdfUrl}
         file={pdfUrl}
         onLoadSuccess={(pdf) => {
           setDocumentError(null)
