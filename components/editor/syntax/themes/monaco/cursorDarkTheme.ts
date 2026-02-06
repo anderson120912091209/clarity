@@ -1,0 +1,47 @@
+import type { editor } from 'monaco-editor'
+
+export const CURSOR_DARK_MONACO_THEME: editor.IStandaloneThemeData = {
+  base: 'vs-dark',
+  inherit: true,
+  rules: [
+    { token: '', foreground: 'd4d4d8' },
+    { token: 'comment', foreground: '71717a', fontStyle: 'italic' },
+    { token: 'keyword', foreground: 'c4b5fd', fontStyle: 'bold' },
+    { token: 'keyword.control', foreground: 'c4b5fd' },
+
+    { token: 'delimiter.curly', foreground: 'fde047' },
+    { token: 'delimiter.square', foreground: 'e879f9' },
+    { token: 'delimiter.parenthesis', foreground: 'e879f9' },
+    { token: 'delimiter', foreground: 'fde047' },
+
+    { token: 'operator', foreground: '93c5fd' },
+    { token: 'string', foreground: '86efac' },
+    { token: 'number', foreground: 'fdba74' },
+    { token: 'regexp', foreground: 'f9a8d4' },
+    { token: 'type', foreground: '5eead4' },
+    { token: 'class', foreground: '5eead4' },
+    { token: 'function', foreground: '7dd3fc' },
+    { token: 'variable', foreground: 'd4d4d8' },
+    { token: 'variable.parameter', foreground: 'd4d4d8' },
+    { token: 'tag', foreground: 'fca5a5' },
+    { token: 'attribute.name', foreground: '7dd3fc' },
+  ],
+  colors: {
+    'editor.background': '#101011',
+    'editor.foreground': '#d4d4d8',
+    'editor.lineHighlightBackground': '#18181b',
+    'editor.selectionBackground': '#3b82f626',
+    'editor.inactiveSelectionBackground': '#27272a',
+    'editorCursor.foreground': '#ffffffff',
+    'editorWhitespace.foreground': '#27272a',
+    'editorIndentGuide.background': '#27272a',
+    'editorIndentGuide.activeBackground': '#52525b',
+    'editorLineNumber.foreground': '#52525b',
+    'editorLineNumber.activeForeground': '#a1a1aa',
+    'editor.border': '#00000000',
+    'editorWidget.background': '#18181b',
+    'editorWidget.border': '#27272a',
+    'list.activeSelectionBackground': '#27272a',
+    'list.hoverBackground': '#27272a',
+  },
+}

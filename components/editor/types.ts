@@ -1,5 +1,7 @@
-import type { editor, languages } from 'monaco-editor'
+import type { editor } from 'monaco-editor'
 import * as monaco from 'monaco-editor'
+export type { EditorSyntaxTheme } from './syntax/themes/catalog'
+export { DEFAULT_EDITOR_SYNTAX_THEME } from './syntax/themes/catalog'
 
 export interface CodeEditorProps {
   onChange: (value: string) => void
@@ -17,7 +19,4 @@ export type Range = monaco.Range
 
 export type Editor = editor.IStandaloneCodeEditor
 
-export type StreamableValue = {}
-
-export type EditorSyntaxTheme = 'default' | 'shiki'
-export const DEFAULT_EDITOR_SYNTAX_THEME: EditorSyntaxTheme = 'shiki'
+export type StreamableValue = unknown

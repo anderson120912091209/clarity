@@ -6,13 +6,12 @@
 
 import * as monaco from 'monaco-editor'
 import {
-  findMathAtPosition,
   getMathAtCursor,
   extractCommandDefinitions,
   extractEnvironmentDefinitions,
   MathExpression,
 } from '../utils/math-detection'
-import { loadMathJax, renderMathToSVG } from '../utils/mathjax-loader'
+import { renderMathToSVG } from '../utils/mathjax-loader'
 
 const HIDE_TOOLTIP_EVENT = 'editor:hideMathTooltip'
 
@@ -21,6 +20,8 @@ interface MathPreviewState {
   currentMath: MathExpression | null
   hide: boolean
 }
+
+type MathPreviewLanguage = 'latex'
 
 class MathPreviewWidget implements monaco.editor.IContentWidget {
   readonly id = 'math-preview-widget'
@@ -62,7 +63,10 @@ class MathPreviewWidget implements monaco.editor.IContentWidget {
     return this.position
   }
 
-  async updateMath(math: MathExpression | null, definitions: string = '') {
+  async updateMath(
+    math: MathExpression | null,
+    options: { language: MathPreviewLanguage; definitions?: string }
+  ) {
     this.currentMath = math
 
     if (!math) {
@@ -81,10 +85,14 @@ class MathPreviewWidget implements monaco.editor.IContentWidget {
       this.mathContent.style.cssText = `
         background: var(--math-preview-bg, hsl(var(--background)));
         border: 1px solid hsl(var(--border));
-        border-radius: 6px;
-        padding: 12px;
+        border-radius: 4px;
+        padding: 2px 5px;
         box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-        max-width: 400px;
+        font-size: 12px;
+        width: max-content;
+        max-width: calc(100vw - 80px);
+        max-height: calc(100vh - 120px);
+        overflow: auto;
         opacity: 0;
         transition: opacity 0.2s;
       `
@@ -100,12 +108,26 @@ class MathPreviewWidget implements monaco.editor.IContentWidget {
     this.mathContent.style.opacity = '1'
 
     try {
-      // Render math
-      const svgElement = await renderMathToSVG(math.content, math.displayMode, definitions)
+      const renderedElement = await renderMathToSVG(
+        math.content,
+        math.displayMode,
+        options.definitions ?? ''
+      )
       
       // Clear and append rendered math
       this.mathContent.innerHTML = ''
-      this.mathContent.appendChild(svgElement)
+      this.mathContent.appendChild(renderedElement)
+      const svgElement =
+        renderedElement instanceof SVGElement
+          ? renderedElement
+          : renderedElement.querySelector('svg')
+
+      if (svgElement instanceof SVGElement) {
+        svgElement.style.display = 'block'
+        svgElement.style.maxWidth = 'none'
+        svgElement.style.width = 'auto'
+        svgElement.style.height = 'auto'
+      }
       
       // Update position
       this.updatePosition(math)
@@ -135,10 +157,8 @@ class MathPreviewWidget implements monaco.editor.IContentWidget {
     }
 
     if (this.domNode) {
-    if (this.domNode) {
       this.editor.layoutContentWidget(this)
     }
-  }
   }
 
   show() {
@@ -214,18 +234,24 @@ export class MathPreviewExtension {
     const position = this.editor.getPosition()
     if (!position) return
 
+    if (model.getLanguageId() !== 'latex') {
+      this.widget.hide()
+      this.state.currentMath = null
+      return
+    }
+    const language: MathPreviewLanguage = 'latex'
+
     // Find math expression at cursor
-    const math = getMathAtCursor(model, position)
+    const math = getMathAtCursor(model, position, { languageId: language })
 
     if (math) {
-      // Extract definitions from document
+      // Update widget with math
       const fullText = model.getValue()
       const commandDefs = extractCommandDefinitions(fullText)
       const envDefs = extractEnvironmentDefinitions(fullText)
       const definitions = [...commandDefs, ...envDefs].join('\n')
+      await this.widget.updateMath(math, { language, definitions })
 
-      // Update widget with math
-      await this.widget.updateMath(math, definitions)
       this.widget.show()
       this.state.currentMath = math
       this.state.hide = false
@@ -273,4 +299,3 @@ export function createMathPreview(
 export function hideMathPreview() {
   window.dispatchEvent(new CustomEvent(HIDE_TOOLTIP_EVENT))
 }
-

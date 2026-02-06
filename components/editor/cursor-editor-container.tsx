@@ -203,6 +203,7 @@ const CursorEditorContainer: React.FC<CursorEditorContainerProps> = ({
             value={localContent}
             onCursorClick={onCursorClick}
             syntaxTheme={syntaxTheme}
+            fileName={openFile?.name}
             key={`${theme || systemTheme}-${openFile?.id}`}
           />
 

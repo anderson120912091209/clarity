@@ -122,7 +122,13 @@ const EditorContainer = () => {
             "flex-grow h-full transition-all duration-300",
             isChatOpen ? "mr-[400px]" : "mr-0"
           )}>
-            <CodeEditor onChange={handleCodeChange} setIsStreaming={handleIsStreamingChange} value={localContent} key={`${theme || systemTheme}-${openFile?.id}`} />
+            <CodeEditor
+              onChange={handleCodeChange}
+              setIsStreaming={handleIsStreamingChange}
+              value={localContent}
+              fileName={openFile?.name}
+              key={`${theme || systemTheme}-${openFile?.id}`}
+            />
           </div>
 
           <ChatSidebar 

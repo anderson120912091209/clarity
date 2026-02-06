@@ -15,6 +15,7 @@ import { SidebarShell } from '@/components/layout/sidebar-shell'
 import { Button } from '@/components/ui/button'
 import { Switch } from '@/components/ui/switch'
 import type { EditorSyntaxTheme } from '@/components/editor/types'
+import { EDITOR_SYNTAX_THEME_OPTIONS } from '@/components/editor/syntax/themes/catalog'
 
 interface EditorSidebarProps {
   syntaxTheme: EditorSyntaxTheme
@@ -210,24 +211,18 @@ export default function EditorSidebar({ syntaxTheme, onSyntaxThemeChange }: Edit
                     <div className="flex items-center justify-between gap-2">
                       <span className="text-[12px] text-white/60">Syntax theme</span>
                       <div className="flex items-center gap-1 border border-white/10 bg-zinc-950/40 rounded-md p-0.5">
-                        <Button
-                          type="button"
-                          variant={syntaxTheme === 'default' ? 'secondary' : 'ghost'}
-                          size="sm"
-                          className="h-5 px-2 text-[10px] font-medium"
-                          onClick={() => onSyntaxThemeChange('default')}
-                        >
-                          Default
-                        </Button>
-                        <Button
-                          type="button"
-                          variant={syntaxTheme === 'shiki' ? 'secondary' : 'ghost'}
-                          size="sm"
-                          className="h-5 px-2 text-[10px] font-medium"
-                          onClick={() => onSyntaxThemeChange('shiki')}
-                        >
-                          Shiki
-                        </Button>
+                        {EDITOR_SYNTAX_THEME_OPTIONS.map((option) => (
+                          <Button
+                            key={option.value}
+                            type="button"
+                            variant={syntaxTheme === option.value ? 'secondary' : 'ghost'}
+                            size="sm"
+                            className="h-5 px-2 text-[10px] font-medium"
+                            onClick={() => onSyntaxThemeChange(option.value)}
+                          >
+                            {option.label}
+                          </Button>
+                        ))}
                       </div>
                     </div>
                   </div>

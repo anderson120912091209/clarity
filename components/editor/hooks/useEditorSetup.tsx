@@ -1,15 +1,38 @@
 'use client'
-import { useEffect, useRef } from 'react'
+import { useCallback, useEffect, useRef } from 'react'
 import { editor } from 'monaco-editor'
 import * as monaco from 'monaco-editor'
 import { createMathPreview, MathPreviewExtension } from '@/features/source-editor/extensions/math-preview'
 import { setupAutoCloseBrackets } from '@/features/languages/latex/linter/autoclose-bracket'
+import type { EditorLanguageId } from '../syntax/languages/registry'
 
-export function useEditorSetup(onChange: (value: string) => void, value: string) {
+export function useEditorSetup(
+  onChange: (value: string) => void,
+  value: string,
+  languageId: EditorLanguageId
+) {
   const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null)
   const mathPreviewRef = useRef<MathPreviewExtension | null>(null)
   const autoCloseDisposableRef = useRef<monaco.IDisposable | null>(null)
   const onChangeRef = useRef(onChange)
+
+  const applyLanguageSpecificEditorConfig = useCallback(
+    (editorInstance: editor.IStandaloneCodeEditor) => {
+      autoCloseDisposableRef.current?.dispose()
+      autoCloseDisposableRef.current = null
+
+      if (languageId === 'latex') {
+        autoCloseDisposableRef.current = setupAutoCloseBrackets(editorInstance, monaco)
+        return
+      }
+
+      editorInstance.updateOptions({
+        autoClosingBrackets: 'languageDefined',
+        autoClosingQuotes: 'languageDefined',
+      })
+    },
+    [languageId]
+  )
 
   useEffect(() => {
     onChangeRef.current = onChange
@@ -27,9 +50,7 @@ export function useEditorSetup(onChange: (value: string) => void, value: string)
 
     // Initialize math preview extension
     mathPreviewRef.current = createMathPreview(editor, monacoInstance, true)
-
-    // Setup auto-closing brackets for LaTeX
-    autoCloseDisposableRef.current = setupAutoCloseBrackets(editor, monacoInstance)
+    applyLanguageSpecificEditorConfig(editor)
 
     editor.setValue(value)
 
@@ -62,6 +83,22 @@ export function useEditorSetup(onChange: (value: string) => void, value: string)
       }
     })
   }
+
+  useEffect(() => {
+    const editorInstance = editorRef.current
+    if (!editorInstance) return
+    applyLanguageSpecificEditorConfig(editorInstance)
+  }, [applyLanguageSpecificEditorConfig])
+
+  useEffect(
+    () => () => {
+      autoCloseDisposableRef.current?.dispose()
+      autoCloseDisposableRef.current = null
+      mathPreviewRef.current?.dispose()
+      mathPreviewRef.current = null
+    },
+    []
+  )
 
   return { editorRef, handleEditorDidMount }
 }

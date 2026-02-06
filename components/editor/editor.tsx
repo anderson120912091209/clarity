@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef } from 'react'
 import Editor from '@monaco-editor/react'
 import { useEditorSetup } from './hooks/useEditorSetup'
 import { useAIAssist } from '@/features/agent'
@@ -8,10 +8,17 @@ import { Loader2 } from 'lucide-react'
 import { historyService } from '@/services/agent/browser/history/historyService'
 import { setupShikiMonaco } from './utils/shiki-monaco'
 import { useTheme } from 'next-themes'
-import latex from 'monaco-latex'
+import type { editor as MonacoEditorNamespace, IDisposable } from 'monaco-editor'
+import {
+  applyMonarchTokensProvider,
+  resolveEditorLanguageId,
+} from './syntax/languages/registry'
+import type { EditorLanguageId } from './syntax/languages/registry'
+import { resolveMonacoThemeForSyntaxTheme } from './syntax/themes/catalog'
 import { DEFAULT_EDITOR_SYNTAX_THEME, type EditorSyntaxTheme } from './types'
 
-const LATEX_LANGUAGE_ID = 'latex'
+type MonacoInstance = typeof import('monaco-editor')
+type MonacoModel = MonacoEditorNamespace.ITextModel
 
 interface CodeEditorProps {
   onChange: (value: string) => void
@@ -19,6 +26,7 @@ interface CodeEditorProps {
   setIsStreaming: (isStreaming: boolean) => void
   onCursorClick?: (payload: { lineNumber: number; column: number; lineCount: number }) => void
   syntaxTheme?: EditorSyntaxTheme
+  fileName?: string
 }
 
 const EditorLoading = () => (
@@ -33,15 +41,24 @@ export const CodeEditor = ({
   setIsStreaming,
   onCursorClick,
   syntaxTheme = DEFAULT_EDITOR_SYNTAX_THEME,
+  fileName,
 }: CodeEditorProps) => {
-  const { editorRef, handleEditorDidMount } = useEditorSetup(onChange, value)
+  const activeLanguage = useMemo<EditorLanguageId>(
+    () => resolveEditorLanguageId(fileName),
+    [fileName]
+  )
+  const { editorRef, handleEditorDidMount } = useEditorSetup(
+    onChange,
+    value,
+    activeLanguage
+  )
   const { handleAIAssist } = useAIAssist(onChange)
   const { setTheme } = useEditorTheme()
   const { theme, systemTheme } = useTheme()
 
-  const monacoRef = useRef<any>(null)
+  const monacoRef = useRef<MonacoInstance | null>(null)
   const originalSetThemeRef = useRef<((theme: string) => void) | null>(null)
-  const defaultTokensDisposableRef = useRef<{ dispose: () => void } | null>(null)
+  const defaultTokensDisposableRef = useRef<IDisposable | null>(null)
   const onCursorClickRef = useRef(onCursorClick)
   const applySeqRef = useRef(0)
   const isMac =
@@ -49,95 +66,87 @@ export const CodeEditor = ({
   const isDark =
     theme === 'dark' || (theme === 'system' && systemTheme === 'dark')
 
-  const ensureLatexLanguage = useCallback((monaco: any) => {
-    try {
-      const alreadyRegistered = monaco.languages
-        .getLanguages?.()
-        ?.some((lang: any) => lang.id === LATEX_LANGUAGE_ID)
-      if (!alreadyRegistered) {
-        monaco.languages.register({ id: LATEX_LANGUAGE_ID })
-      }
-    } catch {
-      monaco.languages.register({ id: LATEX_LANGUAGE_ID })
-    }
-  }, [])
-
   const applyDefaultSyntaxTheme = useCallback(
-    (monaco: any, model: any) => {
-      ensureLatexLanguage(monaco)
-      if (originalSetThemeRef.current && monaco.editor.setTheme !== originalSetThemeRef.current) {
-        monaco.editor.setTheme = originalSetThemeRef.current
+    (monacoInstance: MonacoInstance, model: MonacoModel) => {
+      if (
+        originalSetThemeRef.current &&
+        monacoInstance.editor.setTheme !== originalSetThemeRef.current
+      ) {
+        monacoInstance.editor.setTheme = originalSetThemeRef.current
       }
       defaultTokensDisposableRef.current?.dispose()
-      defaultTokensDisposableRef.current = monaco.languages.setMonarchTokensProvider(
-        LATEX_LANGUAGE_ID,
-        latex as any
+      defaultTokensDisposableRef.current = applyMonarchTokensProvider(
+        monacoInstance,
+        activeLanguage
       )
-      setTheme(monaco)
-      monaco.editor.setModelLanguage(model, LATEX_LANGUAGE_ID)
+      setTheme(monacoInstance)
+      monacoInstance.editor.setModelLanguage(model, activeLanguage)
       model.forceTokenization?.(model.getLineCount())
     },
-    [ensureLatexLanguage, setTheme]
+    [activeLanguage, setTheme]
   )
 
   const applyShikiSyntaxTheme = useCallback(
-    (monaco: any, model: any) => {
-      monaco.editor.setTheme(isDark ? 'vitesse-dark' : 'vitesse-light')
-      monaco.editor.setModelLanguage(model, LATEX_LANGUAGE_ID)
+    (monacoInstance: MonacoInstance, model: MonacoModel) => {
+      monacoInstance.editor.setTheme(
+        resolveMonacoThemeForSyntaxTheme('shiki', isDark)
+      )
+      monacoInstance.editor.setModelLanguage(model, activeLanguage)
       model.forceTokenization?.(model.getLineCount())
     },
-    [isDark]
+    [activeLanguage, isDark]
   )
 
   const applySyntaxTheme = useCallback(async () => {
     const seq = ++applySeqRef.current
-    const monaco = monacoRef.current
+    const monacoInstance = monacoRef.current
     const editor = editorRef.current
     const model = editor?.getModel()
-    if (!monaco || !editor || !model) return
+    if (!monacoInstance || !editor || !model) return
 
     if (syntaxTheme === 'shiki') {
       try {
-        ensureLatexLanguage(monaco)
         defaultTokensDisposableRef.current?.dispose()
         defaultTokensDisposableRef.current = null
-        await setupShikiMonaco(monaco)
+        await setupShikiMonaco(monacoInstance)
         if (applySeqRef.current !== seq) return
-        applyShikiSyntaxTheme(monaco, model)
+        applyShikiSyntaxTheme(monacoInstance, model)
       } catch (err) {
         console.warn('[Shiki] Theme setup failed; falling back to default:', err)
         if (applySeqRef.current !== seq) return
-        applyDefaultSyntaxTheme(monaco, model)
+        applyDefaultSyntaxTheme(monacoInstance, model)
       }
       return
     }
 
-    applyDefaultSyntaxTheme(monaco, model)
-  }, [applyDefaultSyntaxTheme, applyShikiSyntaxTheme, ensureLatexLanguage, syntaxTheme])
+    applyDefaultSyntaxTheme(monacoInstance, model)
+  }, [applyDefaultSyntaxTheme, applyShikiSyntaxTheme, editorRef, syntaxTheme])
 
   useEffect(() => {
     applySyntaxTheme()
   }, [applySyntaxTheme])
 
+  useEffect(
+    () => () => {
+      defaultTokensDisposableRef.current?.dispose()
+      defaultTokensDisposableRef.current = null
+    },
+    []
+  )
+
   useEffect(() => {
     onCursorClickRef.current = onCursorClick
   }, [onCursorClick])
 
+  const editorTheme = resolveMonacoThemeForSyntaxTheme(syntaxTheme, isDark)
+
   return (
     <Editor
-      language={LATEX_LANGUAGE_ID}
+      language={activeLanguage}
       height="100%"
       width="100%"
       value={value}
-      theme={
-        syntaxTheme === 'shiki'
-          ? isDark
-            ? 'vitesse-dark'
-            : 'vitesse-light'
-          : isDark
-            ? 'vs-dark'
-            : 'vs'
-      }
+      theme={editorTheme}
       className="bg-transparent" // Let Monaco handle bg
       onMount={(editor, monaco) => {
         monacoRef.current = monaco
@@ -155,7 +164,7 @@ export const CodeEditor = ({
           : 'Ctrl+L to chat, Ctrl+K to generate'
 
         let hintPosition: { lineNumber: number; column: number } | null = null
-        const hintWidget = {
+        const hintWidget: MonacoEditorNamespace.IContentWidget = {
           getId: () => 'inline-chat-hint-widget',
           getDomNode: () => hintNode,
           getPosition: () =>
@@ -167,20 +176,20 @@ export const CodeEditor = ({
               : null,
         }
 
-        editor.addContentWidget(hintWidget as any)
+        editor.addContentWidget(hintWidget)
 
         const updateInlineChatHint = () => {
           const model = editor.getModel()
           const selection = editor.getSelection()
           if (!model || !selection || !editor.hasTextFocus()) {
             hintPosition = null
-            editor.layoutContentWidget(hintWidget as any)
+            editor.layoutContentWidget(hintWidget)
             return
           }
 
           if (!selection.isEmpty()) {
             hintPosition = null
-            editor.layoutContentWidget(hintWidget as any)
+            editor.layoutContentWidget(hintWidget)
             return
           }
 
@@ -189,7 +198,7 @@ export const CodeEditor = ({
           const lineContent = model.getLineContent(lineNumber)
           const isEmptyLine = lineContent.trim().length === 0
           hintPosition = isEmptyLine ? { lineNumber, column } : null
-          editor.layoutContentWidget(hintWidget as any)
+          editor.layoutContentWidget(hintWidget)
         }
 
         // Some Monaco tokenizers/themes can "snap back" after (re)focus; re-apply for stability.

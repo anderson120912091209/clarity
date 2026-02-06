@@ -1,17 +1,46 @@
 'use client'
 
 import type * as monaco from 'monaco-editor'
+import {
+  ensureMonacoLanguageRegistered,
+  getShikiLanguageId,
+  type EditorLanguageId,
+} from '../syntax/languages/registry'
 
 const SHIKI_VERSION = '3.12.2'
 const SHIKI_URL = `https://esm.sh/shiki@${SHIKI_VERSION}`
 const SHIKI_MONACO_URL = `https://esm.sh/@shikijs/monaco@${SHIKI_VERSION}`
+const SUPPORTED_EDITOR_LANGUAGES: EditorLanguageId[] = ['latex', 'typst']
+
+type ShikiHighlighter = unknown
+
+interface ShikiModule {
+  createHighlighter: (options: {
+    themes: string[]
+    langs: string[]
+  }) => Promise<ShikiHighlighter>
+}
+
+interface ShikiMonacoModule {
+  shikiToMonaco: (
+    highlighter: ShikiHighlighter,
+    monacoInstance: typeof monaco
+  ) => void
+}
+
+type MonacoEditorWithShikiFlag = typeof monaco.editor & {
+  __shikiThemeAliasApplied?: boolean
+}
 
 let setupPromise: Promise<{
-  highlighter: any
-  shikiToMonaco: (highlighter: any, monacoInstance: typeof monaco) => void
+  highlighter: ShikiHighlighter
+  shikiToMonaco: (
+    highlighter: ShikiHighlighter,
+    monacoInstance: typeof monaco
+  ) => void
 }> | null = null
 
-function importFromUrl(url: string): Promise<any> {
+function importFromUrl(url: string): Promise<unknown> {
   // Use native `import()` at runtime without asking the bundler to resolve http(s) specifiers.
   // eslint-disable-next-line no-eval
   return (0, eval)(`import(${JSON.stringify(url)})`)
@@ -20,14 +49,19 @@ function importFromUrl(url: string): Promise<any> {
 export async function setupShikiMonaco(monacoInstance: typeof monaco): Promise<void> {
   if (!setupPromise) {
     setupPromise = (async () => {
-      const [{ createHighlighter }, { shikiToMonaco }] = await Promise.all([
+      const [shikiModule, shikiMonacoModule] = (await Promise.all([
         importFromUrl(SHIKI_URL),
         importFromUrl(SHIKI_MONACO_URL),
-      ])
+      ])) as [ShikiModule, ShikiMonacoModule]
+
+      const { createHighlighter } = shikiModule
+      const { shikiToMonaco } = shikiMonacoModule
 
       const highlighter = await createHighlighter({
         themes: ['vitesse-dark', 'vitesse-light'],
-        langs: ['latex'],
+        langs: SUPPORTED_EDITOR_LANGUAGES.map((languageId) =>
+          getShikiLanguageId(languageId)
+        ),
       })
 
       return { highlighter, shikiToMonaco }
@@ -40,23 +74,15 @@ export async function setupShikiMonaco(monacoInstance: typeof monaco): Promise<v
 
   const { highlighter, shikiToMonaco } = await setupPromise
 
-  try {
-    const alreadyRegistered = monacoInstance.languages
-      .getLanguages?.()
-      ?.some((l: any) => l.id === 'latex')
-    if (!alreadyRegistered) {
-      monacoInstance.languages.register({ id: 'latex' })
-    }
-  } catch {
-    monacoInstance.languages.register({ id: 'latex' })
-  }
+  ensureMonacoLanguageRegistered(monacoInstance, 'latex')
+  ensureMonacoLanguageRegistered(monacoInstance, 'typst')
 
   // Re-apply tokenization on every call to keep switching stable.
   shikiToMonaco(highlighter, monacoInstance)
 
   // Map common Monaco theme names to Shiki themes so patched setTheme doesn't throw.
-  const editorAny = monacoInstance.editor as any
-  if (!editorAny.__shikiThemeAliasApplied) {
+  const editorWithFlag = monacoInstance.editor as MonacoEditorWithShikiFlag
+  if (!editorWithFlag.__shikiThemeAliasApplied) {
     const baseSetTheme = monacoInstance.editor.setTheme.bind(monacoInstance.editor)
     monacoInstance.editor.setTheme = (themeName: string) => {
       const mapped =
@@ -67,6 +93,6 @@ export async function setupShikiMonaco(monacoInstance: typeof monaco): Promise<v
             : themeName
       return baseSetTheme(mapped)
     }
-    editorAny.__shikiThemeAliasApplied = true
+    editorWithFlag.__shikiThemeAliasApplied = true
   }
 }
