@@ -5,6 +5,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { MoreHorizontal, FileText, Edit2Icon, CopyIcon, DownloadIcon, XIcon } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
@@ -30,6 +31,10 @@ export default function ProjectListItem({ project, loading = false }: ProjectLis
   const { user } = useFrontend();
   const { email, id: userId } = user || { email: '', id: '' }
   const { data: files } = getAllProjectFiles(project?.id || '', userId)
+
+  // Determine project type
+  const isTypst = files?.files?.some((f: any) => f.name.endsWith('.typ'))
+  const projectType = isTypst ? 'Typst' : 'TeX'
 
   useEffect(() => {
     if (loading || !project || !email || !userId) return
@@ -129,10 +134,18 @@ export default function ProjectListItem({ project, loading = false }: ProjectLis
         </div>
 
         {/* Title */}
-        <div className="min-w-0">
+        <div className="min-w-0 flex items-center gap-2">
             <h3 className="text-[13px] font-medium text-zinc-300 group-hover:text-white truncate transition-colors">
                 {project.title}
             </h3>
+            <span className="text-zinc-600">•</span>
+            <span className={`text-[13px] font-medium ${
+                 isTypst 
+                  ? 'text-[#ABCCF5]' 
+                  : 'text-[#B5C6AE]'
+               }`}>
+                 {projectType}
+            </span>
         </div>
 
         {/* Date */}

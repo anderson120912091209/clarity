@@ -28,7 +28,11 @@ export default function ProjectCard({ project, detailed = false, loading = false
   const { user } = useFrontend();
   const { email, id: userId } = user || { email: '', id: '' }
   const [downloadURL, setDownloadURL] = useState('');
-  const { data: files} = getAllProjectFiles(project?.id || '', userId)
+  const { data: files } = getAllProjectFiles(project?.id || '', userId)
+
+  // Determine project type
+  const isTypst = files?.files?.some((f: any) => f.name.endsWith('.typ'))
+  const projectType = isTypst ? 'Typst' : 'TeX'
 
   useEffect(() => {
     if (loading || !project || !email || !userId) return
@@ -223,6 +227,7 @@ export default function ProjectCard({ project, detailed = false, loading = false
             onError={() => setImageError(true)}
           />
 
+
           {/* More Options Overlay */}
           <div className="absolute top-2 right-2 opacity-0 transition-opacity duration-200 group-focus-within:opacity-100 group-hover:opacity-100 z-10">
              <div onClick={(e) => {e.preventDefault(); e.stopPropagation();}}>
@@ -266,7 +271,19 @@ export default function ProjectCard({ project, detailed = false, loading = false
         
         {/* Title & Info Below Card */}
         <div className="mt-2 flex flex-col gap-0.5 px-0.5">
-          <h3 className="truncate text-[12px] font-medium text-white/90 group-hover:text-white transition-colors leading-tight">{project.title}</h3>
+          <div className="flex items-center gap-2 max-w-full">
+            <h3 className="truncate text-[12px] font-medium text-white/90 group-hover:text-white transition-colors leading-tight shrink">{project.title}</h3>
+            <div className="flex items-center text-[12px] shrink-0">
+               <span className="text-zinc-600 mr-1.5">•</span>
+               <span className={`font-medium ${
+                 isTypst 
+                  ? 'text-[#ABCCF5]' 
+                  : 'text-[#B5C6AE]'
+               }`}>
+                 {projectType}
+               </span>
+            </div>
+          </div>
           <p className="text-[10px] text-zinc-500 font-mono tracking-tight">
             {project.last_compiled 
               ? getTimeAgo(new Date(project.last_compiled))
