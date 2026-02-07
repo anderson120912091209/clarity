@@ -58,8 +58,8 @@ export function FileTreeItem({
         className={cn(
           "flex items-center gap-1.5 py-1 px-2 cursor-pointer transition-colors group rounded-sm mb-0.5 last:mb-0 text-left",
           isSelected
-            ? "bg-white/10 text-white"
-            : "text-white/60 hover:text-white hover:bg-white/5"
+            ? "bg-[#1C1D21] text-[#E4E4E7]"
+            : "text-white/60 hover:text-white hover:bg-[#151619]"
         )}
         style={{ paddingLeft: `${level * 12 + 4}px` }}
         onClick={(e) => {
@@ -106,36 +106,51 @@ export function FileTreeItem({
         )}
 
         <div className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center">
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <div 
-                  role="button" 
-                  className="p-0.5 hover:bg-zinc-700/50 rounded"
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <MoreHorizontal className="h-3 w-3" />
-                </div>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-40">
-                {isFolder && (
-                  <>
-                    <DropdownMenuItem onClick={() => onCreateFile(node.id)}>
-                      <FilePlus className="mr-2 h-3.5 w-3.5" /> New File
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => onCreateFolder(node.id)}>
-                      <FolderPlus className="mr-2 h-3.5 w-3.5" /> New Folder
-                    </DropdownMenuItem>
-                    <DropdownMenuSeparator />
-                  </>
-                )}
-                <DropdownMenuItem onClick={() => setIsEditing(true)}>
-                  <Edit2 className="mr-2 h-3.5 w-3.5" /> Rename
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => onDelete(node.id)} className="text-red-500 hover:text-red-600 focus:text-red-600">
-                  <Trash2 className="mr-2 h-3.5 w-3.5" /> Delete
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <div 
+                role="button" 
+                className="p-0.5 hover:bg-zinc-700/50 rounded text-white/40 hover:text-white"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <MoreHorizontal className="h-3.5 w-3.5" />
+              </div>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent 
+              align="end" 
+              className="w-48 bg-[#1C1D1F] border-white/[0.08] text-white/90 shadow-xl p-1"
+            >
+              {isFolder && (
+                <>
+                  <DropdownMenuItem 
+                    onClick={() => onCreateFile(node.id)}
+                    className="focus:bg-[#151619] focus:text-white cursor-pointer text-[12px] px-2 py-1.5 rounded-sm"
+                  >
+                    <FilePlus className="mr-2 h-3.5 w-3.5 opacity-70" /> New File
+                  </DropdownMenuItem>
+                  <DropdownMenuItem 
+                    onClick={() => onCreateFolder(node.id)}
+                    className="focus:bg-[#151619] focus:text-white cursor-pointer text-[12px] px-2 py-1.5 rounded-sm"
+                  >
+                    <FolderPlus className="mr-2 h-3.5 w-3.5 opacity-70" /> New Folder
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator className="bg-white/[0.08] my-1" />
+                </>
+              )}
+              <DropdownMenuItem 
+                onClick={() => setIsEditing(true)}
+                className="focus:bg-[#151619] focus:text-white cursor-pointer text-[12px] px-2 py-1.5 rounded-sm"
+              >
+                <Edit2 className="mr-2 h-3.5 w-3.5 opacity-70" /> Rename
+              </DropdownMenuItem>
+              <DropdownMenuItem 
+                onClick={() => onDelete(node.id)} 
+                className="focus:bg-[#3f1616] focus:text-red-400 text-red-500 hover:text-red-400 cursor-pointer text-[12px] px-2 py-1.5 rounded-sm"
+              >
+                <Trash2 className="mr-2 h-3.5 w-3.5 opacity-70" /> Delete
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
 

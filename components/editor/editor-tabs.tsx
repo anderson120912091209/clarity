@@ -78,7 +78,7 @@ export function EditorTabs() {
             key={file.id}
             onClick={() => handleTabClick(file.id)}
             className={cn(
-               "group flex items-center gap-2 pl-2.5 pr-1 h-7 min-w-[90px] max-w-[140px] rounded-md border text-[12px] font-medium cursor-pointer select-none transition-all",
+               "group shrink-0 flex items-center gap-2 pl-2.5 pr-1 h-7 rounded-md border text-[12px] font-medium cursor-pointer select-none transition-all whitespace-nowrap",
                isActive 
                  ? "bg-[#1C1D21] border-white/[0.08] text-[#E4E4E7] shadow-sm"
                  : "bg-transparent border-transparent text-white/50 hover:text-white/80 hover:bg-white/5"
@@ -86,7 +86,7 @@ export function EditorTabs() {
             title={file.name}
           >
             <Icon className={cn("w-3.5 h-3.5 shrink-0 transition-colors", isActive ? "text-[#E4E4E7]" : "opacity-60 group-hover:opacity-80")} />
-            <span className="truncate flex-1">{file.name}</span>
+            <span className="whitespace-nowrap">{file.name}</span>
             <div 
               role="button"
               onClick={(e) => handleCloseTab(e, file.id)}
