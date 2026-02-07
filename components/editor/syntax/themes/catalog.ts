@@ -1,6 +1,6 @@
 export type EditorSyntaxTheme = 'default' | 'shiki'
 
-export const DEFAULT_EDITOR_SYNTAX_THEME: EditorSyntaxTheme = 'shiki'
+export const DEFAULT_EDITOR_SYNTAX_THEME: EditorSyntaxTheme = 'default'
 
 export interface EditorSyntaxThemeOption {
   value: EditorSyntaxTheme

@@ -61,7 +61,7 @@ export function EditorTabs() {
   // Tabs are h-9 (36px). Container is h-[38px] to leave 2px for scrollbar at the bottom.
   // The scrollbar acts as the separator.
   return (
-    <div className="flex items-start w-full h-[38px] bg-[#101011] overflow-x-auto [&::-webkit-scrollbar]:h-[2px] [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-white/10 hover:[&::-webkit-scrollbar-thumb]:bg-white/20"> {
+    <div className="flex items-center w-full h-10 px-1 gap-1.5 bg-[#101011] overflow-x-auto [&::-webkit-scrollbar]:h-[2px] [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-white/10 hover:[&::-webkit-scrollbar-thumb]:bg-white/20"> {
         openFiles.map((file: any) => {
         const isActive = file.id === activeFileId
         const ext = getFileExtension(file.name).toLowerCase()
@@ -78,21 +78,21 @@ export function EditorTabs() {
             key={file.id}
             onClick={() => handleTabClick(file.id)}
             className={cn(
-              "group flex items-center gap-2 px-3 h-full min-w-[120px] max-w-[200px] border-r border-white/5 cursor-pointer select-none transition-colors",
-              isActive 
-                ? "bg-zinc-900/50 text-white border-t-2 border-t-violet-300" 
-                : "bg-transparent text-white/50 hover:bg-white/[0.02] border-t-2 border-t-transparent hover:text-white/80"
+               "group flex items-center gap-2 pl-2.5 pr-1 h-7 min-w-[90px] max-w-[140px] rounded-md border text-[12px] font-medium cursor-pointer select-none transition-all",
+               isActive 
+                 ? "bg-[#1C1D21] border-white/[0.08] text-[#E4E4E7] shadow-sm"
+                 : "bg-transparent border-transparent text-white/50 hover:text-white/80 hover:bg-white/5"
             )}
             title={file.name}
           >
-            <Icon className={cn("w-3.5 h-3.5 shrink-0", isActive ? "text-violet-300" : "opacity-70")} />
-            <span className="text-[12px] truncate flex-1">{file.name}</span>
+            <Icon className={cn("w-3.5 h-3.5 shrink-0 transition-colors", isActive ? "text-[#E4E4E7]" : "opacity-60 group-hover:opacity-80")} />
+            <span className="truncate flex-1">{file.name}</span>
             <div 
               role="button"
               onClick={(e) => handleCloseTab(e, file.id)}
               className={cn(
-                "rounded-sm p-0.5 opacity-0 group-hover:opacity-100 hover:bg-white/10 transition-all",
-                isActive && "opacity-100"
+                "rounded-md p-0.5 opacity-0 group-hover:opacity-100 hover:bg-white/10 text-white/40 hover:text-white transition-all",
+                isActive && "opacity-100 text-white/60"
               )}
             >
               <X className="w-3 h-3" />
