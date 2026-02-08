@@ -82,6 +82,30 @@ function shouldAllowTypstNetwork(resources: Array<{ path: string; content?: stri
   return false
 }
 
+function arrayBufferToBase64(buffer: ArrayBuffer): string {
+  const bytes = new Uint8Array(buffer)
+  const parts: string[] = []
+  const chunkSize = 0x8000
+
+  for (let index = 0; index < bytes.length; index += chunkSize) {
+    const chunk = bytes.subarray(index, index + chunkSize)
+    let chunkBinary = ''
+    for (const byte of chunk) {
+      chunkBinary += String.fromCharCode(byte)
+    }
+    parts.push(chunkBinary)
+  }
+
+  return btoa(parts.join(''))
+}
+
+function getByteSignature(buffer: ArrayBuffer, maxBytes = 8): string {
+  const bytes = new Uint8Array(buffer).subarray(0, maxBytes)
+  return Array.from(bytes)
+    .map((byte) => byte.toString(16).padStart(2, '0'))
+    .join(' ')
+}
+
 export async function fetchPdf(
   files: EditorFiles | EditorFiles[] | undefined | null,
   options: FetchPdfOptions = {}
@@ -142,29 +166,45 @@ export async function fetchPdf(
   const resources = await Promise.all(filesArray
     .filter((file: any) => file.type === 'file')
     .map(async (file: any) => {
+      const path = getFullPath(file)
       let content = file.content || ''
+      let encoding: 'utf-8' | 'base64' = 'utf-8'
       
       // If content is empty but we have a URL (uploaded file), fetch it
       if (!content && file.url) {
         try {
           const response = await fetch(file.url)
+          if (!response.ok) {
+            throw new Error(`Storage responded ${response.status} ${response.statusText}`)
+          }
           const arrayBuffer = await response.arrayBuffer()
-          // Convert to Base64
-          // Note context is browser here
-          const base64 = btoa(
-            new Uint8Array(arrayBuffer)
-              .reduce((data, byte) => data + String.fromCharCode(byte), '')
-          )
-          content = base64
+          if (arrayBuffer.byteLength === 0) {
+            throw new Error('Storage returned an empty file')
+          }
+
+          content = arrayBufferToBase64(arrayBuffer)
+          encoding = 'base64'
+
+          console.log('[CLSI] Loaded uploaded resource', {
+            path,
+            bytes: arrayBuffer.byteLength,
+            signature: getByteSignature(arrayBuffer),
+            contentType: response.headers.get('content-type') || 'unknown',
+          })
         } catch (e) {
-          console.error(`Failed to fetch content for ${file.name}`, e)
+          const reason = e instanceof Error ? e.message : String(e)
+          throw new Error(
+            `Failed to fetch uploaded file "${file.name}" from storage.\n\n` +
+            `This file could not be sent to the compiler.\n` +
+            `Reason: ${reason}`
+          )
         }
       }
 
       return {
-        path: getFullPath(file),
+        path,
         content,
-        encoding: (!content && file.url) ? 'base64' : 'utf-8'
+        encoding
       }
     }))
 
@@ -176,6 +216,10 @@ export async function fetchPdf(
   console.log('[CLSI] Compiler:', compileTarget.compiler)
   console.log('[CLSI] Root file:', compileTarget.rootResourcePath)
   console.log('[CLSI] Resources:', resources.map(r => r.path))
+  console.log(
+    '[CLSI] Resource encodings:',
+    resources.map((resource) => `${resource.path} (${resource.encoding ?? 'utf-8'})`)
+  )
   const typstAllowNetwork = compileTarget.compiler === 'typst' ? shouldAllowTypstNetwork(resources) : false
 
   const requestVariants =
