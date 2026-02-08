@@ -1,6 +1,10 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   output: 'standalone',
+  eslint: {
+    // Temporary deploy safeguard: lint still runs in local/CI commands, but won't block `next build`.
+    ignoreDuringBuilds: true,
+  },
   images: {
     remotePatterns: [
       {

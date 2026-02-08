@@ -19,6 +19,9 @@ import { DEFAULT_EDITOR_SYNTAX_THEME, type EditorSyntaxTheme } from './types'
 
 type MonacoInstance = typeof import('monaco-editor')
 type MonacoModel = MonacoEditorNamespace.ITextModel
+type TokenizableMonacoModel = MonacoModel & {
+  forceTokenization?: (lineNumber: number) => void
+}
 
 interface CodeEditorProps {
   onChange: (value: string) => void
@@ -81,7 +84,7 @@ export const CodeEditor = ({
       )
       setTheme(monacoInstance)
       monacoInstance.editor.setModelLanguage(model, activeLanguage)
-      model.forceTokenization?.(model.getLineCount())
+      ;(model as TokenizableMonacoModel).forceTokenization?.(model.getLineCount())
     },
     [activeLanguage, setTheme]
   )
@@ -92,7 +95,7 @@ export const CodeEditor = ({
         resolveMonacoThemeForSyntaxTheme('shiki', isDark)
       )
       monacoInstance.editor.setModelLanguage(model, activeLanguage)
-      model.forceTokenization?.(model.getLineCount())
+      ;(model as TokenizableMonacoModel).forceTokenization?.(model.getLineCount())
     },
     [activeLanguage, isDark]
   )

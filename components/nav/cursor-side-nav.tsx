@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState } from 'react'
-import FileTree from '@/components/file-tree/file-tree'
+import { FileTree } from '@/components/file-tree/file-tree'
 import { Input } from '@/components/ui/input'
 import { Search, Settings, PanelLeft, MoreHorizontal, Sparkles, Command } from 'lucide-react'
 import Link from 'next/link'
@@ -10,9 +10,11 @@ import LoadingSideNav from '@/components/nav/loading-side-nav'
 import { useProject } from '@/contexts/ProjectContext'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
+import { db } from '@/lib/constants'
+import { tx } from '@instantdb/react'
 
 export default function CursorSideNav() {
-  const { project, isProjectLoading, projectId } = useProject()
+  const { project, isProjectLoading, projectId, files, currentlyOpen } = useProject()
   const [query, setQuery] = useState('')
   const [isSearchFocused, setIsSearchFocused] = useState(false)
 
@@ -78,7 +80,18 @@ export default function CursorSideNav() {
             or we can keep the label here. Cursor puts 'EXPLORER' as a collapsible header. 
             We'll let FileTree handle the 'EXPLORER' header row to include actions. 
         */}
-        <FileTree projectId={projectId} query={query} />
+        <FileTree
+          files={files || []}
+          projectId={projectId}
+          userId={files?.[0]?.user_id || ''}
+          onOpenFile={(file: { id: string }) => {
+            db.transact([
+              tx.files[file.id].update({ isOpen: true }),
+              tx.projects[projectId].update({ activeFileId: file.id }),
+            ])
+          }}
+          currentlyOpenId={currentlyOpen?.id}
+        />
       </div>
 
       {/* Footer / User Profile */}
