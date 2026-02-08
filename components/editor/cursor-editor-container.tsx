@@ -8,8 +8,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { useProject } from '@/contexts/ProjectContext'
 import { getFileExtension } from '@/lib/utils/client-utils'
 import ImageViewer from './image-viewer'
-import { Sparkles, MessageSquare, Command, ChevronRight, File } from 'lucide-react'
-import { motion, AnimatePresence } from 'framer-motion'
+import { Command, ChevronRight, File } from 'lucide-react'
 import type { EditorSyntaxTheme } from '@/components/editor/types'
 
 const isMac = typeof window !== 'undefined' && navigator.userAgent.includes('Macintosh')
@@ -35,7 +34,6 @@ const CursorEditorContainer: React.FC<CursorEditorContainerProps> = ({
   const [localContent, setLocalContent] = useState('')
   const [openFile, setOpenFile] = useState<any>(null)
   const { currentlyOpen, isFilesLoading, isProjectLoading } = useProject()
-  const [isStreaming, setIsStreaming] = useState(false)
   const isStreamingRef = useRef(false)
   const localContentRef = useRef('')
   const persistTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -128,7 +126,6 @@ const CursorEditorContainer: React.FC<CursorEditorContainerProps> = ({
   
   // ... other handlers ...
   const handleIsStreamingChange = useCallback((streaming: boolean) => {
-    setIsStreaming(streaming)
     isStreamingRef.current = streaming
   }, [])
 
@@ -206,29 +203,6 @@ const CursorEditorContainer: React.FC<CursorEditorContainerProps> = ({
             fileName={openFile?.name}
             key={`${theme || systemTheme}-${openFile?.id}`}
           />
-
-          {/* AI Streaming Indicator */}
-          <AnimatePresence>
-            {isStreaming && (
-              <motion.div
-                initial={{ opacity: 0, scale: 0.9, y: 10 }}
-                animate={{ opacity: 1, scale: 1, y: 0 }}
-                exit={{ opacity: 0, scale: 0.9, y: 10 }}
-                className="absolute bottom-6 right-8 z-50 pointer-events-none"
-              >
-                <div className="flex items-center gap-3 pl-3 pr-4 py-2.5 bg-zinc-900/90 backdrop-blur-xl border border-blue-500/20 rounded-full shadow-2xl shadow-blue-900/20 ring-1 ring-blue-500/30">
-                  <div className="relative flex items-center justify-center w-4 h-4">
-                     <span className="absolute inset-0 bg-blue-500 rounded-full animate-ping opacity-20" />
-                     <Sparkles className="w-3.5 h-3.5 text-blue-400" />
-                  </div>
-                  <div className="flex flex-col gap-0.5">
-                     <span className="text-[11px] font-medium text-zinc-100">AI is writing...</span>
-                     <span className="text-[9px] text-zinc-500">Generating code</span>
-                  </div>
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
         </div>
       )}
     </div>

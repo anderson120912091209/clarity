@@ -7,7 +7,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { User, Search, Pencil, ChevronDown, ArrowLeft, Settings, ChevronRight, Palette, MousePointer2, SquarePen } from 'lucide-react'
 import { db } from '@/lib/constants'
 import { useRouter } from 'next/navigation'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useSidebar } from '@/contexts/SidebarContext'
 import { useProject } from '@/contexts/ProjectContext'
 import { FileTree } from '@/components/file-tree/file-tree'
@@ -17,6 +17,15 @@ import { Button } from '@/components/ui/button'
 import { Switch } from '@/components/ui/switch'
 import type { EditorSyntaxTheme } from '@/components/editor/types'
 import { EDITOR_SYNTAX_THEME_OPTIONS } from '@/components/editor/syntax/themes/catalog'
+import {
+  DEFAULT_PDF_BACKGROUND_THEME,
+  PDF_BACKGROUND_THEME_CHANGE_EVENT,
+  PDF_BACKGROUND_THEME_OPTIONS,
+  getPdfBackgroundThemeStorageKey,
+  isPdfBackgroundThemeKey,
+  resolvePdfBackgroundTheme,
+  type PdfBackgroundThemeKey,
+} from '@/lib/constants/pdf-background-themes'
 
 interface EditorSidebarProps {
   syntaxTheme: EditorSyntaxTheme
@@ -29,9 +38,33 @@ export default function EditorSidebar({ syntaxTheme, onSyntaxThemeChange }: Edit
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
   const [settingsView, setSettingsView] = useState<'root' | 'theme' | 'preview'>('root')
+  const [localPdfBackgroundTheme, setLocalPdfBackgroundTheme] = useState<PdfBackgroundThemeKey>(DEFAULT_PDF_BACKGROUND_THEME)
   const { isCollapsed } = useSidebar()
   const { projectId, project, files, currentlyOpen } = useProject()
   const isPdfCaretNavigationEnabled = project?.isPdfCaretNavigationEnabled ?? true
+  const pdfBackgroundTheme = localPdfBackgroundTheme
+  const selectedPdfBackgroundTheme = resolvePdfBackgroundTheme(pdfBackgroundTheme)
+
+  useEffect(() => {
+    const projectTheme = project?.pdfBackgroundTheme
+    if (isPdfBackgroundThemeKey(projectTheme)) {
+      setLocalPdfBackgroundTheme(projectTheme)
+      if (typeof window !== 'undefined') {
+        window.localStorage.setItem(getPdfBackgroundThemeStorageKey(projectId), projectTheme)
+      }
+      return
+    }
+
+    if (typeof window !== 'undefined') {
+      const stored = window.localStorage.getItem(getPdfBackgroundThemeStorageKey(projectId))
+      if (isPdfBackgroundThemeKey(stored)) {
+        setLocalPdfBackgroundTheme(stored)
+        return
+      }
+    }
+
+    setLocalPdfBackgroundTheme(DEFAULT_PDF_BACKGROUND_THEME)
+  }, [project?.pdfBackgroundTheme, projectId])
 
   const handleSignOut = () => {
     db.auth.signOut()
@@ -42,6 +75,25 @@ export default function EditorSidebar({ syntaxTheme, onSyntaxThemeChange }: Edit
     db.transact([
       tx.projects[projectId].update({
         isPdfCaretNavigationEnabled: enabled,
+      }),
+    ])
+  }
+
+  const handlePdfBackgroundThemeChange = (theme: PdfBackgroundThemeKey) => {
+    setLocalPdfBackgroundTheme(theme)
+
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem(getPdfBackgroundThemeStorageKey(projectId), theme)
+      window.dispatchEvent(
+        new CustomEvent(PDF_BACKGROUND_THEME_CHANGE_EVENT, {
+          detail: { projectId, theme },
+        })
+      )
+    }
+
+    db.transact([
+      tx.projects[projectId].update({
+        pdfBackgroundTheme: theme,
       }),
     ])
   }
@@ -241,6 +293,37 @@ export default function EditorSidebar({ syntaxTheme, onSyntaxThemeChange }: Edit
                           </Button>
                         ))}
                       </div>
+                    </div>
+                    <div className="space-y-1.5">
+                      <span className="text-[12px] text-white/60">PDF background</span>
+                      <div className="grid grid-cols-5 gap-1.5 rounded-md border border-white/10 bg-zinc-950/40 p-1.5">
+                        {PDF_BACKGROUND_THEME_OPTIONS.map((option) => {
+                          const isActive = pdfBackgroundTheme === option.key
+                          return (
+                            <button
+                              key={option.key}
+                              type="button"
+                              onClick={() => handlePdfBackgroundThemeChange(option.key)}
+                              aria-label={`Set PDF background to ${option.label}`}
+                              title={option.label}
+                              className={`relative h-6 w-full rounded-sm border transition ${isActive ? 'border-white/50 ring-1 ring-white/35' : 'border-white/10 hover:border-white/30'}`}
+                            >
+                              <span
+                                className="absolute inset-0 rounded-[inherit]"
+                                style={{ backgroundColor: option.panelColor }}
+                              />
+                              <span
+                                className="absolute inset-0 rounded-[inherit]"
+                                style={{
+                                  backgroundImage: `radial-gradient(${option.dotColor} ${option.dotSize}px, transparent ${option.dotSize}px)`,
+                                  backgroundSize: `${option.dotSpacing}px ${option.dotSpacing}px`,
+                                }}
+                              />
+                            </button>
+                          )
+                        })}
+                      </div>
+                      <div className="text-[10px] text-white/45">{selectedPdfBackgroundTheme.label}</div>
                     </div>
                   </div>
                 ) : (

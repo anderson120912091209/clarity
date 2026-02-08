@@ -35,6 +35,7 @@ const _schema = i.schema({
       document_class: i.string().optional(),
       last_compiled: i.string().optional(),
       page_count: i.number().optional(),
+      pdfBackgroundTheme: i.string().optional(),
       project_content: i.string().optional(),
       template: i.string().optional(),
       title: i.string().optional(),

@@ -17,6 +17,14 @@ import LatexLoading from './latex-loading'
 import LatexCanvas from './latex-canvas'
 import { updateProject } from '@/hooks/data'
 import { cn } from '@/lib/utils'
+import {
+  DEFAULT_PDF_BACKGROUND_THEME,
+  PDF_BACKGROUND_THEME_CHANGE_EVENT,
+  getPdfBackgroundThemeStorageKey,
+  isPdfBackgroundThemeKey,
+  resolvePdfBackgroundTheme,
+  type PdfBackgroundThemeKey,
+} from '@/lib/constants/pdf-background-themes'
 
 if (typeof window !== 'undefined') {
   pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.mjs`
@@ -336,10 +344,49 @@ interface LatexRendererProps {
 function LatexRenderer({ pdfUrl, isLoading, error, logs, showLogs, header, scrollRequest }: LatexRendererProps) {
   const { project: data, projectId } = useProject();
   const scale = data?.projectScale ?? 0.9;
+  const [localPdfBackgroundTheme, setLocalPdfBackgroundTheme] = useState<PdfBackgroundThemeKey>(DEFAULT_PDF_BACKGROUND_THEME)
+  const pdfBackgroundTheme = resolvePdfBackgroundTheme(localPdfBackgroundTheme)
   const containerRef = useRef<HTMLDivElement>(null);
   
   const [numPages, setNumPages] = useState<number>(0)
   const [loadedPdfUrl, setLoadedPdfUrl] = useState<string | null>(null)
+
+  useEffect(() => {
+    const projectTheme = data?.pdfBackgroundTheme
+    if (isPdfBackgroundThemeKey(projectTheme)) {
+      setLocalPdfBackgroundTheme(projectTheme)
+      if (typeof window !== 'undefined') {
+        window.localStorage.setItem(getPdfBackgroundThemeStorageKey(projectId), projectTheme)
+      }
+      return
+    }
+
+    if (typeof window !== 'undefined') {
+      const stored = window.localStorage.getItem(getPdfBackgroundThemeStorageKey(projectId))
+      if (isPdfBackgroundThemeKey(stored)) {
+        setLocalPdfBackgroundTheme(stored)
+        return
+      }
+    }
+
+    setLocalPdfBackgroundTheme(DEFAULT_PDF_BACKGROUND_THEME)
+  }, [data?.pdfBackgroundTheme, projectId])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+
+    const handleThemeChange = (event: Event) => {
+      const detail = (event as CustomEvent<{ projectId?: string; theme?: string }>).detail
+      if (!detail || detail.projectId !== projectId) return
+      if (!isPdfBackgroundThemeKey(detail.theme)) return
+      setLocalPdfBackgroundTheme(detail.theme)
+    }
+
+    window.addEventListener(PDF_BACKGROUND_THEME_CHANGE_EVENT, handleThemeChange)
+    return () => {
+      window.removeEventListener(PDF_BACKGROUND_THEME_CHANGE_EVENT, handleThemeChange)
+    }
+  }, [projectId])
 
   // Trackpad zoom support
   useEffect(() => {
@@ -425,9 +472,18 @@ function LatexRenderer({ pdfUrl, isLoading, error, logs, showLogs, header, scrol
           <LatexError error={error} />
         </div>
       ) : pdfUrl ? (
-        <div className="flex-1 w-full relative bg-zinc-900/30 overflow-hidden">
+        <div
+          className="flex-1 w-full relative overflow-hidden"
+          style={{ backgroundColor: pdfBackgroundTheme.panelColor }}
+        >
              {/* PDF Pattern Background */}
-             <div className="absolute inset-0 bg-[radial-gradient(#ffffff05_1px,transparent_1px)] [background-size:20px_20px]" />
+             <div
+               className="absolute inset-0"
+               style={{
+                 backgroundImage: `radial-gradient(${pdfBackgroundTheme.dotColor} ${pdfBackgroundTheme.dotSize}px, transparent ${pdfBackgroundTheme.dotSize}px)`,
+                 backgroundSize: `${pdfBackgroundTheme.dotSpacing}px ${pdfBackgroundTheme.dotSpacing}px`,
+               }}
+             />
              
              <LatexCanvas
                 pdfUrl={pdfUrl}
