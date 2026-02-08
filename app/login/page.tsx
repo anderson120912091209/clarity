@@ -1,69 +1,132 @@
 'use client'
 
-import React from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { Button } from '@/components/ui/button'
-import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card'
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { useRouter } from 'next/navigation'
 import { db } from '@/lib/constants'
-import { useEffect } from 'react'
 import { tx } from '@instantdb/react'
 import Link from 'next/link'
 import { Navbar } from '@/components/landing/navbar'
+import { buildWelcomeProjectTransactions, WELCOME_SEED_VERSION } from '@/lib/utils/init-default-projects'
+
+type AuthenticatedUser = NonNullable<ReturnType<typeof db.useAuth>['user']>
+
+function toUserProperties(user: AuthenticatedUser) {
+  return Object.entries(user).reduce<Record<string, unknown>>((acc, [key, value]) => {
+    if (key !== 'id') {
+      acc[key] = value
+    }
+    return acc
+  }, {})
+}
 
 export default function Login() {
   const router = useRouter()
   const { isLoading, user, error } = db.useAuth()
+  const [bootstrapError, setBootstrapError] = useState<string | null>(null)
+  const [isBootstrapping, setIsBootstrapping] = useState(false)
+  const bootstrapStartedRef = useRef(false)
+  const bootstrapState = db.useQuery(
+    user
+      ? {
+          users: {},
+          projects: {
+            $: {
+              where: {
+                user_id: user.id,
+              },
+            },
+          },
+        }
+      : null
+  )
 
   useEffect(() => {
-    if (user) {
-      const userProperties = Object.entries(user).reduce((acc, [key, value]) => {
-        if (key !== 'id') {
-          acc[key] = value;
-        }
-        return acc;
-      }, {} as Record<string, any>);
+    if (!user || bootstrapStartedRef.current || bootstrapState.isLoading) return
 
-      db.transact(tx.users[user.id].update(userProperties));
+    if (bootstrapState.error) {
+      setBootstrapError(bootstrapState.error.message)
+      return
+    }
+
+    bootstrapStartedRef.current = true
+    setIsBootstrapping(true)
+
+    const bootstrapUser = async () => {
+      const userRecord = bootstrapState.data?.users?.[0]
+      const hasProjects = (bootstrapState.data?.projects?.length ?? 0) > 0
+      const hasWelcomeSeeded = (userRecord?.welcome_seed_version ?? 0) >= WELCOME_SEED_VERSION
+      const nowISO = new Date().toISOString()
+      const userProperties = toUserProperties(user)
+      const userUpdate = {
+        ...userProperties,
+        welcome_seed_version: WELCOME_SEED_VERSION,
+        welcome_seeded_at: nowISO,
+      }
+
+      if (hasWelcomeSeeded || hasProjects) {
+        await db.transact(tx.users[user.id].update(userUpdate))
+        router.push('/projects')
+        return
+      }
+
+      const { transactions } = buildWelcomeProjectTransactions(user.id, nowISO)
+      await db.transact([
+        tx.users[user.id].update(userUpdate),
+        ...transactions,
+      ])
       router.push('/projects')
     }
-  }, [user, router]);
 
-  if (isLoading) {
-  return (
+    bootstrapUser().catch((err: unknown) => {
+      bootstrapStartedRef.current = false
+      setIsBootstrapping(false)
+      setBootstrapError(err instanceof Error ? err.message : 'Failed to initialize your account')
+      console.error('Failed to bootstrap user account:', err)
+    })
+  }, [user, bootstrapState.isLoading, bootstrapState.error, bootstrapState.data, router])
+
+  if (isLoading || isBootstrapping || (user && bootstrapState.isLoading)) {
+    return (
       <div className="flex justify-center items-center h-screen bg-background">
         <div className="text-muted-foreground">Loading...</div>
-    </div>
-  )
-}
-
-  if (error) {
-  return (
-      <div className="flex justify-center items-center h-screen bg-background">
-    <Card className="w-[350px]">
-      <CardHeader>
-            <CardTitle className="text-xl text-destructive">Error</CardTitle>
-      </CardHeader>
-      <CardContent>
-            <p className="text-muted-foreground">{error.message}</p>
-      </CardContent>
-    </Card>
       </div>
     )
   }
-  
+
+  if (error || bootstrapError) {
+    return (
+      <div className="flex justify-center items-center h-screen bg-background">
+        <Card className="w-[350px]">
+          <CardHeader>
+            <CardTitle className="text-xl text-destructive">Error</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-muted-foreground">{error?.message ?? bootstrapError}</p>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
+
   return <LoginForm />
 }
 
+type AuthClientWithCreateAuthorizationURL = {
+  createAuthorizationURL: (args: { clientName: string; redirectURL: string }) => string
+}
+
 function LoginForm() {
-  // @ts-ignore - InstantDB createAuthorizationURL method
   const getAuthUrl = () => {
     try {
       if (typeof window === 'undefined') return '#'
+      const authClient = db.auth as typeof db.auth & AuthClientWithCreateAuthorizationURL
       // Use origin + /login for redirect URL
       const redirectURL = `${window.location.origin}/login`
-      return db.auth.createAuthorizationURL({
-        clientName: "google-web",
-        redirectURL: redirectURL,
+      return authClient.createAuthorizationURL({
+        clientName: 'google-web',
+        redirectURL,
       })
     } catch (error) {
       console.error('Error creating auth URL:', error)

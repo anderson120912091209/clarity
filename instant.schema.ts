@@ -49,6 +49,8 @@ const _schema = i.schema({
       isGuest: i.boolean().optional(),
       refresh_token: i.string().optional(),
       type: i.string().optional(),
+      welcome_seed_version: i.number().optional(),
+      welcome_seeded_at: i.string().optional(),
     }),
   },
   links: {
@@ -70,8 +72,7 @@ const _schema = i.schema({
 })
 
 // This helps Typescript display nicer intellisense
-type _AppSchema = typeof _schema
-interface AppSchema extends _AppSchema {}
+type AppSchema = typeof _schema
 const schema: AppSchema = _schema
 
 export type { AppSchema }

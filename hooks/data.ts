@@ -25,16 +25,20 @@ export function useProjectFiles(projectId: string, userId?: string) {
   })
 }
 
-export function getAllProjects(userId: string) {
-  return db.useQuery({
-    projects: {
-      $: {
-        where: {
-          user_id: userId,
-        },
-      },
-    },
-  })
+export function getAllProjects(userId?: string) {
+  return db.useQuery(
+    userId
+      ? {
+          projects: {
+            $: {
+              where: {
+                user_id: userId,
+              },
+            },
+          },
+        }
+      : null
+  )
 }
 
 export function getAllProjectFiles(projectId: string, userId?: string) {
@@ -51,7 +55,7 @@ export function getAllProjectFiles(projectId: string, userId?: string) {
 
 
 interface ProjectFields {
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 export function updateProject(projectId: string, fields: ProjectFields) {

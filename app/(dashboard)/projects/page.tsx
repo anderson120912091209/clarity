@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { SearchIcon, PlusIcon, FileText } from 'lucide-react'
+import { SearchIcon, PlusIcon } from 'lucide-react'
 import Link from 'next/link'
 import ProjectCard from '@/components/projects/project-card'
 import NewProjectCard from '@/components/projects/new-project-card'
@@ -11,7 +11,6 @@ import { useFrontend } from '@/contexts/FrontendContext'
 import { getAllProjects } from '@/hooks/data'
 import { ViewToggle } from '@/components/projects/view-toggle'
 import ProjectListItem from '@/components/projects/project-list-item'
-import { initializeDefaultProjects } from '@/lib/utils/init-default-projects'
 
 export default function ProjectsPage() {
   const { user, isLoading: userLoading } = useFrontend()
@@ -20,7 +19,7 @@ export default function ProjectsPage() {
   const [sortOrder, setSortOrder] = useState<'date' | 'name'>('date')
   const [minLoadTimeElapsed, setMinLoadTimeElapsed] = useState(false)
   
-  const { isLoading, error, data } = getAllProjects(user?.id || '')
+  const { isLoading, error, data } = getAllProjects(user?.id)
 
   // Loading Screen Timer, use this to adjust the loading screen UI 
   // For loading other resources we could elongate the loading screen time for users first entrance 
@@ -34,23 +33,6 @@ export default function ProjectsPage() {
   }, [])
 
   const projects = data?.projects || []
-
-  // Initialize default projects for new users
-  useEffect(() => {
-    const initDefaults = async () => {
-      // Only initialize if user is loaded, not currently loading projects, and has zero projects
-      if (user && !isLoading && projects.length === 0) {
-        try {
-          await initializeDefaultProjects(user.id)
-        } catch (error) {
-          console.error('Failed to initialize default projects:', error)
-        }
-      }
-    }
-
-    initDefaults()
-  }, [user, isLoading, projects.length])
-
 
   const isPageLoading = !minLoadTimeElapsed || userLoading || !user || isLoading
   const filteredProjects = projects.filter((project) => 
