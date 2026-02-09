@@ -350,6 +350,12 @@ interface LatexRendererProps {
         position?: SynctexPdfPosition
       }
     | null
+  highlightRequest?:
+    | {
+        nonce: number
+        boxes: SynctexPdfPosition[]
+      }
+    | null
   onPdfPointSelect?: (point: { page: number; h: number; v: number }) => void
   isPdfNavigationEnabled?: boolean
 }
@@ -363,6 +369,7 @@ function LatexRenderer({
   showLogs,
   header,
   scrollRequest,
+  highlightRequest,
   onPdfPointSelect,
   isPdfNavigationEnabled = true,
 }: LatexRendererProps) {
@@ -517,6 +524,7 @@ function LatexRenderer({
                  numPages={numPages}
                  scale={scale}
                  scrollRequest={scrollRequest}
+                 highlightRequest={highlightRequest}
                  onPdfPointSelect={onPdfPointSelect}
                  isPdfNavigationEnabled={isPdfNavigationEnabled}
              />

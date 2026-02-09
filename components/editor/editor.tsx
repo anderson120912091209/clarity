@@ -23,6 +23,20 @@ type TokenizableMonacoModel = MonacoModel & {
   forceTokenization?: (lineNumber: number) => void
 }
 
+export interface EditorSelectionPayload {
+  startLineNumber: number
+  startColumn: number
+  endLineNumber: number
+  endColumn: number
+  lineCount: number
+  selectedText: string
+  filePath?: string
+  anchorLeftPx?: number
+  anchorTopPx?: number
+  anchorHeightPx?: number
+  nonce: number
+}
+
 interface CodeEditorProps {
   onChange: (value: string) => void
   value: string
@@ -36,6 +50,8 @@ interface CodeEditorProps {
   syntaxTheme?: EditorSyntaxTheme
   fileName?: string
   filePath?: string
+  onSelectionChange?: (payload: EditorSelectionPayload | null) => void
+  onActionsReady?: (actions: { triggerQuickEdit: () => void }) => void
   gotoRequest?: {
     fileId: string
     lineNumber: number
@@ -58,6 +74,8 @@ export const CodeEditor = ({
   syntaxTheme = DEFAULT_EDITOR_SYNTAX_THEME,
   fileName,
   filePath,
+  onSelectionChange,
+  onActionsReady,
   gotoRequest,
 }: CodeEditorProps) => {
   const activeLanguage = useMemo<EditorLanguageId>(
@@ -69,7 +87,7 @@ export const CodeEditor = ({
     value,
     activeLanguage
   )
-  const { handleAIAssist } = useAIAssist(onChange)
+  const { handleAIAssist, triggerQuickEdit } = useAIAssist(onChange)
   const { setTheme } = useEditorTheme()
   const { theme, systemTheme } = useTheme()
 
@@ -77,6 +95,8 @@ export const CodeEditor = ({
   const originalSetThemeRef = useRef<((theme: string) => void) | null>(null)
   const defaultTokensDisposableRef = useRef<IDisposable | null>(null)
   const onCursorClickRef = useRef(onCursorClick)
+  const onSelectionChangeRef = useRef(onSelectionChange)
+  const onActionsReadyRef = useRef(onActionsReady)
   const applySeqRef = useRef(0)
   const isMac =
     typeof navigator !== 'undefined' && navigator.userAgent.includes('Macintosh')
@@ -156,6 +176,14 @@ export const CodeEditor = ({
   }, [onCursorClick])
 
   useEffect(() => {
+    onSelectionChangeRef.current = onSelectionChange
+  }, [onSelectionChange])
+
+  useEffect(() => {
+    onActionsReadyRef.current = onActionsReady
+  }, [onActionsReady])
+
+  useEffect(() => {
     if (!gotoRequest) return
     const editor = editorRef.current
     const model = editor?.getModel()
@@ -187,7 +215,19 @@ export const CodeEditor = ({
           originalSetThemeRef.current = monaco.editor.setTheme
         }
         handleEditorDidMount(editor, monaco)
-        handleAIAssist(editor, monaco, setIsStreaming, onChange)
+        const cleanupAIAssist = handleAIAssist(editor, monaco, setIsStreaming, onChange)
+        editor.onDidDispose(() => {
+          if (typeof cleanupAIAssist === 'function') {
+            cleanupAIAssist()
+          }
+        })
+
+        onActionsReadyRef.current?.({
+          triggerQuickEdit: () => {
+            editor.focus()
+            triggerQuickEdit()
+          },
+        })
 
         // Inline chat hint on focused empty lines
         const hintNode = document.createElement('div')
@@ -234,6 +274,43 @@ export const CodeEditor = ({
           editor.layoutContentWidget(hintWidget)
         }
 
+        let selectionNonce = 0
+        const emitSelectionPayload = () => {
+          const selectionHandler = onSelectionChangeRef.current
+          if (!selectionHandler) return
+
+          const model = editor.getModel()
+          const selection = editor.getSelection()
+          if (!model || !selection || selection.isEmpty()) {
+            selectionHandler(null)
+            return
+          }
+
+          const selectedText = model.getValueInRange(selection)
+          if (!selectedText || selectedText.trim() === '') {
+            selectionHandler(null)
+            return
+          }
+
+          const startPosition = selection.getStartPosition()
+          const visiblePosition = editor.getScrolledVisiblePosition(startPosition)
+
+          selectionNonce += 1
+          selectionHandler({
+            startLineNumber: selection.startLineNumber,
+            startColumn: selection.startColumn,
+            endLineNumber: selection.endLineNumber,
+            endColumn: selection.endColumn,
+            lineCount: model.getLineCount(),
+            selectedText,
+            filePath,
+            anchorLeftPx: visiblePosition?.left,
+            anchorTopPx: visiblePosition?.top,
+            anchorHeightPx: visiblePosition?.height,
+            nonce: selectionNonce,
+          })
+        }
+
         // Some Monaco tokenizers/themes can "snap back" after (re)focus; re-apply for stability.
         editor.onDidFocusEditorWidget(() => {
           applySyntaxTheme()
@@ -241,6 +318,7 @@ export const CodeEditor = ({
         })
         editor.onDidBlurEditorWidget(() => {
           updateInlineChatHint()
+          emitSelectionPayload()
         })
 
         editor.onMouseDown((e) => {
@@ -258,6 +336,12 @@ export const CodeEditor = ({
 
         editor.onDidChangeCursorPosition(() => {
           updateInlineChatHint()
+        })
+        editor.onDidChangeCursorSelection(() => {
+          emitSelectionPayload()
+        })
+        editor.onDidScrollChange(() => {
+          emitSelectionPayload()
         })
         editor.onDidChangeModelContent(() => {
           updateInlineChatHint()

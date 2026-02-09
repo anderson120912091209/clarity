@@ -7,6 +7,7 @@ import EditorSidebar from '@/components/layout/editor-sidebar'
 import SidebarToggle from '@/components/layout/sidebar-toggle'
 import LatexRenderer from '@/components/latex-render/latex'
 import CursorEditorContainer from '@/components/editor/cursor-editor-container'
+import type { EditorSelectionPayload } from '@/components/editor/editor'
 import { ChatPanel, ChatNavContent } from '@/features/agent'
 import { ProjectProvider } from '@/contexts/ProjectContext'
 import { useParams } from 'next/navigation'
@@ -42,11 +43,118 @@ interface PdfScrollRequest {
   position?: SynctexPdfPosition
 }
 
+interface PdfHighlightRequest {
+  nonce: number
+  boxes: SynctexPdfPosition[]
+}
+
 interface EditorGotoRequest {
   fileId: string
   lineNumber: number
   column: number
   nonce: number
+}
+
+interface HighlightCluster {
+  page: number
+  top: number
+  bottom: number
+  minLeft: number
+  maxRight: number
+}
+
+function sampleLineNumbers(startLine: number, endLine: number, maxPoints = 24): number[] {
+  const start = Math.max(1, Math.min(startLine, endLine))
+  const end = Math.max(1, Math.max(startLine, endLine))
+  const span = end - start + 1
+
+  if (span <= maxPoints) {
+    return Array.from({ length: span }, (_, index) => start + index)
+  }
+
+  const sampled = new Set<number>()
+  const step = (span - 1) / (maxPoints - 1)
+  for (let index = 0; index < maxPoints; index += 1) {
+    sampled.add(Math.round(start + step * index))
+  }
+  sampled.add(start)
+  sampled.add(end)
+
+  return Array.from(sampled).sort((a, b) => a - b)
+}
+
+function buildSelectionHighlightBoxes(
+  positions: SynctexPdfPosition[]
+): SynctexPdfPosition[] {
+  if (!positions.length) return []
+
+  const byPage = new Map<number, SynctexPdfPosition[]>()
+  for (const position of positions) {
+    const list = byPage.get(position.page)
+    if (list) {
+      list.push(position)
+    } else {
+      byPage.set(position.page, [position])
+    }
+  }
+
+  const clusters: HighlightCluster[] = []
+
+  for (const [page, pagePositions] of byPage) {
+    const sorted = pagePositions
+      .slice()
+      .sort((left, right) => left.v - right.v || left.h - right.h)
+    if (!sorted.length) continue
+
+    let current: HighlightCluster | null = null
+    for (const position of sorted) {
+      const top = position.v
+      const bottom = position.v + Math.max(10, position.height)
+      const left = position.h
+      const right = position.h + Math.max(8, position.width)
+
+      if (!current) {
+        current = {
+          page,
+          top,
+          bottom,
+          minLeft: left,
+          maxRight: right,
+        }
+        continue
+      }
+
+      // Merge nearby vertical boxes into one visual section highlight.
+      if (top <= current.bottom + 26) {
+        current.bottom = Math.max(current.bottom, bottom)
+        current.minLeft = Math.min(current.minLeft, left)
+        current.maxRight = Math.max(current.maxRight, right)
+      } else {
+        clusters.push(current)
+        current = {
+          page,
+          top,
+          bottom,
+          minLeft: left,
+          maxRight: right,
+        }
+      }
+    }
+
+    if (current) {
+      clusters.push(current)
+    }
+  }
+
+  return clusters
+    .map((cluster) => ({
+      page: cluster.page,
+      h: Math.max(0, cluster.minLeft - 8),
+      v: Math.max(0, cluster.top - 4),
+      width: Math.max(24, cluster.maxRight - cluster.minLeft + 16),
+      height: Math.max(14, cluster.bottom - cluster.top + 8),
+    }))
+    .sort((left, right) => left.page - right.page || left.v - right.v || left.h - right.h)
 }
 
 function EditorLayout() {
@@ -59,6 +167,7 @@ function EditorLayout() {
   const hasMountedRef = useRef(false)
   const syncFromCodeAbortRef = useRef<AbortController | null>(null)
   const syncFromPdfAbortRef = useRef<AbortController | null>(null)
+  const syncSelectionAbortRef = useRef<AbortController | null>(null)
   const [editorSyntaxTheme, setEditorSyntaxTheme] = useState<EditorSyntaxTheme>(DEFAULT_EDITOR_SYNTAX_THEME)
   const [liveFileContentOverrides, setLiveFileContentOverrides] = useState<Record<string, string>>({})
 
@@ -140,6 +249,7 @@ function EditorLayout() {
   
   const [showLogs, setShowLogs] = useState(false)
   const [pdfScrollRequest, setPdfScrollRequest] = useState<PdfScrollRequest | null>(null)
+  const [pdfHighlightRequest, setPdfHighlightRequest] = useState<PdfHighlightRequest | null>(null)
   const [editorGotoRequest, setEditorGotoRequest] = useState<EditorGotoRequest | null>(null)
 
   const fileIdMap = useRef(new Map<string, any>())
@@ -159,6 +269,7 @@ function EditorLayout() {
     return () => {
       syncFromCodeAbortRef.current?.abort()
       syncFromPdfAbortRef.current?.abort()
+      syncSelectionAbortRef.current?.abort()
     }
   }, [])
 
@@ -166,7 +277,9 @@ function EditorLayout() {
     if (isPdfNavigationEnabled) return
     syncFromCodeAbortRef.current?.abort()
     syncFromPdfAbortRef.current?.abort()
+    syncSelectionAbortRef.current?.abort()
     setPdfScrollRequest(null)
+    setPdfHighlightRequest(null)
   }, [isPdfNavigationEnabled])
 
   const resolveFilePath = useCallback((file: any): string | null => {
@@ -243,6 +356,7 @@ function EditorLayout() {
 
         pdfScrollNonceRef.current += 1
         setPdfScrollRequest({ mode: 'ratio', ratio, nonce: pdfScrollNonceRef.current })
+        setPdfHighlightRequest(null)
       }
 
       if (!synctexContext || !filePath) {
@@ -277,9 +391,87 @@ function EditorLayout() {
             position: positions[0],
             nonce: pdfScrollNonceRef.current,
           })
+          setPdfHighlightRequest(null)
         } catch (error: any) {
           if (controller.signal.aborted || error?.name === 'AbortError') return
           console.warn('SyncTeX source->pdf sync failed, falling back to ratio scroll', error)
+          fallbackToRatio()
+        }
+      })()
+    },
+    [isPdfNavigationEnabled, synctexContext]
+  )
+
+  const handleFindSelectionInPdf = useCallback(
+    (selection: EditorSelectionPayload) => {
+      if (!isPdfNavigationEnabled) return
+
+      const fallbackToRatio = () => {
+        const safeLineCount = Math.max(1, selection.lineCount)
+        const focusLine = Math.round((selection.startLineNumber + selection.endLineNumber) / 2)
+        const ratio =
+          safeLineCount <= 1 ? 0 : Math.min(1, Math.max(0, (focusLine - 1) / (safeLineCount - 1)))
+
+        pdfScrollNonceRef.current += 1
+        setPdfScrollRequest({ mode: 'ratio', ratio, nonce: pdfScrollNonceRef.current })
+        setPdfHighlightRequest(null)
+      }
+
+      if (!synctexContext || !selection.filePath) {
+        fallbackToRatio()
+        return
+      }
+
+      syncSelectionAbortRef.current?.abort()
+      const controller = new AbortController()
+      syncSelectionAbortRef.current = controller
+
+      void (async () => {
+        try {
+          const targetLines = sampleLineNumbers(selection.startLineNumber, selection.endLineNumber, 30)
+          const settled = await Promise.allSettled(
+            targetLines.map((lineNumber) =>
+              syncSourceToPdf(
+                synctexContext,
+                {
+                  file: selection.filePath!,
+                  line: lineNumber,
+                  column: lineNumber === selection.startLineNumber ? selection.startColumn : 1,
+                },
+                { signal: controller.signal }
+              )
+            )
+          )
+
+          if (controller.signal.aborted) return
+
+          const positions = settled.flatMap((result) =>
+            result.status === 'fulfilled' ? result.value : []
+          )
+
+          if (!positions.length) {
+            fallbackToRatio()
+            return
+          }
+
+          const ordered = positions
+            .slice()
+            .sort((left, right) => left.page - right.page || left.v - right.v || left.h - right.h)
+          const highlightBoxes = buildSelectionHighlightBoxes(ordered)
+
+          pdfScrollNonceRef.current += 1
+          setPdfScrollRequest({
+            mode: 'synctex',
+            position: ordered[0],
+            nonce: pdfScrollNonceRef.current,
+          })
+          setPdfHighlightRequest({
+            nonce: pdfScrollNonceRef.current,
+            boxes: (highlightBoxes.length ? highlightBoxes : ordered).slice(0, 80),
+          })
+        } catch (error: any) {
+          if (controller.signal.aborted || error?.name === 'AbortError') return
+          console.warn('SyncTeX selection->pdf sync failed, falling back to ratio scroll', error)
           fallbackToRatio()
         }
       })()
@@ -383,6 +575,8 @@ function EditorLayout() {
             isChatVisible={isChatVisible}
             header={editorHeader}
             onCursorClick={handleEditorCursorClick}
+            onFindSelectionInPdf={handleFindSelectionInPdf}
+            isPdfNavigationEnabled={isPdfNavigationEnabled}
             syntaxTheme={editorSyntaxTheme}
             onFileContentChange={handleLiveFileContentChange}
             gotoRequest={editorGotoRequest}
@@ -400,6 +594,7 @@ function EditorLayout() {
             showLogs={showLogs}
             header={pdfHeader}
             scrollRequest={pdfScrollRequest}
+            highlightRequest={pdfHighlightRequest}
             onPdfPointSelect={handlePdfPointSelect}
             isPdfNavigationEnabled={isPdfNavigationEnabled}
           />

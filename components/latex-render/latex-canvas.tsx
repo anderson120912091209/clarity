@@ -20,6 +20,7 @@ export default function LatexCanvas({
   numPages,
   scale,
   scrollRequest,
+  highlightRequest,
   onPdfPointSelect,
   isPdfNavigationEnabled = true,
 }: {
@@ -35,6 +36,12 @@ export default function LatexCanvas({
         nonce: number
         ratio?: number
         position?: SynctexPdfPosition
+      }
+    | null;
+  highlightRequest?:
+    | {
+        nonce: number
+        boxes: SynctexPdfPosition[]
       }
     | null;
   onPdfPointSelect?: (point: { page: number; h: number; v: number }) => void;
@@ -127,6 +134,48 @@ export default function LatexCanvas({
     })
   }
 
+  const resolveHighlightRects = (pageNumber: number) => {
+    if (!highlightRequest?.boxes?.length) return []
+
+    const pageContainer = pageContainerRefs.current[pageNumber]
+    if (!pageContainer) return []
+
+    const renderedRect = pageContainer.getBoundingClientRect()
+    const renderedWidth = renderedRect.width
+    const renderedHeight = renderedRect.height
+    if (renderedWidth <= 0 || renderedHeight <= 0) return []
+
+    const dimensions = pageDimensionsRef.current[pageNumber]
+    const sourceWidth = dimensions?.width ?? renderedWidth
+    const sourceHeight = dimensions?.height ?? renderedHeight
+    if (sourceWidth <= 0 || sourceHeight <= 0) return []
+
+    return highlightRequest.boxes
+      .filter((box) => box.page === pageNumber)
+      .slice(0, 120)
+      .map((box, index) => {
+        const left = (box.h / sourceWidth) * renderedWidth
+        const top = (box.v / sourceHeight) * renderedHeight
+        const width = Math.max(8, (box.width / sourceWidth) * renderedWidth)
+        const height = Math.max(10, (box.height / sourceHeight) * renderedHeight)
+
+        const clampedLeft = Math.min(Math.max(0, left), Math.max(0, renderedWidth - 2))
+        const clampedTop = Math.min(Math.max(0, top), Math.max(0, renderedHeight - 2))
+        const clampedWidth = Math.min(width, Math.max(2, renderedWidth - clampedLeft))
+        const clampedHeight = Math.min(height, Math.max(2, renderedHeight - clampedTop))
+
+        return {
+          id: `${highlightRequest.nonce}-${pageNumber}-${index}-${box.h}-${box.v}`,
+          style: {
+            left: clampedLeft,
+            top: clampedTop,
+            width: clampedWidth,
+            height: clampedHeight,
+          },
+        }
+      })
+  }
+
   if (!workerReady) {
     return (
       <div className="flex justify-center items-center w-full h-full">
@@ -153,39 +202,55 @@ export default function LatexCanvas({
         options={options}
       >
         {isDocumentReady && numPages > 0 && !documentError && workerReady &&
-          Array.from(new Array(numPages), (el, index) => (
-            <div
-              key={`page_wrapper_${index + 1}`}
-              ref={(node) => {
-                pageContainerRefs.current[index + 1] = node
-              }}
-              onClick={handlePageClick(index + 1)}
-              className={`mb-4 shadow-lg ${isPdfNavigationEnabled ? 'cursor-pointer' : 'cursor-default'}`}
-            >
-              <Page
-                key={`page_${index + 1}`}
-                pageNumber={index + 1}
-                scale={scale}
-                width={typeof window !== 'undefined' ? Math.min(window.innerWidth - 80, 800) : 800}
-                loading={<Skeleton className="w-full h-[calc(100vh-80px)] mb-4" />}
-                onLoadSuccess={(page) => {
-                  const viewport = page.getViewport({ scale: 1 })
-                  pageDimensionsRef.current[index + 1] = {
-                    width: viewport.width,
-                    height: viewport.height,
-                  }
+          Array.from(new Array(numPages), (el, index) => {
+            const pageNumber = index + 1
+            const highlightRects = resolveHighlightRects(pageNumber)
+
+            return (
+              <div
+                key={`page_wrapper_${pageNumber}`}
+                ref={(node) => {
+                  pageContainerRefs.current[pageNumber] = node
                 }}
-                onRenderError={(error) => {
-                  console.error(`Error rendering page ${index + 1}:`, error)
-                  setDocumentError(`Failed to render page ${index + 1}`)
-                }}
-                onLoadError={(error) => {
-                  console.error(`Error loading page ${index + 1}:`, error)
-                  setDocumentError(`Failed to load page ${index + 1}`)
-                }}
-              />
-            </div>
-          ))}
+                onClick={handlePageClick(pageNumber)}
+                className={`relative mb-4 shadow-lg ${isPdfNavigationEnabled ? 'cursor-pointer' : 'cursor-default'}`}
+              >
+                <Page
+                  key={`page_${pageNumber}`}
+                  pageNumber={pageNumber}
+                  scale={scale}
+                  width={typeof window !== 'undefined' ? Math.min(window.innerWidth - 80, 800) : 800}
+                  loading={<Skeleton className="w-full h-[calc(100vh-80px)] mb-4" />}
+                  onLoadSuccess={(page) => {
+                    const viewport = page.getViewport({ scale: 1 })
+                    pageDimensionsRef.current[pageNumber] = {
+                      width: viewport.width,
+                      height: viewport.height,
+                    }
+                  }}
+                  onRenderError={(error) => {
+                    console.error(`Error rendering page ${pageNumber}:`, error)
+                    setDocumentError(`Failed to render page ${pageNumber}`)
+                  }}
+                  onLoadError={(error) => {
+                    console.error(`Error loading page ${pageNumber}:`, error)
+                    setDocumentError(`Failed to load page ${pageNumber}`)
+                  }}
+                />
+                {highlightRects.length > 0 && (
+                  <div className="pointer-events-none absolute inset-0">
+                    {highlightRects.map((rect) => (
+                      <div
+                        key={rect.id}
+                        className="absolute rounded-[4px] border border-amber-400/95 bg-amber-300/40 shadow-[0_0_0_2px_rgba(251,191,36,0.35)] animate-pulse"
+                        style={rect.style}
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
+            )
+          })}
         {documentError && (
           <div className="p-4 text-red-500">
             Error loading PDF: {documentError}

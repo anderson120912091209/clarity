@@ -43,7 +43,8 @@ export interface UseAIAssistReturn {
     monacoInstance: typeof monaco,
     setIsStreaming: (val: boolean) => void,
     onChange: (value: string) => void
-  ) => void
+  ) => () => void
+  triggerQuickEdit: () => void
 }
 
 /**
@@ -60,6 +61,21 @@ export function useAIAssist(onChange?: (value: string) => void): UseAIAssistRetu
     widgets: { widget: editor.IContentWidget, root: Root }[]
     listeners?: monaco.IDisposable[]
   } | null>(null)
+  const quickEditActionRef = useRef<QuickEditAction | null>(null)
+  const quickEditHandlerRef = useRef<((selection: NormalizedSelection) => void | Promise<void>) | null>(null)
+
+  const triggerQuickEdit = useCallback(() => {
+    const quickEditAction = quickEditActionRef.current
+    const quickEditHandler = quickEditHandlerRef.current
+    if (!quickEditAction || !quickEditHandler) {
+      console.warn('[useAIAssist] Quick edit action is not ready')
+      return
+    }
+
+    void quickEditAction.execute(quickEditHandler).catch((error) => {
+      console.error('[useAIAssist] Error triggering quick edit:', error)
+    })
+  }, [])
 
   const handleAIAssist = useCallback((
     editor: editor.IStandaloneCodeEditor,
@@ -69,9 +85,10 @@ export function useAIAssist(onChange?: (value: string) => void): UseAIAssistRetu
   ) => {
     // Create QuickEditAction for keybinding registration
     const quickEditAction = new QuickEditAction(editor, monacoInstance)
+    quickEditActionRef.current = quickEditAction
 
     // Register Cmd+K with our custom inline flow
-    quickEditAction.registerKeybinding(async (selection: NormalizedSelection) => {
+    const quickEditHandler = async (selection: NormalizedSelection) => {
       // Remove existing zone if any
       if (activeZoneRef.current) {
         cleanupActiveZone(editor, activeZoneRef.current)
@@ -470,7 +487,10 @@ export function useAIAssist(onChange?: (value: string) => void): UseAIAssistRetu
         const input = domNode.querySelector('textarea')
         input?.focus()
       }, 100)
-    })
+    }
+
+    quickEditHandlerRef.current = quickEditHandler
+    quickEditAction.registerKeybinding(quickEditHandler)
     
     // Listen for History Rewind events
     const restoreListener = ({ uri, snapshot }: { uri: string, snapshot: any }) => {
@@ -596,6 +616,12 @@ export function useAIAssist(onChange?: (value: string) => void): UseAIAssistRetu
 
     // Return cleanup function
     return () => {
+      if (quickEditActionRef.current === quickEditAction) {
+        quickEditActionRef.current = null
+      }
+      if (quickEditHandlerRef.current === quickEditHandler) {
+        quickEditHandlerRef.current = null
+      }
       quickEditAction.dispose()
       historyService.off('restore', restoreListener)
     }
@@ -604,6 +630,7 @@ export function useAIAssist(onChange?: (value: string) => void): UseAIAssistRetu
   return {
     isActive: activeZoneRef.current !== null,
     handleAIAssist,
+    triggerQuickEdit,
   }
 }
 

@@ -1,6 +1,6 @@
 import { EditorTabs } from './editor-tabs'
 import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react'
-import { CodeEditor } from './editor'
+import { CodeEditor, type EditorSelectionPayload } from './editor'
 import { useTheme } from 'next-themes'
 import { db } from '@/lib/constants'
 import { tx } from '@instantdb/react'
@@ -10,8 +10,6 @@ import { getFileExtension } from '@/lib/utils/client-utils'
 import ImageViewer from './image-viewer'
 import { Command, ChevronRight, File } from 'lucide-react'
 import type { EditorSyntaxTheme } from '@/components/editor/types'
-
-const isMac = typeof window !== 'undefined' && navigator.userAgent.includes('Macintosh')
 
 interface CursorEditorContainerProps {
   onChatToggle?: () => void
@@ -31,6 +29,8 @@ interface CursorEditorContainerProps {
     column: number
     nonce: number
   } | null
+  onFindSelectionInPdf?: (payload: EditorSelectionPayload) => void
+  isPdfNavigationEnabled?: boolean
 }
 
 const CursorEditorContainer: React.FC<CursorEditorContainerProps> = ({ 
@@ -40,14 +40,20 @@ const CursorEditorContainer: React.FC<CursorEditorContainerProps> = ({
   onCursorClick,
   syntaxTheme,
   onFileContentChange,
-  gotoRequest
+  gotoRequest,
+  onFindSelectionInPdf,
+  isPdfNavigationEnabled = true,
 }) => {
   const { theme, systemTheme } = useTheme()
   const [localContent, setLocalContent] = useState('')
   const [openFile, setOpenFile] = useState<any>(null)
+  const [selectionPayload, setSelectionPayload] = useState<EditorSelectionPayload | null>(null)
+  const [isSelectionActionsVisible, setIsSelectionActionsVisible] = useState(false)
   const { currentlyOpen, isFilesLoading, isProjectLoading, files } = useProject()
   const isStreamingRef = useRef(false)
   const localContentRef = useRef('')
+  const quickEditTriggerRef = useRef<(() => void) | null>(null)
+  const editorPaneRef = useRef<HTMLDivElement | null>(null)
   const persistTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const pendingPersistRef = useRef<{ fileId: string; content: string } | null>(null)
   const isPersistingRef = useRef(false)
@@ -148,6 +154,53 @@ const CursorEditorContainer: React.FC<CursorEditorContainerProps> = ({
     }
   }, [currentlyOpen?.id, currentlyOpen?.content, openFile?.id, flushPendingPersist])
 
+  useEffect(() => {
+    setSelectionPayload(null)
+    setIsSelectionActionsVisible(false)
+  }, [openFile?.id, isImageFile, isPdfFile])
+
+  const handleSelectionChange = useCallback((payload: EditorSelectionPayload | null) => {
+    setSelectionPayload(payload)
+    setIsSelectionActionsVisible(Boolean(payload))
+  }, [])
+
+  const handleEditorActionsReady = useCallback(
+    (actions: { triggerQuickEdit: () => void }) => {
+      quickEditTriggerRef.current = actions.triggerQuickEdit
+    },
+    []
+  )
+
+  const handleSelectionQuickEdit = useCallback(() => {
+    quickEditTriggerRef.current?.()
+    setIsSelectionActionsVisible(false)
+  }, [])
+
+  const handleFindSelectionInPdf = useCallback(() => {
+    if (!selectionPayload || !onFindSelectionInPdf || !isPdfNavigationEnabled) return
+    onFindSelectionInPdf(selectionPayload)
+    setIsSelectionActionsVisible(false)
+  }, [selectionPayload, onFindSelectionInPdf, isPdfNavigationEnabled])
+
+  const selectionActionStyle = useMemo(() => {
+    if (!selectionPayload) return undefined
+
+    const left = Math.max(8, Math.round(selectionPayload.anchorLeftPx ?? 8))
+    const selectionTop = Math.max(8, Math.round(selectionPayload.anchorTopPx ?? 8))
+    const top = Math.max(8, selectionTop - 36)
+
+    const editorPane = editorPaneRef.current
+    if (!editorPane) {
+      return { left, top }
+    }
+
+    const maxLeft = Math.max(8, editorPane.clientWidth - 210)
+    return {
+      left: Math.min(left, maxLeft),
+      top,
+    }
+  }, [selectionPayload])
+
   const handleCodeChange = useCallback(
     (newCode: string) => {
       // Only update if it's a text file (not image/pdf)
@@ -231,7 +284,30 @@ const CursorEditorContainer: React.FC<CursorEditorContainerProps> = ({
           )}
         </div>
       ) : (
-        <div className="relative flex-grow h-full overflow-hidden">
+        <div ref={editorPaneRef} className="relative flex-grow h-full overflow-hidden">
+            {isSelectionActionsVisible && selectionPayload && (
+              <div className="absolute z-30" style={selectionActionStyle}>
+                <div className="flex items-center gap-1.5 rounded-[10px] bg-[#101216] px-1.5 py-1.5">
+                  <button
+                    type="button"
+                    onMouseDown={(event) => event.preventDefault()}
+                    onClick={handleSelectionQuickEdit}
+                    className="h-7 px-3 rounded-[8px] text-[11px] font-medium text-[#cbd3e2] bg-[#181c24] border border-[#2a3040] hover:bg-[#1c212b] transition-colors duration-150"
+                  >
+                    Quick Edit
+                  </button>
+                  <button
+                    type="button"
+                    onMouseDown={(event) => event.preventDefault()}
+                    onClick={handleFindSelectionInPdf}
+                    disabled={!isPdfNavigationEnabled || !onFindSelectionInPdf}
+                    className="h-7 px-3 rounded-[8px] text-[11px] font-medium text-[#cbd3e2] bg-[#181c24] border border-[#2a3040] hover:bg-[#1c212b] transition-colors duration-150 disabled:opacity-45 disabled:cursor-not-allowed"
+                  >
+                    Find in PDF
+                  </button>
+                </div>
+              </div>
+            )}
             <CodeEditor
               onChange={handleCodeChange}
               setIsStreaming={handleIsStreamingChange}
@@ -240,6 +316,8 @@ const CursorEditorContainer: React.FC<CursorEditorContainerProps> = ({
               syntaxTheme={syntaxTheme}
               fileName={openFile?.name}
               filePath={openFilePath}
+              onSelectionChange={handleSelectionChange}
+              onActionsReady={handleEditorActionsReady}
               gotoRequest={activeGotoRequest}
               key={`${theme || systemTheme}-${openFile?.id}`}
             />

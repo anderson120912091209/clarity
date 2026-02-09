@@ -63,10 +63,7 @@ export class QuickEditAction {
       this.monacoInstance.KeyMod.CtrlCmd | this.monacoInstance.KeyCode.KeyK,
       async () => {
         try {
-          const normalizedSelection = await this.captureAndNormalizeSelection()
-          if (normalizedSelection) {
-            await handler(normalizedSelection)
-          }
+          await this.execute(handler)
         } catch (error) {
           console.error('[QuickEditAction] Error handling quick edit:', error)
         }
@@ -74,6 +71,17 @@ export class QuickEditAction {
     )
     // Note: addCommand returns string | null, not IDisposable
     // For now we don't track these disposables since Monaco doesn't provide a dispose method for commands
+  }
+
+  /**
+   * Trigger quick edit flow programmatically using the current editor selection.
+   */
+  public async execute(
+    handler: (selection: NormalizedSelection) => void | Promise<void>
+  ): Promise<void> {
+    const normalizedSelection = await this.captureAndNormalizeSelection()
+    if (!normalizedSelection) return
+    await handler(normalizedSelection)
   }
 
   /**
