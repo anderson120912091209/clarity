@@ -340,8 +340,8 @@ export default function EditorSidebar({ syntaxTheme, onSyntaxThemeChange }: Edit
                     </div>
                     <div className="flex items-center justify-between gap-3 rounded-md border border-white/10 bg-zinc-950/40 px-2 py-2">
                       <div className="space-y-0.5">
-                        <div className="text-[11px] text-white/85">Navigate PDF from caret</div>
-                        <div className="text-[10px] text-white/50">Scroll preview when your cursor moves in editor</div>
+                        <div className="text-[11px] text-white/85">Enable PDF navigation</div>
+                        <div className="text-[10px] text-white/50">Uses SyncTeX when available, falls back to ratio mapping, and enables PDF click-to-source navigation</div>
                       </div>
                       <Switch
                         checked={isPdfCaretNavigationEnabled}

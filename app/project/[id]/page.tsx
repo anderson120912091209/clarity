@@ -53,7 +53,7 @@ function EditorLayout() {
   const [isChatVisible, setIsChatVisible] = useState(false)
   const { currentlyOpen, project, files, projectId } = useProject()
   const fileContent = currentlyOpen?.content || ''
-  const isPdfCaretNavigationEnabled = project?.isPdfCaretNavigationEnabled ?? true
+  const isPdfNavigationEnabled = project?.isPdfCaretNavigationEnabled ?? true
   const pdfScrollNonceRef = useRef(0)
   const editorGotoNonceRef = useRef(0)
   const hasMountedRef = useRef(false)
@@ -162,6 +162,13 @@ function EditorLayout() {
     }
   }, [])
 
+  useEffect(() => {
+    if (isPdfNavigationEnabled) return
+    syncFromCodeAbortRef.current?.abort()
+    syncFromPdfAbortRef.current?.abort()
+    setPdfScrollRequest(null)
+  }, [isPdfNavigationEnabled])
+
   const resolveFilePath = useCallback((file: any): string | null => {
     if (!file?.name) return null
 
@@ -225,7 +232,7 @@ function EditorLayout() {
       lineCount: number
       filePath?: string
     }) => {
-      if (!isPdfCaretNavigationEnabled) {
+      if (!isPdfNavigationEnabled) {
         return
       }
 
@@ -277,11 +284,12 @@ function EditorLayout() {
         }
       })()
     },
-    [isPdfCaretNavigationEnabled, synctexContext]
+    [isPdfNavigationEnabled, synctexContext]
   )
 
   const handlePdfPointSelect = useCallback(
     ({ page, h, v }: { page: number; h: number; v: number }) => {
+      if (!isPdfNavigationEnabled) return
       if (!synctexContext) return
 
       syncFromPdfAbortRef.current?.abort()
@@ -319,7 +327,7 @@ function EditorLayout() {
         }
       })()
     },
-    [synctexContext, findFileByPath, projectId]
+    [isPdfNavigationEnabled, synctexContext, findFileByPath, projectId]
   )
 
   // Header content for the editor pane
@@ -393,6 +401,7 @@ function EditorLayout() {
             header={pdfHeader}
             scrollRequest={pdfScrollRequest}
             onPdfPointSelect={handlePdfPointSelect}
+            isPdfNavigationEnabled={isPdfNavigationEnabled}
           />
         </ResizablePanel>
         {isChatVisible && (

@@ -21,6 +21,7 @@ export default function LatexCanvas({
   scale,
   scrollRequest,
   onPdfPointSelect,
+  isPdfNavigationEnabled = true,
 }: {
   pdfUrl: string;
   onDocumentLoadSuccess: (result: { numPages: number }) => void;
@@ -37,6 +38,7 @@ export default function LatexCanvas({
       }
     | null;
   onPdfPointSelect?: (point: { page: number; h: number; v: number }) => void;
+  isPdfNavigationEnabled?: boolean;
 }) {
   const [workerReady, setWorkerReady] = useState(false)
   const [documentError, setDocumentError] = useState<string | null>(null)
@@ -99,6 +101,7 @@ export default function LatexCanvas({
   }, [scrollRequest?.nonce, workerReady, isDocumentReady, numPages])
 
   const handlePageClick = (pageNumber: number) => (event: MouseEvent<HTMLDivElement>) => {
+    if (!isPdfNavigationEnabled) return
     if (!onPdfPointSelect) return
 
     const pageContainer = pageContainerRefs.current[pageNumber]
@@ -157,7 +160,7 @@ export default function LatexCanvas({
                 pageContainerRefs.current[index + 1] = node
               }}
               onClick={handlePageClick(index + 1)}
-              className="mb-4 shadow-lg cursor-pointer"
+              className={`mb-4 shadow-lg ${isPdfNavigationEnabled ? 'cursor-pointer' : 'cursor-default'}`}
             >
               <Page
                 key={`page_${index + 1}`}

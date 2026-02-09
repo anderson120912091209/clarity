@@ -351,6 +351,7 @@ interface LatexRendererProps {
       }
     | null
   onPdfPointSelect?: (point: { page: number; h: number; v: number }) => void
+  isPdfNavigationEnabled?: boolean
 }
 
 
@@ -363,6 +364,7 @@ function LatexRenderer({
   header,
   scrollRequest,
   onPdfPointSelect,
+  isPdfNavigationEnabled = true,
 }: LatexRendererProps) {
   const { project: data, projectId } = useProject();
   const scale = data?.projectScale ?? 0.9;
@@ -516,6 +518,7 @@ function LatexRenderer({
                  scale={scale}
                  scrollRequest={scrollRequest}
                  onPdfPointSelect={onPdfPointSelect}
+                 isPdfNavigationEnabled={isPdfNavigationEnabled}
              />
         </div>
       ) : (
