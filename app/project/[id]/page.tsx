@@ -14,6 +14,14 @@ import { useProject } from '@/contexts/ProjectContext'
 import { EditorTabs } from '@/components/editor/editor-tabs'
 import { PDFNavContent, useLatex } from '@/components/latex-render/latex'
 import { DEFAULT_EDITOR_SYNTAX_THEME, type EditorSyntaxTheme } from '@/components/editor/types'
+import { db } from '@/lib/constants'
+import { tx } from '@instantdb/react'
+import {
+  normalizeComparablePath,
+  syncPdfToSource,
+  syncSourceToPdf,
+  type SynctexPdfPosition,
+} from '@/lib/utils/synctex-utils'
 
 export const maxDuration = 30
 
@@ -27,13 +35,30 @@ export default function Home() {
   )
 }
 
+interface PdfScrollRequest {
+  mode: 'ratio' | 'synctex'
+  nonce: number
+  ratio?: number
+  position?: SynctexPdfPosition
+}
+
+interface EditorGotoRequest {
+  fileId: string
+  lineNumber: number
+  column: number
+  nonce: number
+}
+
 function EditorLayout() {
   const [isChatVisible, setIsChatVisible] = useState(false)
-  const { currentlyOpen, project, files } = useProject()
+  const { currentlyOpen, project, files, projectId } = useProject()
   const fileContent = currentlyOpen?.content || ''
   const isPdfCaretNavigationEnabled = project?.isPdfCaretNavigationEnabled ?? true
   const pdfScrollNonceRef = useRef(0)
+  const editorGotoNonceRef = useRef(0)
   const hasMountedRef = useRef(false)
+  const syncFromCodeAbortRef = useRef<AbortController | null>(null)
+  const syncFromPdfAbortRef = useRef<AbortController | null>(null)
   const [editorSyntaxTheme, setEditorSyntaxTheme] = useState<EditorSyntaxTheme>(DEFAULT_EDITOR_SYNTAX_THEME)
   const [liveFileContentOverrides, setLiveFileContentOverrides] = useState<Record<string, string>>({})
 
@@ -109,27 +134,192 @@ function EditorLayout() {
     handleZoomOut, 
     handleResetZoom, 
     handleDownload,
-    logs
+    logs,
+    synctexContext,
   } = useLatex(liveFileContentOverrides)
   
   const [showLogs, setShowLogs] = useState(false)
-  const [pdfScrollRequest, setPdfScrollRequest] = useState<{ ratio: number; nonce: number } | null>(null)
+  const [pdfScrollRequest, setPdfScrollRequest] = useState<PdfScrollRequest | null>(null)
+  const [editorGotoRequest, setEditorGotoRequest] = useState<EditorGotoRequest | null>(null)
+
+  const fileIdMap = useRef(new Map<string, any>())
+
+  useEffect(() => {
+    const map = new Map<string, any>()
+    if (Array.isArray(files)) {
+      for (const file of files) {
+        if (!file?.id) continue
+        map.set(file.id, file)
+      }
+    }
+    fileIdMap.current = map
+  }, [files])
+
+  useEffect(() => {
+    return () => {
+      syncFromCodeAbortRef.current?.abort()
+      syncFromPdfAbortRef.current?.abort()
+    }
+  }, [])
+
+  const resolveFilePath = useCallback((file: any): string | null => {
+    if (!file?.name) return null
+
+    const parts = [file.name]
+    let current = file
+    const map = fileIdMap.current
+
+    while (current?.parent_id && map.has(current.parent_id)) {
+      current = map.get(current.parent_id)
+      if (!current?.name) break
+      parts.unshift(current.name)
+    }
+
+    return parts.join('/')
+  }, [])
+
+  const findFileByPath = useCallback(
+    (inputPath: string): any | null => {
+      const normalizedTarget = normalizeComparablePath(inputPath)
+      if (!normalizedTarget || !Array.isArray(files)) return null
+
+      let basenameMatch: any | null = null
+      for (const file of files) {
+        if (file?.type !== 'file') continue
+        const resolved = resolveFilePath(file)
+        if (!resolved) continue
+        const normalizedResolved = normalizeComparablePath(resolved)
+        if (normalizedResolved === normalizedTarget) {
+          return file
+        }
+
+        const targetBasename = normalizedTarget.split('/').pop()
+        const resolvedBasename = normalizedResolved.split('/').pop()
+        if (
+          targetBasename &&
+          resolvedBasename &&
+          targetBasename === resolvedBasename
+        ) {
+          if (basenameMatch) {
+            basenameMatch = null
+            break
+          }
+          basenameMatch = file
+        }
+      }
+
+      return basenameMatch
+    },
+    [files, resolveFilePath]
+  )
 
   const handleEditorCursorClick = useCallback(
-    ({ lineNumber, lineCount }: { lineNumber: number; column: number; lineCount: number }) => {
+    ({
+      lineNumber,
+      column,
+      lineCount,
+      filePath,
+    }: {
+      lineNumber: number
+      column: number
+      lineCount: number
+      filePath?: string
+    }) => {
       if (!isPdfCaretNavigationEnabled) {
         return
       }
 
-      // Keep it simple for now: map source line position to a scroll ratio.
-      const safeLineCount = Math.max(1, lineCount)
-      const ratio =
-        safeLineCount <= 1 ? 0 : Math.min(1, Math.max(0, (lineNumber - 1) / (safeLineCount - 1)))
+      const fallbackToRatio = () => {
+        const safeLineCount = Math.max(1, lineCount)
+        const ratio =
+          safeLineCount <= 1 ? 0 : Math.min(1, Math.max(0, (lineNumber - 1) / (safeLineCount - 1)))
 
-      pdfScrollNonceRef.current += 1
-      setPdfScrollRequest({ ratio, nonce: pdfScrollNonceRef.current })
+        pdfScrollNonceRef.current += 1
+        setPdfScrollRequest({ mode: 'ratio', ratio, nonce: pdfScrollNonceRef.current })
+      }
+
+      if (!synctexContext || !filePath) {
+        fallbackToRatio()
+        return
+      }
+
+      syncFromCodeAbortRef.current?.abort()
+      const controller = new AbortController()
+      syncFromCodeAbortRef.current = controller
+
+      void (async () => {
+        try {
+          const positions = await syncSourceToPdf(
+            synctexContext,
+            {
+              file: filePath,
+              line: lineNumber,
+              column,
+            },
+            { signal: controller.signal }
+          )
+
+          if (!positions.length) {
+            fallbackToRatio()
+            return
+          }
+
+          pdfScrollNonceRef.current += 1
+          setPdfScrollRequest({
+            mode: 'synctex',
+            position: positions[0],
+            nonce: pdfScrollNonceRef.current,
+          })
+        } catch (error: any) {
+          if (controller.signal.aborted || error?.name === 'AbortError') return
+          console.warn('SyncTeX source->pdf sync failed, falling back to ratio scroll', error)
+          fallbackToRatio()
+        }
+      })()
     },
-    [isPdfCaretNavigationEnabled]
+    [isPdfCaretNavigationEnabled, synctexContext]
+  )
+
+  const handlePdfPointSelect = useCallback(
+    ({ page, h, v }: { page: number; h: number; v: number }) => {
+      if (!synctexContext) return
+
+      syncFromPdfAbortRef.current?.abort()
+      const controller = new AbortController()
+      syncFromPdfAbortRef.current = controller
+
+      void (async () => {
+        try {
+          const codePositions = await syncPdfToSource(
+            synctexContext,
+            { page, h, v },
+            { signal: controller.signal }
+          )
+
+          if (!codePositions.length) return
+          const target = codePositions[0]
+          const file = findFileByPath(target.file)
+          if (!file?.id) return
+
+          await db.transact([
+            tx.files[file.id].update({ isOpen: true }),
+            tx.projects[projectId].update({ activeFileId: file.id }),
+          ])
+
+          editorGotoNonceRef.current += 1
+          setEditorGotoRequest({
+            fileId: file.id,
+            lineNumber: Math.max(1, target.line),
+            column: Math.max(1, target.column),
+            nonce: editorGotoNonceRef.current,
+          })
+        } catch (error: any) {
+          if (controller.signal.aborted || error?.name === 'AbortError') return
+          console.warn('SyncTeX pdf->source sync failed', error)
+        }
+      })()
+    },
+    [synctexContext, findFileByPath, projectId]
   )
 
   // Header content for the editor pane
@@ -187,6 +377,7 @@ function EditorLayout() {
             onCursorClick={handleEditorCursorClick}
             syntaxTheme={editorSyntaxTheme}
             onFileContentChange={handleLiveFileContentChange}
+            gotoRequest={editorGotoRequest}
           />
         </ResizablePanel>
         <ResizableHandle className="w-2 bg-transparent flex items-center justify-center group outline-none">
@@ -201,6 +392,7 @@ function EditorLayout() {
             showLogs={showLogs}
             header={pdfHeader}
             scrollRequest={pdfScrollRequest}
+            onPdfPointSelect={handlePdfPointSelect}
           />
         </ResizablePanel>
         {isChatVisible && (

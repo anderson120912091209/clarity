@@ -139,4 +139,11 @@ export class CacheManager {
   getOutputPath(projectId: string, buildId: string, filename: string): string {
     return path.join(settings.outputDir, projectId, 'builds', buildId, filename);
   }
+
+  /**
+   * Get path to a cached build directory.
+   */
+  getBuildPath(projectId: string, buildId: string): string {
+    return path.join(settings.outputDir, projectId, 'builds', buildId);
+  }
 }

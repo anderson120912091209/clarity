@@ -1,5 +1,5 @@
 import { EditorTabs } from './editor-tabs'
-import React, { useState, useCallback, useEffect, useRef } from 'react'
+import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react'
 import { CodeEditor } from './editor'
 import { useTheme } from 'next-themes'
 import { db } from '@/lib/constants'
@@ -17,9 +17,20 @@ interface CursorEditorContainerProps {
   onChatToggle?: () => void
   isChatVisible?: boolean
   header?: React.ReactNode
-  onCursorClick?: (payload: { lineNumber: number; column: number; lineCount: number }) => void
+  onCursorClick?: (payload: {
+    lineNumber: number
+    column: number
+    lineCount: number
+    filePath?: string
+  }) => void
   syntaxTheme?: EditorSyntaxTheme
   onFileContentChange?: (fileId: string, content: string) => void
+  gotoRequest?: {
+    fileId: string
+    lineNumber: number
+    column: number
+    nonce: number
+  } | null
 }
 
 const CursorEditorContainer: React.FC<CursorEditorContainerProps> = ({ 
@@ -28,12 +39,13 @@ const CursorEditorContainer: React.FC<CursorEditorContainerProps> = ({
   header,
   onCursorClick,
   syntaxTheme,
-  onFileContentChange
+  onFileContentChange,
+  gotoRequest
 }) => {
   const { theme, systemTheme } = useTheme()
   const [localContent, setLocalContent] = useState('')
   const [openFile, setOpenFile] = useState<any>(null)
-  const { currentlyOpen, isFilesLoading, isProjectLoading } = useProject()
+  const { currentlyOpen, isFilesLoading, isProjectLoading, files } = useProject()
   const isStreamingRef = useRef(false)
   const localContentRef = useRef('')
   const persistTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -44,6 +56,32 @@ const CursorEditorContainer: React.FC<CursorEditorContainerProps> = ({
   const ext = fileType.toLowerCase()
   const isImageFile = ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp', 'svg'].includes(ext)
   const isPdfFile = ext === 'pdf'
+
+  const openFilePath = useMemo(() => {
+    if (!openFile?.name) return undefined
+    if (!Array.isArray(files) || files.length === 0) return openFile.name
+
+    const fileMap = new Map<string, any>()
+    for (const file of files) {
+      if (!file?.id) continue
+      fileMap.set(file.id, file)
+    }
+
+    const parts = [openFile.name]
+    let current = openFile
+    while (current?.parent_id && fileMap.has(current.parent_id)) {
+      current = fileMap.get(current.parent_id)
+      if (!current?.name) break
+      parts.unshift(current.name)
+    }
+
+    return parts.join('/')
+  }, [files, openFile])
+
+  const activeGotoRequest = useMemo(() => {
+    if (!gotoRequest || !openFile?.id) return null
+    return gotoRequest.fileId === openFile.id ? gotoRequest : null
+  }, [gotoRequest, openFile?.id])
 
   const flushPendingPersist = useCallback(async () => {
     if (isPersistingRef.current) return
@@ -194,15 +232,17 @@ const CursorEditorContainer: React.FC<CursorEditorContainerProps> = ({
         </div>
       ) : (
         <div className="relative flex-grow h-full overflow-hidden">
-          <CodeEditor
-            onChange={handleCodeChange}
-            setIsStreaming={handleIsStreamingChange}
-            value={localContent}
-            onCursorClick={onCursorClick}
-            syntaxTheme={syntaxTheme}
-            fileName={openFile?.name}
-            key={`${theme || systemTheme}-${openFile?.id}`}
-          />
+            <CodeEditor
+              onChange={handleCodeChange}
+              setIsStreaming={handleIsStreamingChange}
+              value={localContent}
+              onCursorClick={onCursorClick}
+              syntaxTheme={syntaxTheme}
+              fileName={openFile?.name}
+              filePath={openFilePath}
+              gotoRequest={activeGotoRequest}
+              key={`${theme || systemTheme}-${openFile?.id}`}
+            />
         </div>
       )}
     </div>

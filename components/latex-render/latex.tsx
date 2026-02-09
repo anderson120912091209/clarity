@@ -12,11 +12,12 @@ import { savePdfToStorage, savePreviewToStorage } from '@/lib/utils/db-utils'
 import { useProject } from '@/contexts/ProjectContext'
 import { createPathname } from '@/lib/utils/client-utils'
 import { useFrontend } from '@/contexts/FrontendContext'
-import { fetchPdf } from '@/lib/utils/pdf-utils'
+import { fetchPdf, type SynctexContext } from '@/lib/utils/pdf-utils'
 import LatexLoading from './latex-loading'
 import LatexCanvas from './latex-canvas'
 import { updateProject } from '@/hooks/data'
 import { cn } from '@/lib/utils'
+import type { SynctexPdfPosition } from '@/lib/utils/synctex-utils'
 import {
   DEFAULT_PDF_BACKGROUND_THEME,
   PDF_BACKGROUND_THEME_CHANGE_EVENT,
@@ -40,6 +41,7 @@ export function useLatex(liveFileContentOverrides: Record<string, string> = {}) 
   const [isLoading, setIsLoading] = useState(false)
   const [logs, setLogs] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [synctexContext, setSynctexContext] = useState<SynctexContext | null>(null)
   const compileRunRef = useRef(0)
   const activeAutoCompileAbortRef = useRef<AbortController | null>(null)
   const objectUrlRef = useRef<string | null>(null)
@@ -89,6 +91,7 @@ export function useLatex(liveFileContentOverrides: Record<string, string> = {}) 
     setPdfUrl(null)
     setLogs(null)
     setError(null)
+    setSynctexContext(null)
 
     if (persistTimeoutRef.current) {
       clearTimeout(persistTimeoutRef.current)
@@ -196,9 +199,9 @@ export function useLatex(liveFileContentOverrides: Record<string, string> = {}) 
     setLogs(null)
     
     try {
-      const { blob, logs } = await fetchPdf(effectiveFiles, {
+      const { blob, logs, synctex } = await fetchPdf(effectiveFiles, {
         signal: abortController.signal,
-      }) as any
+      })
       if (runId !== compileRunRef.current) return
 
       const url = URL.createObjectURL(blob)
@@ -208,6 +211,7 @@ export function useLatex(liveFileContentOverrides: Record<string, string> = {}) 
       objectUrlRef.current = url
       setPdfUrl(url)
       setLogs(logs)
+      setSynctexContext(synctex)
 
       const pathname = createPathname(user.id, projectId)
 
@@ -306,7 +310,8 @@ export function useLatex(liveFileContentOverrides: Record<string, string> = {}) 
     handleZoomOut,
     handleResetZoom,
     handleDownload,
-    logs
+    logs,
+    synctexContext,
   }
 }
 
@@ -337,11 +342,28 @@ interface LatexRendererProps {
   logs?: string | null
   showLogs?: boolean
   header?: React.ReactNode
-  scrollRequest?: { ratio: number; nonce: number } | null
+  scrollRequest?:
+    | {
+        mode: 'ratio' | 'synctex'
+        nonce: number
+        ratio?: number
+        position?: SynctexPdfPosition
+      }
+    | null
+  onPdfPointSelect?: (point: { page: number; h: number; v: number }) => void
 }
 
 
-function LatexRenderer({ pdfUrl, isLoading, error, logs, showLogs, header, scrollRequest }: LatexRendererProps) {
+function LatexRenderer({
+  pdfUrl,
+  isLoading,
+  error,
+  logs,
+  showLogs,
+  header,
+  scrollRequest,
+  onPdfPointSelect,
+}: LatexRendererProps) {
   const { project: data, projectId } = useProject();
   const scale = data?.projectScale ?? 0.9;
   const [localPdfBackgroundTheme, setLocalPdfBackgroundTheme] = useState<PdfBackgroundThemeKey>(DEFAULT_PDF_BACKGROUND_THEME)
@@ -490,9 +512,10 @@ function LatexRenderer({ pdfUrl, isLoading, error, logs, showLogs, header, scrol
                 onDocumentLoadSuccess={onDocumentLoadSuccess}
                 options={options}
                 isDocumentReady={isDocumentReady}
-                numPages={numPages}
-                scale={scale}
-                scrollRequest={scrollRequest}
+                 numPages={numPages}
+                 scale={scale}
+                 scrollRequest={scrollRequest}
+                 onPdfPointSelect={onPdfPointSelect}
              />
         </div>
       ) : (

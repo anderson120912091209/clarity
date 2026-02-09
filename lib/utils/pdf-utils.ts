@@ -45,6 +45,19 @@ interface FetchPdfOptions {
   signal?: AbortSignal
 }
 
+export interface SynctexContext {
+  clsiBaseUrl: string
+  projectId: string
+  buildId: string
+  rootResourcePath: string
+}
+
+interface FetchPdfResult {
+  blob: Blob
+  logs: string | null
+  synctex: SynctexContext | null
+}
+
 function buildClsiCandidates(configuredUrl: string): string[] {
   const cleanedConfiguredUrl = configuredUrl.replace(/\/+$/, '')
   const candidates = [cleanedConfiguredUrl]
@@ -109,7 +122,7 @@ function getByteSignature(buffer: ArrayBuffer, maxBytes = 8): string {
 export async function fetchPdf(
   files: EditorFiles | EditorFiles[] | undefined | null,
   options: FetchPdfOptions = {}
-) {
+): Promise<FetchPdfResult> {
   // Validate files parameter
   if (!files) {
     throw new Error('No files provided. Please ensure you have files in your project.')
@@ -351,6 +364,17 @@ export async function fetchPdf(
 
   console.log('[CLSI] Downloading PDF from:', `${activeClsiUrl}${pdfFile.url}`)
 
+  const synctexFile = compileResult.outputFiles?.find((f: any) => f.path === 'output.synctex.gz')
+  const synctex: SynctexContext | null =
+    compileTarget.compiler === 'typst' || !compileResult.buildId || !synctexFile
+      ? null
+      : {
+          clsiBaseUrl: activeClsiUrl,
+          projectId: 'user-project',
+          buildId: compileResult.buildId,
+          rootResourcePath: compileTarget.rootResourcePath,
+        }
+
   // Fetch the compiled PDF
   try {
     const pdfResponse = await fetch(`${activeClsiUrl}${pdfFile.url}`, {
@@ -360,7 +384,7 @@ export async function fetchPdf(
       throw new Error(`Failed to download PDF: ${pdfResponse.status} ${pdfResponse.statusText}`)
     }
     const blob = await pdfResponse.blob()
-    return { blob, logs }
+    return { blob, logs, synctex }
   } catch (blobError: any) {
     throw new Error(
       `Failed to download compiled PDF.\n\n` +

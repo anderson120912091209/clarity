@@ -27,9 +27,21 @@ interface CodeEditorProps {
   onChange: (value: string) => void
   value: string
   setIsStreaming: (isStreaming: boolean) => void
-  onCursorClick?: (payload: { lineNumber: number; column: number; lineCount: number }) => void
+  onCursorClick?: (payload: {
+    lineNumber: number
+    column: number
+    lineCount: number
+    filePath?: string
+  }) => void
   syntaxTheme?: EditorSyntaxTheme
   fileName?: string
+  filePath?: string
+  gotoRequest?: {
+    fileId: string
+    lineNumber: number
+    column: number
+    nonce: number
+  } | null
 }
 
 const EditorLoading = () => (
@@ -45,6 +57,8 @@ export const CodeEditor = ({
   onCursorClick,
   syntaxTheme = DEFAULT_EDITOR_SYNTAX_THEME,
   fileName,
+  filePath,
+  gotoRequest,
 }: CodeEditorProps) => {
   const activeLanguage = useMemo<EditorLanguageId>(
     () => resolveEditorLanguageId(fileName),
@@ -141,6 +155,22 @@ export const CodeEditor = ({
     onCursorClickRef.current = onCursorClick
   }, [onCursorClick])
 
+  useEffect(() => {
+    if (!gotoRequest) return
+    const editor = editorRef.current
+    const model = editor?.getModel()
+    if (!editor || !model) return
+
+    const maxLine = model.getLineCount()
+    const lineNumber = Math.min(maxLine, Math.max(1, gotoRequest.lineNumber))
+    const maxColumn = model.getLineMaxColumn(lineNumber)
+    const column = Math.min(maxColumn, Math.max(1, gotoRequest.column))
+
+    editor.setPosition({ lineNumber, column })
+    editor.revealPositionInCenter({ lineNumber, column })
+    editor.focus()
+  }, [gotoRequest, editorRef])
+
   const editorTheme = resolveMonacoThemeForSyntaxTheme(syntaxTheme, isDark)
 
   return (
@@ -222,6 +252,7 @@ export const CodeEditor = ({
             lineNumber: position.lineNumber,
             column: position.column,
             lineCount: model.getLineCount(),
+            filePath,
           })
         })
 

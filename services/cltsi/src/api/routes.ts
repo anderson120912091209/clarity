@@ -2,12 +2,14 @@ import express, { type Router, type Request, type Response } from 'express';
 import { CompileManager } from '../core/CompileManager.js';
 import { CacheManager } from '../core/CacheManager.js';
 import { TypstLivePreviewManager } from '../core/TypstLivePreviewManager.js';
+import { SynctexManager, SynctexNotFoundError } from '../core/SynctexManager.js';
 import { compileRequestSchema, typstLivePreviewRequestSchema } from './schemas.js';
 
 export function createRoutes(
   compileManager: CompileManager,
   cacheManager: CacheManager,
-  typstLivePreviewManager: TypstLivePreviewManager
+  typstLivePreviewManager: TypstLivePreviewManager,
+  synctexManager: SynctexManager
 ): Router {
   const router = express.Router();
 
@@ -125,6 +127,64 @@ export function createRoutes(
       }
     }
   );
+
+  /**
+   * GET /project/:projectId/sync/code
+   * Sync from source (file/line/column) to PDF coordinates.
+   */
+  router.get('/project/:projectId/sync/code', async (req: Request, res: Response, next) => {
+    try {
+      const { projectId } = req.params;
+      const file = String(req.query.file || '');
+      const line = Number(req.query.line);
+      const column = Number(req.query.column);
+      const buildId = String(req.query.buildId || '');
+
+      const result = await synctexManager.syncFromCode(projectId, {
+        buildId,
+        file,
+        line,
+        column,
+      });
+
+      res.json(result);
+    } catch (error) {
+      if (error instanceof SynctexNotFoundError) {
+        res.status(404).send('Not Found');
+        return;
+      }
+      next(error);
+    }
+  });
+
+  /**
+   * GET /project/:projectId/sync/pdf
+   * Sync from PDF coordinates to source (file/line/column).
+   */
+  router.get('/project/:projectId/sync/pdf', async (req: Request, res: Response, next) => {
+    try {
+      const { projectId } = req.params;
+      const page = Number(req.query.page);
+      const h = Number(req.query.h);
+      const v = Number(req.query.v);
+      const buildId = String(req.query.buildId || '');
+
+      const result = await synctexManager.syncFromPdf(projectId, {
+        buildId,
+        page,
+        h,
+        v,
+      });
+
+      res.json(result);
+    } catch (error) {
+      if (error instanceof SynctexNotFoundError) {
+        res.status(404).send('Not Found');
+        return;
+      }
+      next(error);
+    }
+  });
 
   /**
    * GET /status

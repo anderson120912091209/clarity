@@ -4,6 +4,8 @@ import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area"
 import { Document, Page, pdfjs } from 'react-pdf'
 import { Skeleton } from "@/components/ui/skeleton"
 import { useEffect, useRef, useState } from 'react'
+import type { SynctexPdfPosition } from '@/lib/utils/synctex-utils'
+import type { MouseEvent } from 'react'
 
 // Ensure worker is initialized
 if (typeof window !== 'undefined') {
@@ -17,7 +19,8 @@ export default function LatexCanvas({
   isDocumentReady,
   numPages,
   scale,
-  scrollRequest
+  scrollRequest,
+  onPdfPointSelect,
 }: {
   pdfUrl: string;
   onDocumentLoadSuccess: (result: { numPages: number }) => void;
@@ -25,14 +28,26 @@ export default function LatexCanvas({
   isDocumentReady: boolean;
   numPages: number;
   scale: number;
-  scrollRequest?: { ratio: number; nonce: number } | null;
+  scrollRequest?:
+    | {
+        mode: 'ratio' | 'synctex'
+        nonce: number
+        ratio?: number
+        position?: SynctexPdfPosition
+      }
+    | null;
+  onPdfPointSelect?: (point: { page: number; h: number; v: number }) => void;
 }) {
   const [workerReady, setWorkerReady] = useState(false)
   const [documentError, setDocumentError] = useState<string | null>(null)
   const scrollAreaRef = useRef<HTMLDivElement | null>(null)
+  const pageContainerRefs = useRef<Record<number, HTMLDivElement | null>>({})
+  const pageDimensionsRef = useRef<Record<number, { width: number; height: number }>>({})
 
   useEffect(() => {
     setDocumentError(null)
+    pageContainerRefs.current = {}
+    pageDimensionsRef.current = {}
   }, [pdfUrl])
 
   useEffect(() => {
@@ -59,13 +74,55 @@ export default function LatexCanvas({
     const root = scrollAreaRef.current
     const viewport = root?.querySelector('[data-radix-scroll-area-viewport]') as HTMLElement | null
     if (!viewport) return
-
-    const ratio = Math.min(1, Math.max(0, scrollRequest.ratio))
     const maxScrollTop = viewport.scrollHeight - viewport.clientHeight
     if (maxScrollTop <= 0) return
 
+    if (scrollRequest.mode === 'synctex' && scrollRequest.position) {
+      const { page, v } = scrollRequest.position
+      const pageContainer = pageContainerRefs.current[page]
+      if (pageContainer) {
+        const dimensions = pageDimensionsRef.current[page]
+        const renderedHeight = pageContainer.getBoundingClientRect().height
+        const sourceHeight = dimensions?.height ?? renderedHeight
+        const verticalRatio =
+          sourceHeight > 0 ? Math.min(1, Math.max(0, v / sourceHeight)) : 0
+        const targetTop =
+          pageContainer.offsetTop + renderedHeight * verticalRatio - viewport.clientHeight * 0.35
+        const clampedTop = Math.min(maxScrollTop, Math.max(0, targetTop))
+        viewport.scrollTo({ top: clampedTop, behavior: 'smooth' })
+        return
+      }
+    }
+
+    const ratio = Math.min(1, Math.max(0, scrollRequest.ratio ?? 0))
     viewport.scrollTo({ top: maxScrollTop * ratio, behavior: 'smooth' })
   }, [scrollRequest?.nonce, workerReady, isDocumentReady, numPages])
+
+  const handlePageClick = (pageNumber: number) => (event: MouseEvent<HTMLDivElement>) => {
+    if (!onPdfPointSelect) return
+
+    const pageContainer = pageContainerRefs.current[pageNumber]
+    if (!pageContainer) return
+
+    const rect = pageContainer.getBoundingClientRect()
+    const relativeX = event.clientX - rect.left
+    const relativeY = event.clientY - rect.top
+    if (relativeX < 0 || relativeY < 0 || relativeX > rect.width || relativeY > rect.height) {
+      return
+    }
+
+    const dimensions = pageDimensionsRef.current[pageNumber]
+    const sourceWidth = dimensions?.width ?? rect.width
+    const sourceHeight = dimensions?.height ?? rect.height
+    const h = rect.width > 0 ? (relativeX / rect.width) * sourceWidth : relativeX
+    const v = rect.height > 0 ? (relativeY / rect.height) * sourceHeight : relativeY
+
+    onPdfPointSelect({
+      page: pageNumber,
+      h: Math.max(0, h),
+      v: Math.max(0, v),
+    })
+  }
 
   if (!workerReady) {
     return (
@@ -94,22 +151,37 @@ export default function LatexCanvas({
       >
         {isDocumentReady && numPages > 0 && !documentError && workerReady &&
           Array.from(new Array(numPages), (el, index) => (
-            <Page
-              key={`page_${index + 1}`}
-              pageNumber={index + 1}
-              className="mb-4 shadow-lg"
-              scale={scale}
-              width={typeof window !== 'undefined' ? Math.min(window.innerWidth - 80, 800) : 800}
-              loading={<Skeleton className="w-full h-[calc(100vh-80px)] mb-4" />}
-              onRenderError={(error) => {
-                console.error(`Error rendering page ${index + 1}:`, error)
-                setDocumentError(`Failed to render page ${index + 1}`)
+            <div
+              key={`page_wrapper_${index + 1}`}
+              ref={(node) => {
+                pageContainerRefs.current[index + 1] = node
               }}
-              onLoadError={(error) => {
-                console.error(`Error loading page ${index + 1}:`, error)
-                setDocumentError(`Failed to load page ${index + 1}`)
-              }}
-            />
+              onClick={handlePageClick(index + 1)}
+              className="mb-4 shadow-lg cursor-pointer"
+            >
+              <Page
+                key={`page_${index + 1}`}
+                pageNumber={index + 1}
+                scale={scale}
+                width={typeof window !== 'undefined' ? Math.min(window.innerWidth - 80, 800) : 800}
+                loading={<Skeleton className="w-full h-[calc(100vh-80px)] mb-4" />}
+                onLoadSuccess={(page) => {
+                  const viewport = page.getViewport({ scale: 1 })
+                  pageDimensionsRef.current[index + 1] = {
+                    width: viewport.width,
+                    height: viewport.height,
+                  }
+                }}
+                onRenderError={(error) => {
+                  console.error(`Error rendering page ${index + 1}:`, error)
+                  setDocumentError(`Failed to render page ${index + 1}`)
+                }}
+                onLoadError={(error) => {
+                  console.error(`Error loading page ${index + 1}:`, error)
+                  setDocumentError(`Failed to load page ${index + 1}`)
+                }}
+              />
+            </div>
           ))}
         {documentError && (
           <div className="p-4 text-red-500">

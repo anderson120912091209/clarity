@@ -8,6 +8,7 @@ import { ResourceManager } from './core/ResourceManager.js';
 import { CacheManager } from './core/CacheManager.js';
 import { CompileManager } from './core/CompileManager.js';
 import { TypstLivePreviewManager } from './core/TypstLivePreviewManager.js';
+import { SynctexManager } from './core/SynctexManager.js';
 import { createRoutes } from './api/routes.js';
 import { errorHandler, requestLogger } from './api/middleware.js';
 import settings from './config/settings.js';
@@ -29,6 +30,7 @@ async function main() {
     const typstRunner = new TypstRunner(dockerExecutor);
     const cacheManager = new CacheManager();
     const typstLivePreviewManager = new TypstLivePreviewManager(resourceManager, cacheManager);
+    const synctexManager = new SynctexManager(dockerExecutor, cacheManager);
     const compileManager = new CompileManager(
       lockManager,
       resourceManager,
@@ -76,7 +78,7 @@ async function main() {
     app.use(requestLogger);
 
     // Routes
-    app.use(createRoutes(compileManager, cacheManager, typstLivePreviewManager));
+    app.use(createRoutes(compileManager, cacheManager, typstLivePreviewManager, synctexManager));
 
     // Error handling (must be last)
     app.use(errorHandler);
