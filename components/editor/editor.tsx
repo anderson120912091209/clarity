@@ -275,28 +275,29 @@ export const CodeEditor = ({
         }
 
         let selectionNonce = 0
-        const emitSelectionPayload = () => {
-          const selectionHandler = onSelectionChangeRef.current
-          if (!selectionHandler) return
+        let selectionEmitTimeout: ReturnType<typeof setTimeout> | null = null
+        let isSelectionSettled = false
+        let isPointerDown = false
 
+        const clearSelectionEmitTimeout = () => {
+          if (!selectionEmitTimeout) return
+          clearTimeout(selectionEmitTimeout)
+          selectionEmitTimeout = null
+        }
+
+        const buildSelectionPayload = (): EditorSelectionPayload | null => {
           const model = editor.getModel()
           const selection = editor.getSelection()
-          if (!model || !selection || selection.isEmpty()) {
-            selectionHandler(null)
-            return
-          }
+          if (!model || !selection || selection.isEmpty()) return null
 
           const selectedText = model.getValueInRange(selection)
-          if (!selectedText || selectedText.trim() === '') {
-            selectionHandler(null)
-            return
-          }
+          if (!selectedText || selectedText.trim() === '') return null
 
           const startPosition = selection.getStartPosition()
           const visiblePosition = editor.getScrolledVisiblePosition(startPosition)
 
           selectionNonce += 1
-          selectionHandler({
+          return {
             startLineNumber: selection.startLineNumber,
             startColumn: selection.startColumn,
             endLineNumber: selection.endLineNumber,
@@ -308,7 +309,45 @@ export const CodeEditor = ({
             anchorTopPx: visiblePosition?.top,
             anchorHeightPx: visiblePosition?.height,
             nonce: selectionNonce,
-          })
+          }
+        }
+
+        const emitSelectionPayloadNow = () => {
+          const selectionHandler = onSelectionChangeRef.current
+          if (!selectionHandler) return
+
+          const payload = buildSelectionPayload()
+          if (!payload) {
+            isSelectionSettled = false
+            selectionHandler(null)
+            return
+          }
+
+          isSelectionSettled = true
+          selectionHandler(payload)
+        }
+
+        const scheduleSelectionPayload = () => {
+          const selectionHandler = onSelectionChangeRef.current
+          if (!selectionHandler) return
+
+          clearSelectionEmitTimeout()
+          isSelectionSettled = false
+          selectionHandler(null)
+          selectionEmitTimeout = setTimeout(() => {
+            selectionEmitTimeout = null
+            emitSelectionPayloadNow()
+          }, 180)
+        }
+
+        const handlePointerRelease = () => {
+          if (!isPointerDown) return
+          isPointerDown = false
+          scheduleSelectionPayload()
+        }
+
+        if (typeof window !== 'undefined') {
+          window.addEventListener('mouseup', handlePointerRelease)
         }
 
         // Some Monaco tokenizers/themes can "snap back" after (re)focus; re-apply for stability.
@@ -318,10 +357,18 @@ export const CodeEditor = ({
         })
         editor.onDidBlurEditorWidget(() => {
           updateInlineChatHint()
-          emitSelectionPayload()
+          clearSelectionEmitTimeout()
+          isSelectionSettled = false
+          isPointerDown = false
+          onSelectionChangeRef.current?.(null)
         })
 
         editor.onMouseDown((e) => {
+          isPointerDown = true
+          clearSelectionEmitTimeout()
+          isSelectionSettled = false
+          onSelectionChangeRef.current?.(null)
+
           const position = e.target.position
           const model = editor.getModel()
           const cursorClickHandler = onCursorClickRef.current
@@ -338,10 +385,17 @@ export const CodeEditor = ({
           updateInlineChatHint()
         })
         editor.onDidChangeCursorSelection(() => {
-          emitSelectionPayload()
+          if (isPointerDown) {
+            clearSelectionEmitTimeout()
+            isSelectionSettled = false
+            onSelectionChangeRef.current?.(null)
+            return
+          }
+          scheduleSelectionPayload()
         })
         editor.onDidScrollChange(() => {
-          emitSelectionPayload()
+          if (!isSelectionSettled) return
+          emitSelectionPayloadNow()
         })
         editor.onDidChangeModelContent(() => {
           updateInlineChatHint()
@@ -364,6 +418,12 @@ export const CodeEditor = ({
         });
         const container = editor.getDomNode()?.parentElement;
         if (container) resizeObserver.observe(container);
+        editor.onDidDispose(() => {
+          clearSelectionEmitTimeout()
+          if (typeof window !== 'undefined') {
+            window.removeEventListener('mouseup', handlePointerRelease)
+          }
+        })
       }}
       options={{
          ...editorDefaultOptions,

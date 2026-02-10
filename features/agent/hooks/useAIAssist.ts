@@ -36,6 +36,17 @@ import { historyService } from '../../../services/agent/browser/history/historyS
 // CSS will be imported at app level
 // import '../../../styles/agent/quick-edit.css'
 
+const QUICK_EDIT_INPUT_VISIBILITY_EVENT = 'editor.quick-edit-input-visibility'
+
+function emitQuickEditInputVisibility(open: boolean) {
+  if (typeof window === 'undefined') return
+  window.dispatchEvent(
+    new CustomEvent(QUICK_EDIT_INPUT_VISIBILITY_EVENT, {
+      detail: { open },
+    })
+  )
+}
+
 export interface UseAIAssistReturn {
   isActive: boolean
   handleAIAssist: (
@@ -94,6 +105,7 @@ export function useAIAssist(onChange?: (value: string) => void): UseAIAssistRetu
         cleanupActiveZone(editor, activeZoneRef.current)
         activeZoneRef.current = null
       }
+      emitQuickEditInputVisibility(false)
 
       // Calculate indentation for alignment
       const model = editor.getModel()
@@ -143,6 +155,7 @@ export function useAIAssist(onChange?: (value: string) => void): UseAIAssistRetu
         widgets: [],
         listeners: [],
       }
+      emitQuickEditInputVisibility(true)
       
       // Handle submit - stream AI response
       const handleSubmit = async (instructions: string) => {
@@ -394,6 +407,7 @@ export function useAIAssist(onChange?: (value: string) => void): UseAIAssistRetu
           
           // Cleanup the input zone (keep diffs visible)
           cleanupInputZone(editor, viewZoneId, root)
+          emitQuickEditInputVisibility(false)
           
           // Notify change
           onChangeCallback(editor.getValue())
@@ -407,6 +421,7 @@ export function useAIAssist(onChange?: (value: string) => void): UseAIAssistRetu
             cleanupActiveZone(editor, activeZoneRef.current)
             activeZoneRef.current = null
           }
+          emitQuickEditInputVisibility(false)
         } finally {
           if (suspendUri) {
             historyService.resume(suspendUri)
@@ -421,6 +436,7 @@ export function useAIAssist(onChange?: (value: string) => void): UseAIAssistRetu
           cleanupActiveZone(editor, activeZoneRef.current)
           activeZoneRef.current = null
         }
+        emitQuickEditInputVisibility(false)
       }
       
       // Store zone object for height updates
@@ -622,6 +638,7 @@ export function useAIAssist(onChange?: (value: string) => void): UseAIAssistRetu
       if (quickEditHandlerRef.current === quickEditHandler) {
         quickEditHandlerRef.current = null
       }
+      emitQuickEditInputVisibility(false)
       quickEditAction.dispose()
       historyService.off('restore', restoreListener)
     }

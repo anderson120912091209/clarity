@@ -11,6 +11,8 @@ import ImageViewer from './image-viewer'
 import { Command, ChevronRight, File } from 'lucide-react'
 import type { EditorSyntaxTheme } from '@/components/editor/types'
 
+const QUICK_EDIT_INPUT_VISIBILITY_EVENT = 'editor.quick-edit-input-visibility'
+
 interface CursorEditorContainerProps {
   onChatToggle?: () => void
   isChatVisible?: boolean
@@ -49,6 +51,7 @@ const CursorEditorContainer: React.FC<CursorEditorContainerProps> = ({
   const [openFile, setOpenFile] = useState<any>(null)
   const [selectionPayload, setSelectionPayload] = useState<EditorSelectionPayload | null>(null)
   const [isSelectionActionsVisible, setIsSelectionActionsVisible] = useState(false)
+  const [isQuickEditInputOpen, setIsQuickEditInputOpen] = useState(false)
   const { currentlyOpen, isFilesLoading, isProjectLoading, files } = useProject()
   const isStreamingRef = useRef(false)
   const localContentRef = useRef('')
@@ -159,10 +162,34 @@ const CursorEditorContainer: React.FC<CursorEditorContainerProps> = ({
     setIsSelectionActionsVisible(false)
   }, [openFile?.id, isImageFile, isPdfFile])
 
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+
+    const handleQuickEditVisibility = (event: Event) => {
+      const detail = (event as CustomEvent<{ open?: boolean }>).detail
+      const open = Boolean(detail?.open)
+      setIsQuickEditInputOpen(open)
+      if (open) {
+        setSelectionPayload(null)
+        setIsSelectionActionsVisible(false)
+      }
+    }
+
+    window.addEventListener(QUICK_EDIT_INPUT_VISIBILITY_EVENT, handleQuickEditVisibility)
+    return () => {
+      window.removeEventListener(QUICK_EDIT_INPUT_VISIBILITY_EVENT, handleQuickEditVisibility)
+    }
+  }, [])
+
   const handleSelectionChange = useCallback((payload: EditorSelectionPayload | null) => {
+    if (isQuickEditInputOpen) {
+      setSelectionPayload(null)
+      setIsSelectionActionsVisible(false)
+      return
+    }
     setSelectionPayload(payload)
     setIsSelectionActionsVisible(Boolean(payload))
-  }, [])
+  }, [isQuickEditInputOpen])
 
   const handleEditorActionsReady = useCallback(
     (actions: { triggerQuickEdit: () => void }) => {
@@ -172,8 +199,9 @@ const CursorEditorContainer: React.FC<CursorEditorContainerProps> = ({
   )
 
   const handleSelectionQuickEdit = useCallback(() => {
-    quickEditTriggerRef.current?.()
+    setSelectionPayload(null)
     setIsSelectionActionsVisible(false)
+    quickEditTriggerRef.current?.()
   }, [])
 
   const handleFindSelectionInPdf = useCallback(() => {
@@ -284,24 +312,27 @@ const CursorEditorContainer: React.FC<CursorEditorContainerProps> = ({
           )}
         </div>
       ) : (
+        // Edit Selection Actions Popover UI
         <div ref={editorPaneRef} className="relative flex-grow h-full overflow-hidden">
             {isSelectionActionsVisible && selectionPayload && (
               <div className="absolute z-30" style={selectionActionStyle}>
-                <div className="flex items-center gap-1.5 rounded-[10px] bg-[#101216] px-1.5 py-1.5">
+                <div className="flex items-center gap-1 rounded-md border border-[#2D2E33] bg-[#1E1F24] px-0.5">
                   <button
                     type="button"
                     onMouseDown={(event) => event.preventDefault()}
                     onClick={handleSelectionQuickEdit}
-                    className="h-7 px-3 rounded-[8px] text-[11px] font-medium text-[#cbd3e2] bg-[#181c24] border border-[#2a3040] hover:bg-[#1c212b] transition-colors duration-150"
+                    className="h-7 px-3 rounded-[8px] text-[11px] font-medium text-[#cbd3e2] bg-[#1E1F24]
+                    hover:bg-[#1B1B20] transition-colors duration-150"
                   >
-                    Quick Edit
+                    Quick Edit ⌘K
                   </button>
                   <button
                     type="button"
                     onMouseDown={(event) => event.preventDefault()}
                     onClick={handleFindSelectionInPdf}
                     disabled={!isPdfNavigationEnabled || !onFindSelectionInPdf}
-                    className="h-7 px-3 rounded-[8px] text-[11px] font-medium text-[#cbd3e2] bg-[#181c24] border border-[#2a3040] hover:bg-[#1c212b] transition-colors duration-150 disabled:opacity-45 disabled:cursor-not-allowed"
+                    className="h-7 px-3 rounded-[8px] text-[11px] font-medium text-[#cbd3e2] bg-[#1E1F24] 
+                    hover:bg-[#1B1B20] transition-colors duration-150 disabled:opacity-45 disabled:cursor-not-allowed"
                   >
                     Find in PDF
                   </button>
