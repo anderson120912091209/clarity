@@ -156,12 +156,14 @@ export const DEFAULT_FIM_TAGS: FIMTags = {
  */
 export interface QuickEditInputProps {
   diffZoneId: string
-  onSubmit: (instructions: string) => void
+  onSubmit: (instructions: string, modelId: string) => void
   onCancel: () => void
   onHeightChange: (height: number) => void
   initialValue?: string
   isLoading?: boolean
   placeholder?: string
+  initialModelId?: string
+  modelOptions?: Array<{ value: string; label: string }>
 }
 
 /**

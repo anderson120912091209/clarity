@@ -18,6 +18,7 @@ export interface GenerateOptions {
   messages: ChatMessage[]
   stream?: boolean
   abortSignal?: AbortSignal
+  model?: string
 }
 
 export interface GenerateResult {
@@ -46,7 +47,7 @@ class RealChatService implements IChatService {
       const response = await fetch('/api/agent/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messages: opts.messages }),
+        body: JSON.stringify({ messages: opts.messages, model: opts.model }),
         signal: controller.signal,
       })
 

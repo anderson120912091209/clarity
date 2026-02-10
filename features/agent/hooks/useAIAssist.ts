@@ -32,6 +32,7 @@ import React from 'react'
 import { createRoot, Root } from 'react-dom/client'
 import { QuickEditContainer } from '../../../services/agent/browser/react/quick-edit'
 import { historyService } from '../../../services/agent/browser/history/historyService'
+import { QUICK_EDIT_GEMINI_MODEL_OPTIONS } from '@/lib/constants/gemini-models'
 
 // CSS will be imported at app level
 // import '../../../styles/agent/quick-edit.css'
@@ -158,7 +159,7 @@ export function useAIAssist(onChange?: (value: string) => void): UseAIAssistRetu
       emitQuickEditInputVisibility(true)
       
       // Handle submit - stream AI response
-      const handleSubmit = async (instructions: string) => {
+      const handleSubmit = async (instructions: string, modelId: string) => {
         setIsStreaming(true)
 
         let suspendUri: string | null = null
@@ -198,6 +199,7 @@ export function useAIAssist(onChange?: (value: string) => void): UseAIAssistRetu
             ],
             stream: true,
             abortSignal: abortController.signal,
+            model: modelId,
           })
           
           let fullResponse = ''
@@ -468,6 +470,8 @@ export function useAIAssist(onChange?: (value: string) => void): UseAIAssistRetu
           onSubmit: handleSubmit,
           onCancel: handleCancel,
           onHeightChange: handleHeightChange,
+          initialModelId: 'auto',
+          modelOptions: QUICK_EDIT_GEMINI_MODEL_OPTIONS,
           placeholder: 'Describe the change you want...',
         })
       )

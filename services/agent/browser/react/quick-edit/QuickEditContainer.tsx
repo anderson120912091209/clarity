@@ -22,10 +22,12 @@ const ERROR_STYLE: React.CSSProperties = {
 export interface QuickEditContainerProps {
   diffZoneId: string
   initialState?: QuickEditState
-  onSubmit: (instructions: string) => Promise<void>
+  onSubmit: (instructions: string, modelId: string) => Promise<void>
   onCancel: () => void
   onHeightChange: (height: number) => void
   placeholder?: string
+  initialModelId?: string
+  modelOptions?: Array<{ value: string; label: string }>
 }
 
 export const QuickEditContainer: React.FC<QuickEditContainerProps> = ({
@@ -35,6 +37,8 @@ export const QuickEditContainer: React.FC<QuickEditContainerProps> = ({
   onCancel,
   onHeightChange,
   placeholder,
+  initialModelId,
+  modelOptions,
 }) => {
   const [state, setState] = useState<QuickEditState>(initialState)
   const [error, setError] = useState<string | null>(null)
@@ -51,12 +55,12 @@ export const QuickEditContainer: React.FC<QuickEditContainerProps> = ({
     return () => document.removeEventListener('keydown', handleKeyDown)
   }, [state, onCancel])
 
-  const handleSubmit = useCallback(async (instructions: string) => {
+  const handleSubmit = useCallback(async (instructions: string, modelId: string) => {
     setError(null)
     setState('streaming')
 
     try {
-      await onSubmit(instructions)
+      await onSubmit(instructions, modelId)
       setState('review')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred')
@@ -79,6 +83,8 @@ export const QuickEditContainer: React.FC<QuickEditContainerProps> = ({
         onHeightChange={onHeightChange}
         isLoading={state === 'streaming'}
         placeholder={placeholder}
+        initialModelId={initialModelId}
+        modelOptions={modelOptions}
       />
     </div>
   )

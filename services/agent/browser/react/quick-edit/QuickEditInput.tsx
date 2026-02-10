@@ -16,10 +16,13 @@ export const QuickEditInput: React.FC<QuickEditInputProps> = ({
   onCancel,
   onHeightChange,
   initialValue = '',
+  initialModelId = 'auto',
+  modelOptions = [{ value: 'auto', label: 'Auto' }],
   isLoading = false,
   placeholder = 'Edit selected code...',
 }) => {
   const [value, setValue] = useState(initialValue)
+  const [selectedModelId, setSelectedModelId] = useState(initialModelId)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
 
@@ -29,8 +32,8 @@ export const QuickEditInput: React.FC<QuickEditInputProps> = ({
 
   const handleSubmit = useCallback(() => {
     if (!value.trim() || isLoading) return
-    onSubmit(value.trim())
-  }, [value, isLoading, onSubmit])
+    onSubmit(value.trim(), selectedModelId)
+  }, [value, selectedModelId, isLoading, onSubmit])
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -61,9 +64,24 @@ export const QuickEditInput: React.FC<QuickEditInputProps> = ({
 
       <div className="qe-input-footer">
         <div className="qe-footer-left">
-           <button className="qe-dropdown-btn" type="button">
-             Auto <ChevronDownIcon />
-           </button>
+          <div className="qe-model-select-wrap">
+            <select
+              className="qe-model-select"
+              value={selectedModelId}
+              onChange={(e) => setSelectedModelId(e.target.value)}
+              disabled={isLoading}
+              aria-label="Model selection"
+            >
+              {modelOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+            <span className="qe-model-select-chevron" aria-hidden>
+              <ChevronDownIcon />
+            </span>
+          </div>
         </div>
 
         <div className="qe-footer-right">

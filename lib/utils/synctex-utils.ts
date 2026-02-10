@@ -186,7 +186,18 @@ function parsePdfPositions(value: unknown): SynctexPdfPosition[] {
     const height = numberField(item, 'height');
     if (page === null || h === null || v === null || width === null || height === null) continue;
 
-    parsed.push({ page, h, v, width, height });
+    const normalizedWidth = Math.max(0, width)
+    const normalizedHeight = Math.max(0, height)
+    // `synctex view` reports `v` near baseline/depth; convert to top-left y for UI overlays.
+    const normalizedTop = Math.max(0, v - normalizedHeight)
+
+    parsed.push({
+      page,
+      h,
+      v: normalizedTop,
+      width: normalizedWidth,
+      height: normalizedHeight,
+    });
   }
 
   return parsed;

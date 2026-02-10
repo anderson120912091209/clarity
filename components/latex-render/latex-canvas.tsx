@@ -242,7 +242,7 @@ export default function LatexCanvas({
                     {highlightRects.map((rect) => (
                       <div
                         key={rect.id}
-                        className="absolute rounded-[4px] border border-amber-400/95 bg-amber-300/40 shadow-[0_0_0_2px_rgba(251,191,36,0.35)] animate-pulse"
+                        className="absolute bg-amber-300/40"
                         style={rect.style}
                       />
                     ))}
