@@ -26,7 +26,7 @@ function normalizeMathMarkdown(content: string): string {
     if (expression.includes('\n')) return fullMatch
     if (expression.length > 64) return fullMatch
     if (/\\begin\{|\\end\{|\\\\|\\tag\{|\\label\{/.test(expression)) return fullMatch
-    return `$${expression}$`
+    return `\\(${expression}\\)`
   })
 
   normalized = normalized.replace(/\\\[\s*([\s\S]*?)\s*\\\]/g, (fullMatch, rawExpression) => {
@@ -41,6 +41,7 @@ function normalizeMathMarkdown(content: string): string {
   // Collapse inline-math tokens split across lines inside parenthesis.
   normalized = normalized.replace(/\(\s*\n+\s*(\$(?:\\.|[^$\n])+\$)\s*\n+\s*\)/g, '($1)')
   normalized = normalized.replace(/\(\s*\n+\s*(\\\((?:\\.|[^)])+\\\))\s*\n+\s*\)/g, '($1)')
+  normalized = normalized.replace(/\(\s*\n+\s*(\\\[(?:\\.|[\s\S])*?\\\])\s*\n+\s*\)/g, '($1)')
 
   return normalized
 }

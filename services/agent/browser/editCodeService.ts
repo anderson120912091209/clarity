@@ -127,6 +127,7 @@ class EditCodeService {
   private currentStreaming: string | null = null
   private activeEditorBinding: ActiveEditorBinding | null = null
   private inlinePreviewEntries: InlineDiffPreviewEntry[] = []
+  private pendingProgrammaticPersistBypassCount = 0
 
   bindActiveEditor(binding: ActiveEditorBinding): void {
     this.activeEditorBinding = binding
@@ -136,6 +137,16 @@ class EditCodeService {
     if (!this.activeEditorBinding || this.activeEditorBinding.editor !== editorInstance) return
     this.clearInlinePreview()
     this.activeEditorBinding = null
+  }
+
+  consumeProgrammaticPersistBypass(): boolean {
+    if (this.pendingProgrammaticPersistBypassCount <= 0) return false
+    this.pendingProgrammaticPersistBypassCount -= 1
+    return true
+  }
+
+  private markProgrammaticPersistBypass(): void {
+    this.pendingProgrammaticPersistBypassCount += 1
   }
 
   /**
@@ -211,7 +222,8 @@ class EditCodeService {
 
   previewSuggestionInActiveEditor(
     suggestedContent: string,
-    mode?: FileSuggestionApplyMode
+    mode?: FileSuggestionApplyMode,
+    options?: { suppressPersistence?: boolean }
   ): (FileSuggestionApplyResult & { appliedInEditor: boolean }) | null {
     const binding = this.activeEditorBinding
     if (!binding) return null
@@ -233,6 +245,9 @@ class EditCodeService {
     this.clearInlinePreview()
 
     const fullRange = model.getFullModelRange()
+    if (options?.suppressPersistence) {
+      this.markProgrammaticPersistBypass()
+    }
     activeEditor.executeEdits('ai-chat-apply-preview', [
       {
         range: fullRange,
@@ -311,6 +326,43 @@ class EditCodeService {
 
     onChange?.(activeEditor.getValue())
     return { ...result, appliedInEditor: true }
+  }
+
+  clearActiveInlinePreview(): void {
+    this.clearInlinePreview()
+  }
+
+  replaceActiveEditorContent(
+    content: string,
+    options?: { suppressPersistence?: boolean }
+  ): boolean {
+    const binding = this.activeEditorBinding
+    if (!binding) return false
+
+    const { editor: activeEditor, monacoInstance, onChange } = binding
+    const model = activeEditor.getModel()
+    if (!model) return false
+    if (activeEditor.getOption(monacoInstance.editor.EditorOption.readOnly)) return false
+
+    this.clearInlinePreview()
+    const normalizedContent = this.normalizeLineEndings(content ?? '')
+    if (model.getValue() === normalizedContent) {
+      return true
+    }
+    if (options?.suppressPersistence) {
+      this.markProgrammaticPersistBypass()
+    }
+
+    activeEditor.executeEdits('ai-chat-apply-replace', [
+      {
+        range: model.getFullModelRange(),
+        text: normalizedContent,
+        forceMoveMarkers: true,
+      },
+    ])
+
+    onChange?.(activeEditor.getValue())
+    return true
   }
 
   /**

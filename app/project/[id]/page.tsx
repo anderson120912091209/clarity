@@ -8,7 +8,7 @@ import SidebarToggle from '@/components/layout/sidebar-toggle'
 import LatexRenderer from '@/components/latex-render/latex'
 import CursorEditorContainer from '@/components/editor/cursor-editor-container'
 import type { EditorSelectionPayload } from '@/components/editor/editor'
-import { ChatPanel } from '@/features/agent'
+import { ChatPanel, useChangeManagerState } from '@/features/agent'
 import { ProjectProvider } from '@/contexts/ProjectContext'
 import { useParams } from 'next/navigation'
 import { useProject } from '@/contexts/ProjectContext'
@@ -29,6 +29,7 @@ import {
   type InsertMode,
 } from '@/features/agent/lib/assistant-insert'
 import { editCodeService, type FileSuggestionApplyMode } from '@/services/agent/browser/editCodeService'
+import { changeManagerService, type StagedFileChange } from '@/features/agent/services/change-manager'
 
 export const maxDuration = 30
 
@@ -165,8 +166,8 @@ function buildSelectionHighlightBoxes(
 
 function EditorLayout() {
   const [isChatVisible, setIsChatVisible] = useState(false)
-  const { currentlyOpen, project, files, projectId } = useProject()
-  const fileContent = currentlyOpen?.content || ''
+  const { currentlyOpen, project, files: projectFiles, projectId } = useProject()
+  const { files: stagedChanges, anyStreaming: anyStagedStreaming } = useChangeManagerState()
   const isPdfNavigationEnabled = project?.isPdfCaretNavigationEnabled ?? true
   const pdfScrollNonceRef = useRef(0)
   const editorGotoNonceRef = useRef(0)
@@ -176,6 +177,7 @@ function EditorLayout() {
   const syncSelectionAbortRef = useRef<AbortController | null>(null)
   const [editorSyntaxTheme, setEditorSyntaxTheme] = useState<EditorSyntaxTheme>(DEFAULT_EDITOR_SYNTAX_THEME)
   const [liveFileContentOverrides, setLiveFileContentOverrides] = useState<Record<string, string>>({})
+  const fileContent = (currentlyOpen?.id ? liveFileContentOverrides[currentlyOpen.id] : undefined) ?? currentlyOpen?.content ?? ''
 
   useEffect(() => {
     try {
@@ -197,13 +199,13 @@ function EditorLayout() {
   }, [editorSyntaxTheme])
 
   useEffect(() => {
-    if (!Array.isArray(files) || files.length === 0) {
+    if (!Array.isArray(projectFiles) || projectFiles.length === 0) {
       setLiveFileContentOverrides({})
       return
     }
 
     const contentById = new Map<string, string>()
-    for (const file of files) {
+    for (const file of projectFiles) {
       if (!file?.id) continue
       contentById.set(file.id, file.content ?? '')
     }
@@ -229,7 +231,7 @@ function EditorLayout() {
 
       return changed ? next : prev
     })
-  }, [files])
+  }, [projectFiles])
 
   const handleLiveFileContentChange = useCallback((fileId: string, content: string) => {
     setLiveFileContentOverrides((prev) => {
@@ -262,20 +264,21 @@ function EditorLayout() {
 
   useEffect(() => {
     const map = new Map<string, any>()
-    if (Array.isArray(files)) {
-      for (const file of files) {
+    if (Array.isArray(projectFiles)) {
+      for (const file of projectFiles) {
         if (!file?.id) continue
         map.set(file.id, file)
       }
     }
     fileIdMap.current = map
-  }, [files])
+  }, [projectFiles])
 
   useEffect(() => {
     return () => {
       syncFromCodeAbortRef.current?.abort()
       syncFromPdfAbortRef.current?.abort()
       syncSelectionAbortRef.current?.abort()
+      changeManagerService.clear()
     }
   }, [])
 
@@ -307,10 +310,10 @@ function EditorLayout() {
   const findFileByPath = useCallback(
     (inputPath: string): any | null => {
       const normalizedTarget = normalizeComparablePath(inputPath)
-      if (!normalizedTarget || !Array.isArray(files)) return null
+      if (!normalizedTarget || !Array.isArray(projectFiles)) return null
 
       let basenameMatch: any | null = null
-      for (const file of files) {
+      for (const file of projectFiles) {
         if (file?.type !== 'file') continue
         const resolved = resolveFilePath(file)
         if (!resolved) continue
@@ -336,11 +339,11 @@ function EditorLayout() {
 
       return basenameMatch
     },
-    [files, resolveFilePath]
+    [projectFiles, resolveFilePath]
   )
 
   const handleInsertAssistantContent = useCallback(
-    async (messageContent: string) => {
+    (messageContent: string) => {
       const trimmed = messageContent.trim()
       if (!trimmed) return
 
@@ -355,10 +358,32 @@ function EditorLayout() {
               },
             ]
 
-      const stagedByFileId = new Map<string, { file: any; content: string; focusLine: number }>()
+      type PendingStageEntry = {
+        file: any
+        originalContent: string
+        proposedContent: string
+        focusLine: number
+        diffs: StagedFileChange['diffs']
+        summary: StagedFileChange['summary']
+      }
+
+      const stagedByFileId = new Map<string, PendingStageEntry>()
       let primaryTarget: { fileId: string; focusLine: number } | null = null
 
       for (const block of blocksToApply) {
+        if (
+          parsedBlocks.length > 0 &&
+          block.insertMode === 'append' &&
+          !block.hasExplicitInsertMode &&
+          !block.anchorText &&
+          !block.line
+        ) {
+          console.warn(
+            '[AI Chat Apply] No explicit insert metadata detected for a code block. Skipping ambiguous append to avoid placing code at file bottom.'
+          )
+          continue
+        }
+
         const explicitTargetPath = block.filePath?.trim()
         const targetFile = explicitTargetPath
           ? findFileByPath(explicitTargetPath)
@@ -374,7 +399,7 @@ function EditorLayout() {
         }
 
         const baseContent =
-          stagedByFileId.get(targetFile.id)?.content ??
+          stagedByFileId.get(targetFile.id)?.proposedContent ??
           liveFileContentOverrides[targetFile.id] ??
           targetFile.content ??
           ''
@@ -411,68 +436,76 @@ function EditorLayout() {
 
         if (nextContent === baseContent) continue
 
+        const stageResult = editCodeService.applySuggestionToFile(
+          baseContent,
+          nextContent,
+          'replace_file'
+        )
+
+        if (!stageResult.changed) continue
+
         stagedByFileId.set(targetFile.id, {
           file: targetFile,
-          content: nextContent,
-          focusLine,
+          originalContent: baseContent,
+          proposedContent: stageResult.nextContent,
+          focusLine: stageResult.firstChangedLine || focusLine,
+          diffs: stageResult.diffs,
+          summary: stageResult.summary,
         })
 
         if (!primaryTarget) {
-          primaryTarget = { fileId: targetFile.id, focusLine }
+          primaryTarget = {
+            fileId: targetFile.id,
+            focusLine: stageResult.firstChangedLine || focusLine,
+          }
         }
       }
 
       if (!stagedByFileId.size) return
 
-      const previewedFileIds = new Set<string>()
+      const stagedPayload: Array<Omit<StagedFileChange, 'updatedAt'>> = []
       stagedByFileId.forEach((entry, fileId) => {
-        if (fileId !== currentlyOpen?.id) return
+        let isPreviewApplied = false
+        if (fileId === currentlyOpen?.id) {
+          const preview = editCodeService.previewSuggestionInActiveEditor(
+            entry.proposedContent,
+            'replace_file',
+            { suppressPersistence: true }
+          )
+          if (preview?.appliedInEditor) {
+            isPreviewApplied = true
+            entry.focusLine = preview.firstChangedLine
+            console.info(
+              `[AI Chat Apply Preview] ${entry.file.name}: changedBlocks=${preview.summary.totalChangedBlocks}, insertions=${preview.summary.insertions}, deletions=${preview.summary.deletions}, edits=${preview.summary.edits}`
+            )
+          }
+        }
 
-        const preview = editCodeService.previewSuggestionInActiveEditor(
-          entry.content,
-          'replace_file'
-        )
-        if (!preview || !preview.appliedInEditor) return
-
-        previewedFileIds.add(fileId)
-        entry.focusLine = preview.firstChangedLine
-        console.info(
-          `[AI Chat Apply Preview] ${entry.file.name}: changedBlocks=${preview.summary.totalChangedBlocks}, insertions=${preview.summary.insertions}, deletions=${preview.summary.deletions}, edits=${preview.summary.edits}`
-        )
+        stagedPayload.push({
+          fileId,
+          fileName: entry.file.name ?? 'untitled',
+          filePath: resolveFilePath(entry.file) ?? entry.file.name ?? 'untitled',
+          originalContent: entry.originalContent,
+          proposedContent: entry.proposedContent,
+          diffs: entry.diffs,
+          summary: entry.summary,
+          firstChangedLine: entry.focusLine,
+          isStreaming: false,
+          isPreviewApplied,
+        })
       })
 
-      stagedByFileId.forEach((entry, fileId) => {
-        if (previewedFileIds.has(fileId)) return
-        handleLiveFileContentChange(fileId, entry.content)
-      })
+      changeManagerService.stageChanges(stagedPayload)
+
+      if (primaryTarget) {
+        changeManagerService.setActiveFile(primaryTarget.fileId)
+      }
 
       console.info(
-        `[AI Chat Insert] Applying ${blocksToApply.length} block(s) across ${stagedByFileId.size} file(s). Previewed: ${previewedFileIds.size}.`
+        `[AI Chat Stage] Staged ${blocksToApply.length} block(s) across ${stagedByFileId.size} file(s).`
       )
 
-      const operations: any[] = []
-      stagedByFileId.forEach((entry, fileId) => {
-        if (previewedFileIds.has(fileId)) return
-        const updatePayload: Record<string, any> = { content: entry.content }
-        if (primaryTarget?.fileId === fileId) {
-          updatePayload.isOpen = true
-        }
-        operations.push(tx.files[fileId].update(updatePayload))
-      })
-
-      if (primaryTarget) {
-        operations.push(tx.projects[projectId].update({ activeFileId: primaryTarget.fileId }))
-      }
-
-      if (operations.length > 0) {
-        try {
-          await db.transact(operations)
-        } catch (error) {
-          console.warn('Failed to persist assistant insertion to file:', error)
-        }
-      }
-
-      if (primaryTarget) {
+      if (primaryTarget && primaryTarget.fileId === currentlyOpen?.id) {
         editorGotoNonceRef.current += 1
         setEditorGotoRequest({
           fileId: primaryTarget.fileId,
@@ -485,10 +518,135 @@ function EditorLayout() {
     [
       currentlyOpen,
       findFileByPath,
-      handleLiveFileContentChange,
       liveFileContentOverrides,
-      projectId,
+      resolveFilePath,
     ]
+  )
+
+  const applyStagedEntries = useCallback(
+    async (entries: StagedFileChange[]) => {
+      if (!entries.length) return
+
+      const operations = entries.map((entry) =>
+        tx.files[entry.fileId].update({ content: entry.proposedContent })
+      )
+
+      try {
+        await db.transact(operations)
+      } catch (error) {
+        console.warn('Failed to apply staged assistant changes:', error)
+        return
+      }
+
+      for (const entry of entries) {
+        handleLiveFileContentChange(entry.fileId, entry.proposedContent)
+        if (entry.fileId === currentlyOpen?.id) {
+          editCodeService.clearActiveInlinePreview()
+        }
+        changeManagerService.removeChange(entry.fileId)
+      }
+    },
+    [currentlyOpen?.id, handleLiveFileContentChange]
+  )
+
+  const rejectStagedEntries = useCallback(
+    async (entries: StagedFileChange[]) => {
+      if (!entries.length) return
+
+      const operations = entries.map((entry) =>
+        tx.files[entry.fileId].update({ content: entry.originalContent })
+      )
+
+      try {
+        await db.transact(operations)
+      } catch (error) {
+        console.warn('Failed to reject staged assistant changes:', error)
+      }
+
+      for (const entry of entries) {
+        if (entry.fileId === currentlyOpen?.id) {
+          editCodeService.replaceActiveEditorContent(entry.originalContent, {
+            suppressPersistence: true,
+          })
+          editCodeService.clearActiveInlinePreview()
+        }
+
+        handleLiveFileContentChange(entry.fileId, entry.originalContent)
+        changeManagerService.removeChange(entry.fileId)
+      }
+    },
+    [currentlyOpen?.id, handleLiveFileContentChange]
+  )
+
+  const handleAcceptStagedFile = useCallback(
+    async (fileId: string) => {
+      const entry = changeManagerService.getChange(fileId)
+      if (!entry) return
+      await applyStagedEntries([entry])
+    },
+    [applyStagedEntries]
+  )
+
+  const handleRejectStagedFile = useCallback(
+    async (fileId: string) => {
+      const entry = changeManagerService.getChange(fileId)
+      if (!entry) return
+      await rejectStagedEntries([entry])
+    },
+    [rejectStagedEntries]
+  )
+
+  const handleAcceptAllStaged = useCallback(async () => {
+    const entries = changeManagerService.getAllChanges()
+    await applyStagedEntries(entries)
+  }, [applyStagedEntries])
+
+  const handleRejectAllStaged = useCallback(async () => {
+    const entries = changeManagerService.getAllChanges()
+    await rejectStagedEntries(entries)
+  }, [rejectStagedEntries])
+
+  const handleJumpToStagedFile = useCallback(
+    async (fileId: string) => {
+      const entry = changeManagerService.getChange(fileId)
+      const file = fileIdMap.current.get(fileId)
+      if (!entry || !file) return
+
+      try {
+        await db.transact([
+          tx.files[fileId].update({ isOpen: true }),
+          tx.projects[projectId].update({ activeFileId: fileId }),
+        ])
+      } catch (error) {
+        console.warn('Failed to open staged file:', error)
+      }
+
+      changeManagerService.setActiveFile(fileId)
+
+      editorGotoNonceRef.current += 1
+      setEditorGotoRequest({
+        fileId,
+        lineNumber: Math.max(1, entry.firstChangedLine),
+        column: 1,
+        nonce: editorGotoNonceRef.current,
+      })
+
+      window.setTimeout(() => {
+        const preview = editCodeService.previewSuggestionInActiveEditor(
+          entry.proposedContent,
+          'replace_file',
+          { suppressPersistence: true }
+        )
+        if (!preview?.appliedInEditor) return
+        changeManagerService.updateChange(fileId, {
+          isPreviewApplied: true,
+          firstChangedLine: preview.firstChangedLine,
+          diffs: preview.diffs,
+          summary: preview.summary,
+        })
+      }, 0)
+    },
+    [projectId]
   )
 
   const handleEditorCursorClick = useCallback(
@@ -765,6 +923,13 @@ function EditorLayout() {
                 onToggle={() => setIsChatVisible(false)}
                 activeFileName={currentlyOpen?.name}
                 onInsertIntoEditor={handleInsertAssistantContent}
+                stagedChanges={stagedChanges}
+                anyStagedStreaming={anyStagedStreaming}
+                onJumpToStagedFile={handleJumpToStagedFile}
+                onAcceptStagedFile={handleAcceptStagedFile}
+                onRejectStagedFile={handleRejectStagedFile}
+                onAcceptAllStaged={handleAcceptAllStaged}
+                onRejectAllStaged={handleRejectAllStaged}
               />
             </ResizablePanel>
           </>

@@ -3,6 +3,7 @@
 
 // Real hook export
 export { useAIAssist } from './hooks/useAIAssist'
+export { useChangeManagerState } from './hooks/useChangeManagerState'
 export { ChatPanel } from './components/chat-panel'
 
 // Component stubs - to be replaced during full agent rebuild

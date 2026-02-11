@@ -46,6 +46,26 @@ const DEFAULT_DISPLAY_DELIMITERS = [
 ]
 const DEFAULT_SKIP_HTML_TAGS = ['script', 'noscript', 'style', 'textarea', 'pre', 'code']
 
+function applyMathJaxConfig(mathJax: MathJaxInstance | undefined): MathJaxInstance {
+  const existingConfig = mathJax ?? {}
+  const texConfig = existingConfig.tex ?? {}
+  const optionsConfig = existingConfig.options ?? {}
+
+  return {
+    ...existingConfig,
+    tex: {
+      ...texConfig,
+      inlineMath: texConfig.inlineMath ?? DEFAULT_INLINE_DELIMITERS,
+      displayMath: texConfig.displayMath ?? DEFAULT_DISPLAY_DELIMITERS,
+      processEscapes: texConfig.processEscapes ?? true,
+    },
+    options: {
+      ...optionsConfig,
+      skipHtmlTags: optionsConfig.skipHtmlTags ?? DEFAULT_SKIP_HTML_TAGS,
+    },
+  }
+}
+
 export async function loadMathJax(): Promise<MathJaxInstance> {
   if (mathJaxPromise) {
     return mathJaxPromise
@@ -57,28 +77,11 @@ export async function loadMathJax(): Promise<MathJaxInstance> {
       return
     }
 
-    const existingMathJax = window.MathJax
+    const existingMathJax = applyMathJaxConfig(window.MathJax)
+    window.MathJax = existingMathJax
     if (existingMathJax?.tex2svgPromise) {
       resolve(existingMathJax)
       return
-    }
-
-    const existingConfig = existingMathJax ?? {}
-    const texConfig = existingConfig.tex ?? {}
-    const optionsConfig = existingConfig.options ?? {}
-
-    window.MathJax = {
-      ...existingConfig,
-      tex: {
-        ...texConfig,
-        inlineMath: texConfig.inlineMath ?? DEFAULT_INLINE_DELIMITERS,
-        displayMath: texConfig.displayMath ?? DEFAULT_DISPLAY_DELIMITERS,
-        processEscapes: texConfig.processEscapes ?? true,
-      },
-      options: {
-        ...optionsConfig,
-        skipHtmlTags: optionsConfig.skipHtmlTags ?? DEFAULT_SKIP_HTML_TAGS,
-      },
     }
 
     // Load MathJax script

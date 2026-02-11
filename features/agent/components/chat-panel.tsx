@@ -24,6 +24,7 @@ import { QUICK_EDIT_GEMINI_MODEL_OPTIONS } from '@/lib/constants/gemini-models'
 import { chatService, type ChatMessage } from '@/services/agent/browser/quick-edit/chatService'
 import { cn } from '@/lib/utils'
 import { ChatMarkdown } from './chat-markdown'
+import type { StagedFileChange } from '@/features/agent/services/change-manager'
 
 interface ChatPanelProps {
   fileContent?: string
@@ -31,6 +32,13 @@ interface ChatPanelProps {
   onToggle?: () => void
   activeFileName?: string
   onInsertIntoEditor?: (content: string) => void | Promise<void>
+  stagedChanges?: StagedFileChange[]
+  anyStagedStreaming?: boolean
+  onJumpToStagedFile?: (fileId: string) => void | Promise<void>
+  onAcceptStagedFile?: (fileId: string) => void | Promise<void>
+  onRejectStagedFile?: (fileId: string) => void | Promise<void>
+  onAcceptAllStaged?: () => void | Promise<void>
+  onRejectAllStaged?: () => void | Promise<void>
 }
 
 interface PanelMessage {
@@ -63,6 +71,13 @@ export function ChatPanel({
   onToggle,
   activeFileName,
   onInsertIntoEditor,
+  stagedChanges = [],
+  anyStagedStreaming = false,
+  onJumpToStagedFile,
+  onAcceptStagedFile,
+  onRejectStagedFile,
+  onAcceptAllStaged,
+  onRejectAllStaged,
 }: ChatPanelProps) {
   const [messageInput, setMessageInput] = useState('')
   const [messages, setMessages] = useState<PanelMessage[]>([])
@@ -74,6 +89,7 @@ export function ChatPanel({
   const [showCurrentDocument, setShowCurrentDocument] = useState(true)
   const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null)
   const [insertingMessageId, setInsertingMessageId] = useState<string | null>(null)
+  const [runningStagedAction, setRunningStagedAction] = useState<string | null>(null)
 
   const activeRequestIdRef = useRef<string | null>(null)
   const abortControllerRef = useRef<AbortController | null>(null)
@@ -81,6 +97,8 @@ export function ChatPanel({
   const messagesEndRef = useRef<HTMLDivElement | null>(null)
 
   const canSubmit = messageInput.trim().length > 0 && !isSubmitting
+  const hasStagedChanges = stagedChanges.length > 0
+  const stagedActionsDisabled = anyStagedStreaming || runningStagedAction !== null
   const currentDocumentLabel = useMemo(() => {
     if (!activeFileName) return 'Current document'
     return activeFileName.length > 30 ? `${activeFileName.slice(0, 27)}...` : activeFileName
@@ -304,6 +322,21 @@ export function ChatPanel({
     [onInsertIntoEditor]
   )
 
+  const runStagedAction = useCallback(
+    async (actionId: string, action: (() => void | Promise<void>) | undefined) => {
+      if (!action || stagedActionsDisabled) return
+      setRunningStagedAction(actionId)
+      try {
+        await action()
+      } catch (error) {
+        console.warn('Failed staged change action:', error)
+      } finally {
+        setRunningStagedAction((current) => (current === actionId ? null : current))
+      }
+    },
+    [stagedActionsDisabled]
+  )
+
   return (
     <>
       <div className={cn('flex h-full w-full flex-col bg-[#101011]', !isVisible && 'pointer-events-none')}>
@@ -345,6 +378,81 @@ export function ChatPanel({
       </div>
 
       <div className="mx-2 my-2 flex min-h-0 flex-1 flex-col rounded-xl border border-white/10 bg-zinc-950/40 overflow-hidden">
+        {hasStagedChanges && (
+          <div className="border-b border-white/10 bg-[#15161c] px-3 py-2">
+            <div className="flex items-center justify-between gap-2">
+              <div className="text-xs text-zinc-300">
+                {stagedChanges.length} file{stagedChanges.length === 1 ? '' : 's'} with staged changes
+              </div>
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={() => void runStagedAction('reject-all', onRejectAllStaged)}
+                  disabled={stagedActionsDisabled}
+                  className="inline-flex h-6 items-center gap-1 rounded-md border border-[#3b3d46] px-2 text-[11px] text-zinc-300 transition-colors hover:bg-white/5 disabled:cursor-not-allowed disabled:opacity-45"
+                >
+                  <X className="h-3 w-3" />
+                  <span>Reject All</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void runStagedAction('accept-all', onAcceptAllStaged)}
+                  disabled={stagedActionsDisabled}
+                  className="inline-flex h-6 items-center gap-1 rounded-md bg-[#6D78E7] px-2 text-[11px] text-white transition-colors hover:bg-[#5b65d6] disabled:cursor-not-allowed disabled:opacity-45"
+                >
+                  <Check className="h-3 w-3" />
+                  <span>Accept All</span>
+                </button>
+              </div>
+            </div>
+            <div className="mt-2 space-y-1">
+              {stagedChanges.map((change) => (
+                <div
+                  key={change.fileId}
+                  className="flex items-center justify-between gap-2 rounded-md border border-white/5 bg-[#13141a] px-2 py-1.5"
+                >
+                  <button
+                    type="button"
+                    onClick={() => void runStagedAction(`jump-${change.fileId}`, () => onJumpToStagedFile?.(change.fileId))}
+                    className="min-w-0 flex-1 text-left"
+                  >
+                    <div className="truncate text-[12px] font-medium text-zinc-200">
+                      {change.fileName}
+                    </div>
+                    <div className="truncate text-[10px] text-zinc-500">{change.filePath}</div>
+                  </button>
+                  <div className="text-[10px] text-zinc-400">
+                    {change.summary.totalChangedBlocks} diff{change.summary.totalChangedBlocks === 1 ? '' : 's'}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      void runStagedAction(`reject-${change.fileId}`, () =>
+                        onRejectStagedFile?.(change.fileId)
+                      )
+                    }
+                    disabled={stagedActionsDisabled}
+                    className="inline-flex h-6 items-center rounded-md border border-[#3b3d46] px-2 text-[11px] text-zinc-300 transition-colors hover:bg-white/5 disabled:cursor-not-allowed disabled:opacity-45"
+                  >
+                    Reject
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      void runStagedAction(`accept-${change.fileId}`, () =>
+                        onAcceptStagedFile?.(change.fileId)
+                      )
+                    }
+                    disabled={stagedActionsDisabled}
+                    className="inline-flex h-6 items-center rounded-md bg-[#6D78E7] px-2 text-[11px] text-white transition-colors hover:bg-[#5b65d6] disabled:cursor-not-allowed disabled:opacity-45"
+                  >
+                    Accept
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
         <div className="flex-1 overflow-y-auto px-3 py-3">
           {messages.length === 0 ? (
             <div className="mx-auto mt-6 max-w-xs text-center text-sm leading-6 text-zinc-500">

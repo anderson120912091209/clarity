@@ -10,6 +10,7 @@ import { getFileExtension } from '@/lib/utils/client-utils'
 import ImageViewer from './image-viewer'
 import { Command, ChevronRight, File } from 'lucide-react'
 import type { EditorSyntaxTheme } from '@/components/editor/types'
+import { editCodeService } from '@/services/agent/browser/editCodeService'
 
 const QUICK_EDIT_INPUT_VISIBILITY_EVENT = 'editor.quick-edit-input-visibility'
 
@@ -238,6 +239,9 @@ const CursorEditorContainer: React.FC<CursorEditorContainerProps> = ({
       localContentRef.current = newCode
       setLocalContent(newCode)
       onFileContentChange?.(openFile.id, newCode)
+      if (editCodeService.consumeProgrammaticPersistBypass()) {
+        return
+      }
       schedulePersist(openFile.id, newCode)
     },
     [openFile, isImageFile, isPdfFile, onFileContentChange, schedulePersist]

@@ -11,10 +11,14 @@ export type InsertMode =
 export interface AssistantInsertBlock {
   filePath?: string
   insertMode: InsertMode
+  hasExplicitInsertMode?: boolean
   line?: number
   anchorText?: string
   code: string
 }
+
+const SEARCH_REPLACE_BLOCK_PATTERN =
+  /<<<<<<<\s*SEARCH[\s\S]*?=======\s*[\s\S]*?>>>>>>>\s*REPLACE/
 
 export function stripWrappingQuotes(value: string): string {
   const trimmed = value.trim()
@@ -102,17 +106,94 @@ export function parseMetadataLine(line: string): { key: string; value: string } 
   return { key, value: match[2].trim() }
 }
 
+function applyMetadataToBlock(parsed: AssistantInsertBlock, metadataLine: string): boolean {
+  const metadata = parseMetadataLine(metadataLine)
+  if (!metadata) return false
+
+  const value = stripWrappingQuotes(metadata.value)
+  if (metadata.key === 'file' || metadata.key === 'path' || metadata.key === 'target') {
+    parsed.filePath = value
+  } else if (metadata.key === 'insert' || metadata.key === 'edit' || metadata.key === 'mode') {
+    const insert = parseInsertInstruction(value)
+    parsed.insertMode = insert.insertMode
+    parsed.hasExplicitInsertMode = true
+    parsed.line = insert.line
+    parsed.anchorText = insert.anchorText
+  } else if (metadata.key === 'line') {
+    parsed.insertMode = 'line'
+    parsed.hasExplicitInsertMode = true
+    parsed.line = Number.parseInt(value, 10)
+  } else if (metadata.key === 'after_line') {
+    parsed.insertMode = 'after_line'
+    parsed.hasExplicitInsertMode = true
+    parsed.line = Number.parseInt(value, 10)
+  } else if (metadata.key === 'before_line') {
+    parsed.insertMode = 'before_line'
+    parsed.hasExplicitInsertMode = true
+    parsed.line = Number.parseInt(value, 10)
+  } else if (metadata.key === 'after') {
+    parsed.insertMode = 'after_text'
+    parsed.hasExplicitInsertMode = true
+    parsed.anchorText = value
+  } else if (metadata.key === 'before') {
+    parsed.insertMode = 'before_text'
+    parsed.hasExplicitInsertMode = true
+    parsed.anchorText = value
+  }
+
+  return true
+}
+
+function getTrailingMetadataLines(segment: string): string[] {
+  const normalized = segment.replace(/\r\n/g, '\n')
+  const lines = normalized.split('\n')
+  const collected: string[] = []
+
+  let cursor = lines.length - 1
+  while (cursor >= 0 && lines[cursor].trim() === '') {
+    cursor -= 1
+  }
+
+  while (cursor >= 0) {
+    const line = lines[cursor]
+    if (!line.trim()) {
+      if (collected.length === 0) {
+        cursor -= 1
+        continue
+      }
+      break
+    }
+
+    if (!parseMetadataLine(line)) {
+      break
+    }
+
+    collected.unshift(line)
+    cursor -= 1
+  }
+
+  return collected
+}
+
 export function parseAssistantInsertBlocks(message: string): AssistantInsertBlock[] {
   const blocks: AssistantInsertBlock[] = []
   const codeFenceRegex = /```([^\n`]*)\n([\s\S]*?)```/g
 
+  let previousFenceEnd = 0
   let match: RegExpExecArray | null
   while ((match = codeFenceRegex.exec(message)) !== null) {
+    const prefixSegment = message.slice(previousFenceEnd, match.index)
     const blockBody = match[2].replace(/\r\n/g, '\n')
     const lines = blockBody.split('\n')
     const parsed: AssistantInsertBlock = {
       insertMode: 'append',
+      hasExplicitInsertMode: false,
       code: '',
+    }
+
+    const externalMetadataLines = getTrailingMetadataLines(prefixSegment)
+    for (const metadataLine of externalMetadataLines) {
+      applyMetadataToBlock(parsed, metadataLine)
     }
 
     let cursor = 0
@@ -120,40 +201,13 @@ export function parseAssistantInsertBlocks(message: string): AssistantInsertBloc
       cursor += 1
     }
 
-    if (cursor < lines.length && looksLikeFilePath(lines[cursor])) {
+    if (!parsed.filePath && cursor < lines.length && looksLikeFilePath(lines[cursor])) {
       parsed.filePath = stripWrappingQuotes(lines[cursor])
       cursor += 1
     }
 
     while (cursor < lines.length) {
-      const metadata = parseMetadataLine(lines[cursor])
-      if (!metadata) break
-
-      const value = stripWrappingQuotes(metadata.value)
-      if (metadata.key === 'file' || metadata.key === 'path' || metadata.key === 'target') {
-        parsed.filePath = value
-      } else if (metadata.key === 'insert' || metadata.key === 'edit' || metadata.key === 'mode') {
-        const insert = parseInsertInstruction(value)
-        parsed.insertMode = insert.insertMode
-        parsed.line = insert.line
-        parsed.anchorText = insert.anchorText
-      } else if (metadata.key === 'line') {
-        parsed.insertMode = 'line'
-        parsed.line = Number.parseInt(value, 10)
-      } else if (metadata.key === 'after_line') {
-        parsed.insertMode = 'after_line'
-        parsed.line = Number.parseInt(value, 10)
-      } else if (metadata.key === 'before_line') {
-        parsed.insertMode = 'before_line'
-        parsed.line = Number.parseInt(value, 10)
-      } else if (metadata.key === 'after') {
-        parsed.insertMode = 'after_text'
-        parsed.anchorText = value
-      } else if (metadata.key === 'before') {
-        parsed.insertMode = 'before_text'
-        parsed.anchorText = value
-      }
-
+      if (!applyMetadataToBlock(parsed, lines[cursor])) break
       cursor += 1
     }
 
@@ -163,10 +217,18 @@ export function parseAssistantInsertBlocks(message: string): AssistantInsertBloc
     }
 
     const code = codeLines.join('\n').trimEnd()
-    if (!code) continue
+    if (!code) {
+      previousFenceEnd = codeFenceRegex.lastIndex
+      continue
+    }
+
+    if (parsed.insertMode === 'append' && SEARCH_REPLACE_BLOCK_PATTERN.test(code)) {
+      parsed.insertMode = 'search_replace'
+    }
 
     parsed.code = code
     blocks.push(parsed)
+    previousFenceEnd = codeFenceRegex.lastIndex
   }
 
   return blocks
@@ -220,6 +282,29 @@ export function applyAssistantInsertBlock(
     }
   }
 
+  const replaceLineAtIndex = (lineIndex: number): { nextContent: string; focusLine: number } => {
+    const sourceLines = source.length > 0 ? source.split('\n') : []
+    const snippetLines = snippet.split('\n')
+
+    if (sourceLines.length === 0) {
+      return {
+        nextContent: snippet,
+        focusLine: 1,
+      }
+    }
+
+    const safeIndex = Math.max(0, Math.min(lineIndex, sourceLines.length - 1))
+    const nextLines = [
+      ...sourceLines.slice(0, safeIndex),
+      ...snippetLines,
+      ...sourceLines.slice(safeIndex + 1),
+    ]
+    return {
+      nextContent: nextLines.join('\n'),
+      focusLine: safeIndex + 1,
+    }
+  }
+
   const findAnchorLine = (anchor: string): number | null => {
     if (!anchor) return null
     const index = source.indexOf(anchor)
@@ -228,7 +313,7 @@ export function applyAssistantInsertBlock(
   }
 
   if (block.insertMode === 'line' && block.line) {
-    return insertAtLineIndex(Math.max(0, block.line - 1))
+    return replaceLineAtIndex(Math.max(0, block.line - 1))
   }
   if (block.insertMode === 'after_line' && block.line) {
     return insertAtLineIndex(Math.max(0, block.line))

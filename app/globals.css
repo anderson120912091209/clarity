@@ -131,6 +131,23 @@ code, kbd, samp, pre {
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
 }
 
+/* Chat math rendering */
+.chat-markdown mjx-container[display='true'] {
+  display: block;
+  text-align: left !important;
+  margin: 0.55rem 0 0.75rem;
+}
+
+.chat-markdown mjx-container[display='true'] > svg {
+  margin-left: 0 !important;
+  margin-right: auto !important;
+}
+
+.chat-markdown mjx-container[display='false'] {
+  display: inline-block;
+  vertical-align: -0.12em;
+}
+
 /* Math Preview Styles */
 .math-preview-container {
   pointer-events: none;
