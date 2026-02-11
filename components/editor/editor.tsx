@@ -97,6 +97,9 @@ export const CodeEditor = ({
   const onCursorClickRef = useRef(onCursorClick)
   const onSelectionChangeRef = useRef(onSelectionChange)
   const onActionsReadyRef = useRef(onActionsReady)
+  const applySyntaxThemeRef = useRef<() => Promise<void>>(
+    async () => {}
+  )
   const applySeqRef = useRef(0)
   const isMac =
     typeof navigator !== 'undefined' && navigator.userAgent.includes('Macintosh')
@@ -158,6 +161,10 @@ export const CodeEditor = ({
 
     applyDefaultSyntaxTheme(monacoInstance, model)
   }, [applyDefaultSyntaxTheme, applyShikiSyntaxTheme, editorRef, syntaxTheme])
+
+  useEffect(() => {
+    applySyntaxThemeRef.current = applySyntaxTheme
+  }, [applySyntaxTheme])
 
   useEffect(() => {
     applySyntaxTheme()
@@ -352,7 +359,7 @@ export const CodeEditor = ({
 
         // Some Monaco tokenizers/themes can "snap back" after (re)focus; re-apply for stability.
         editor.onDidFocusEditorWidget(() => {
-          applySyntaxTheme()
+          void applySyntaxThemeRef.current()
           updateInlineChatHint()
         })
         editor.onDidBlurEditorWidget(() => {
@@ -401,7 +408,7 @@ export const CodeEditor = ({
           updateInlineChatHint()
         })
 
-        applySyntaxTheme()
+        void applySyntaxThemeRef.current()
         updateInlineChatHint()
         
         // Register undo/redo interception

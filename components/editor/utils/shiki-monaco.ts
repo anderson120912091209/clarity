@@ -28,8 +28,8 @@ interface ShikiMonacoModule {
   ) => void
 }
 
-type MonacoEditorWithShikiFlag = typeof monaco.editor & {
-  __shikiThemeAliasApplied?: boolean
+type MonacoEditorWithShikiAlias = typeof monaco.editor & {
+  __shikiThemeAliasBase?: typeof monaco.editor.setTheme
 }
 
 let setupPromise: Promise<{
@@ -80,19 +80,20 @@ export async function setupShikiMonaco(monacoInstance: typeof monaco): Promise<v
   // Re-apply tokenization on every call to keep switching stable.
   shikiToMonaco(highlighter, monacoInstance)
 
-  // Map common Monaco theme names to Shiki themes so patched setTheme doesn't throw.
-  const editorWithFlag = monacoInstance.editor as MonacoEditorWithShikiFlag
-  if (!editorWithFlag.__shikiThemeAliasApplied) {
-    const baseSetTheme = monacoInstance.editor.setTheme.bind(monacoInstance.editor)
+  // Map common Monaco theme names to Shiki themes so theme switches don't throw.
+  // Re-wrap when the underlying setTheme implementation changes (for example after restoring default mode).
+  const editorWithAlias = monacoInstance.editor as MonacoEditorWithShikiAlias
+  const currentSetTheme = monacoInstance.editor.setTheme
+  if (editorWithAlias.__shikiThemeAliasBase !== currentSetTheme) {
     monacoInstance.editor.setTheme = (themeName: string) => {
       const mapped =
         themeName === 'light' || themeName === 'vs'
           ? 'vitesse-light'
-          : themeName === 'dark' || themeName === 'vs-dark'
+          : themeName === 'dark' || themeName === 'vs-dark' || themeName === 'cursor-dark'
             ? 'vitesse-dark'
             : themeName
-      return baseSetTheme(mapped)
+      return currentSetTheme.call(monacoInstance.editor, mapped)
     }
-    editorWithFlag.__shikiThemeAliasApplied = true
+    editorWithAlias.__shikiThemeAliasBase = currentSetTheme
   }
 }

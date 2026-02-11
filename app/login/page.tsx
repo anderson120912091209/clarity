@@ -118,15 +118,13 @@ type AuthClientWithCreateAuthorizationURL = {
 }
 
 function LoginForm() {
-  const getAuthUrl = () => {
+  const getAuthUrl = (clientName: string) => {
     try {
       if (typeof window === 'undefined') return '#'
       const authClient = db.auth as typeof db.auth & AuthClientWithCreateAuthorizationURL
-      // Use origin + /login for redirect URL
-      const redirectURL = `${window.location.origin}/login`
       return authClient.createAuthorizationURL({
-        clientName: 'google-web',
-        redirectURL,
+        clientName,
+        redirectURL: window.location.href,
       })
     } catch (error) {
       console.error('Error creating auth URL:', error)
@@ -135,7 +133,8 @@ function LoginForm() {
     }
   }
 
-  const authUrl = getAuthUrl()
+  const googleAuthUrl = getAuthUrl('google-web')
+  const githubAuthUrl = getAuthUrl('github-web')
 
   return (
     <div className="flex flex-col min-h-screen bg-[#0c0c0e] text-zinc-200 selection:bg-[#94a3b8]/20 selection:text-zinc-100">
@@ -156,7 +155,7 @@ function LoginForm() {
                 hover:bg-[#252525] hover:text-white border border-white/5 
                 font-medium text-[13px] rounded-md transition-all"
             >
-                <Link href={authUrl} className="flex items-center justify-center gap-3">
+                <Link href={googleAuthUrl} className="flex items-center justify-center gap-3">
                   <svg className="h-4 w-4" viewBox="0 0 24 24">
                     <path
                       fill="currentColor"
@@ -176,6 +175,23 @@ function LoginForm() {
                     />
                   </svg>
                   Continue with Google
+                </Link>
+              </Button>
+
+              <Button
+                asChild
+                className="w-full h-11 bg-[#1c1c1c] text-zinc-200
+                hover:bg-[#252525] hover:text-white border border-white/5
+                font-medium text-[13px] rounded-md transition-all"
+              >
+                <Link href={githubAuthUrl} className="flex items-center justify-center gap-3">
+                  <svg className="h-4 w-4" viewBox="0 0 24 24" aria-hidden="true">
+                    <path
+                      fill="currentColor"
+                      d="M12 0a12 12 0 0 0-3.79 23.39c.6.11.82-.26.82-.58v-2.23c-3.34.72-4.04-1.61-4.04-1.61a3.18 3.18 0 0 0-1.34-1.75c-1.1-.76.08-.74.08-.74a2.52 2.52 0 0 1 1.84 1.24 2.55 2.55 0 0 0 3.49.99 2.56 2.56 0 0 1 .76-1.61c-2.67-.3-5.47-1.34-5.47-5.93a4.65 4.65 0 0 1 1.24-3.22 4.32 4.32 0 0 1 .12-3.18s1.01-.32 3.3 1.23a11.48 11.48 0 0 1 6 0c2.3-1.55 3.31-1.23 3.31-1.23.45 1.05.5 2.24.12 3.18a4.64 4.64 0 0 1 1.24 3.22c0 4.6-2.8 5.62-5.48 5.92a2.86 2.86 0 0 1 .82 2.22v3.29c0 .32.22.7.83.58A12 12 0 0 0 12 0z"
+                    />
+                  </svg>
+                  Continue with GitHub
                 </Link>
               </Button>
 
