@@ -3,23 +3,82 @@
  * Dynamically loads MathJax for rendering LaTeX math expressions
  */
 
-let mathJaxPromise: Promise<any> | null = null
+type MathJaxDelimiters = [string, string][]
 
-export async function loadMathJax(): Promise<any> {
+interface MathJaxTexConfig {
+  inlineMath?: MathJaxDelimiters
+  displayMath?: MathJaxDelimiters
+  processEscapes?: boolean
+}
+
+interface MathJaxOptionsConfig {
+  skipHtmlTags?: string[]
+}
+
+interface MathJaxStartup {
+  defaultReady: () => void
+  ready?: () => void
+}
+
+export interface MathJaxInstance {
+  tex?: MathJaxTexConfig
+  options?: MathJaxOptionsConfig
+  startup?: MathJaxStartup
+  tex2svgPromise?: (content: string, options: { display: boolean }) => Promise<HTMLElement>
+  typesetPromise?: (elements: HTMLElement[]) => Promise<void>
+  typesetClear?: (elements: HTMLElement[]) => void
+}
+
+declare global {
+  interface Window {
+    MathJax?: MathJaxInstance
+  }
+}
+
+let mathJaxPromise: Promise<MathJaxInstance> | null = null
+const DEFAULT_INLINE_DELIMITERS = [
+  ['$', '$'],
+  ['\\(', '\\)'],
+]
+const DEFAULT_DISPLAY_DELIMITERS = [
+  ['$$', '$$'],
+  ['\\[', '\\]'],
+]
+const DEFAULT_SKIP_HTML_TAGS = ['script', 'noscript', 'style', 'textarea', 'pre', 'code']
+
+export async function loadMathJax(): Promise<MathJaxInstance> {
   if (mathJaxPromise) {
     return mathJaxPromise
   }
 
-  mathJaxPromise = new Promise((resolve, reject) => {
+  mathJaxPromise = new Promise<MathJaxInstance>((resolve, reject) => {
     if (typeof window === 'undefined') {
       reject(new Error('MathJax can only be loaded in browser environment'))
       return
     }
 
-    // Check if MathJax is already loaded
-    if ((window as any).MathJax) {
-      resolve((window as any).MathJax)
+    const existingMathJax = window.MathJax
+    if (existingMathJax?.tex2svgPromise) {
+      resolve(existingMathJax)
       return
+    }
+
+    const existingConfig = existingMathJax ?? {}
+    const texConfig = existingConfig.tex ?? {}
+    const optionsConfig = existingConfig.options ?? {}
+
+    window.MathJax = {
+      ...existingConfig,
+      tex: {
+        ...texConfig,
+        inlineMath: texConfig.inlineMath ?? DEFAULT_INLINE_DELIMITERS,
+        displayMath: texConfig.displayMath ?? DEFAULT_DISPLAY_DELIMITERS,
+        processEscapes: texConfig.processEscapes ?? true,
+      },
+      options: {
+        ...optionsConfig,
+        skipHtmlTags: optionsConfig.skipHtmlTags ?? DEFAULT_SKIP_HTML_TAGS,
+      },
     }
 
     // Load MathJax script
@@ -27,17 +86,21 @@ export async function loadMathJax(): Promise<any> {
     script.src = 'https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js'
     script.async = true
     script.onload = () => {
-      const MathJax = (window as any).MathJax
-      if (MathJax) {
-        // Configure MathJax
-        MathJax.startup = {
-          ...MathJax.startup,
-          ready: () => {
-            MathJax.startup.defaultReady()
-            resolve(MathJax)
-          },
+      const mathJax = window.MathJax
+      if (mathJax) {
+        const startup = mathJax.startup
+        if (startup?.defaultReady) {
+          mathJax.startup = {
+            ...startup,
+            ready: () => {
+              startup.defaultReady()
+              resolve(mathJax)
+            },
+          }
+          mathJax.startup.ready?.()
+          return
         }
-        MathJax.startup.ready()
+        resolve(mathJax)
       } else {
         reject(new Error('MathJax failed to load'))
       }
@@ -59,13 +122,16 @@ export async function renderMathToSVG(
   displayMode: boolean,
   definitions: string = ''
 ): Promise<HTMLElement> {
-  const MathJax = await loadMathJax()
-  
+  const mathJax = await loadMathJax()
+  if (!mathJax.tex2svgPromise) {
+    throw new Error('MathJax TeX renderer unavailable')
+  }
+
   // Combine definitions with content
   const fullContent = definitions ? `${definitions}\n${content}` : content
 
   try {
-    const svg = await MathJax.tex2svgPromise(fullContent, {
+    const svg = await mathJax.tex2svgPromise(fullContent, {
       display: displayMode,
     })
     return svg
@@ -79,4 +145,3 @@ export async function renderMathToSVG(
     return errorDiv
   }
 }
-

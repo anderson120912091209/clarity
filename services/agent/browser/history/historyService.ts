@@ -141,6 +141,7 @@ export class HistoryService extends EventEmitter {
     }
 
     editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyZ, runUndo)
+    editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyN, runUndo)
     editor.addCommand(
       monaco.KeyMod.CtrlCmd | monaco.KeyMod.Shift | monaco.KeyCode.KeyZ,
       runRedo

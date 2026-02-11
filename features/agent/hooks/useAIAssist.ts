@@ -10,6 +10,7 @@ import * as monaco from 'monaco-editor'
 import type { editor } from 'monaco-editor'
 import { QuickEditAction } from '../../../services/agent/browser/quickEditAction'
 import type { NormalizedSelection } from '../../../services/agent/browser/quickEditAction'
+import type { ComputedDiff } from '../../../services/agent/browser/quick-edit/types'
 import {
   chatService,
   ctrlKStream_systemMessage,
@@ -59,20 +60,38 @@ export interface UseAIAssistReturn {
   triggerQuickEdit: () => void
 }
 
+type RestoreSnapshot = {
+  aiState?: {
+    diffs?: ComputedDiff[]
+  } | null
+}
+
+type PendingDiffAction = {
+  diffId: number
+  startLine: number
+  resolved: boolean
+  accept: () => void | Promise<void>
+  reject: () => void | Promise<void>
+}
+
+type ActiveZoneState = {
+  viewZoneId: string
+  domNode: HTMLElement
+  root: Root
+  abortController: AbortController
+  decorationIds: string[]
+  deletedViewZoneIds: string[]
+  widgets: { widget: editor.IContentWidget, root: Root }[]
+  pendingDiffActions: PendingDiffAction[]
+  listeners?: monaco.IDisposable[]
+}
+
 /**
  * Hook that provides AI-powered code editing capabilities (Cmd+K).
  * Manages the lifecycle of the inline quick edit UI, including Monaco ViewZones, decorations, and widgets.
  */
 export function useAIAssist(onChange?: (value: string) => void): UseAIAssistReturn {
-  const activeZoneRef = useRef<{
-    viewZoneId: string
-    domNode: HTMLElement
-    root: Root
-    abortController: AbortController
-    decorationIds: string[]
-    widgets: { widget: editor.IContentWidget, root: Root }[]
-    listeners?: monaco.IDisposable[]
-  } | null>(null)
+  const activeZoneRef = useRef<ActiveZoneState | null>(null)
   const quickEditActionRef = useRef<QuickEditAction | null>(null)
   const quickEditHandlerRef = useRef<((selection: NormalizedSelection) => void | Promise<void>) | null>(null)
 
@@ -153,7 +172,9 @@ export function useAIAssist(onChange?: (value: string) => void): UseAIAssistRetu
         root,
         abortController,
         decorationIds: initialDecorations, // Store initial decoration
+        deletedViewZoneIds: [],
         widgets: [],
+        pendingDiffActions: [],
         listeners: [],
       }
       emitQuickEditInputVisibility(true)
@@ -309,7 +330,9 @@ export function useAIAssist(onChange?: (value: string) => void): UseAIAssistRetu
           
           // Apply diff decorations
           const newDecorationIds: string[] = []
+          const deletedViewZoneIds: string[] = []
           const widgets: { widget: editor.IContentWidget, root: Root }[] = []
+          const pendingDiffActions: PendingDiffAction[] = []
           
           for (const diff of diffs) {
             const ids = addDiffDecorations(editor, monacoInstance, diff)
@@ -319,79 +342,131 @@ export function useAIAssist(onChange?: (value: string) => void): UseAIAssistRetu
             let deletedViewZoneId: string | null = null
             if (diff.type === 'deletion' || diff.type === 'edit') {
               deletedViewZoneId = addDeletedLinesViewZone(editor, diff, diff.startLine - 1)
+              if (deletedViewZoneId) {
+                deletedViewZoneIds.push(deletedViewZoneId)
+              }
             }
-            
-            // Create accept/reject widget
-            const { widget, root: widgetRoot } = createAcceptRejectWidget(
+
+            const clearDeletedZone = () => {
+              if (!deletedViewZoneId) return
+              const zoneId = deletedViewZoneId
+              editor.changeViewZones((accessor) => accessor.removeZone(zoneId))
+              if (activeZoneRef.current?.deletedViewZoneIds) {
+                activeZoneRef.current.deletedViewZoneIds =
+                  activeZoneRef.current.deletedViewZoneIds.filter((id) => id !== zoneId)
+              }
+              deletedViewZoneId = null
+            }
+            const pendingAction: PendingDiffAction = {
+              diffId: diff.diffId,
+              startLine: diff.startLine,
+              resolved: false,
+              accept: () => {},
+              reject: () => {},
+            }
+            let widget: editor.IContentWidget | null = null
+            let widgetRoot: Root | null = null
+
+            const unregisterPendingAction = () => {
+              if (activeZoneRef.current?.pendingDiffActions) {
+                activeZoneRef.current.pendingDiffActions =
+                  activeZoneRef.current.pendingDiffActions.filter((item) => item !== pendingAction)
+              }
+            }
+
+            const clearWidget = () => {
+              if (!widget || !widgetRoot) return
+              widgetRoot.unmount()
+              editor.removeContentWidget(widget)
+              if (activeZoneRef.current?.widgets) {
+                activeZoneRef.current.widgets =
+                  activeZoneRef.current.widgets.filter((item) => item.widget !== widget)
+              }
+              widget = null
+              widgetRoot = null
+            }
+
+            const markResolved = () => {
+              if (pendingAction.resolved) return false
+              pendingAction.resolved = true
+              unregisterPendingAction()
+              return true
+            }
+
+            const acceptDiff = () => {
+              if (!markResolved()) return
+
+              // Clear highlighting/red lines
+              editor.deltaDecorations(ids, [])
+              clearDeletedZone()
+              clearWidget()
+
+              // Sync to DB/Finish
+              onChangeCallback(editor.getValue())
+            }
+
+            const rejectDiff = () => {
+              if (!markResolved()) return
+
+              // Revert changes
+              const model = editor.getModel()
+              if (model) {
+                const uri = model.uri.toString()
+                historyService.suspend(uri)
+                try {
+                  editor.executeEdits('ai-reject', [{
+                    range: new monacoInstance.Range(
+                      diff.startLine,
+                      1,
+                      diff.endLine,
+                      model.getLineMaxColumn(diff.endLine)
+                    ),
+                    text: diff.type === 'insertion' ? '' : (diff.type === 'edit' ? diff.originalCode : ''), // Insert->Empty, Edit->Original. Deletion is tricky logic here, simplification.
+                    forceMoveMarkers: true,
+                  }])
+
+                  // For deletion, we need to re-insert. computeDiffs logic:
+                  // Deletion: startLine is where it WAS.
+                  // Wait, if I deleted lines, the startLine in diff refers to the line currently there.
+                  // If I 'rejected' a deletion, I insert originalCode at startLine.
+                  if (diff.type === 'deletion') {
+                    editor.executeEdits('ai-reject', [{
+                      range: new monacoInstance.Range(diff.startLine, 1, diff.startLine, 1),
+                      text: diff.originalCode + '\n',
+                      forceMoveMarkers: true
+                    }])
+                  }
+                } finally {
+                  historyService.resume(uri)
+                }
+              }
+
+              // Clear UI
+              editor.deltaDecorations(ids, [])
+              clearDeletedZone()
+              clearWidget()
+            }
+
+            const widgetResult = createAcceptRejectWidget(
               editor,
               monacoInstance,
               diff,
-              () => { // onAccept
-                // Clear highlighting/red lines
-                editor.deltaDecorations(ids, [])
-                if (deletedViewZoneId) {
-                  editor.changeViewZones(accessor => accessor.removeZone(deletedViewZoneId!))
-                }
-                
-                // Cleanup widget
-                widgetRoot.unmount()
-                editor.removeContentWidget(widget)
-                
-                // Sync to DB/Finish
-                onChangeCallback(editor.getValue())
-                
-                // If this is the last widget, full cleanup? 
-                // For now, let's assume one main diff block or user accepts individually.
-              },
-              () => { // onReject
-                // Revert changes
-                const model = editor.getModel()
-                if (model) {
-                  const uri = model.uri.toString()
-                  historyService.suspend(uri)
-                  try {
-                    editor.executeEdits('ai-reject', [{
-                      range: new monacoInstance.Range(
-                        diff.startLine,
-                        1,
-                        diff.endLine,
-                        model.getLineMaxColumn(diff.endLine)
-                      ),
-                      text: diff.type === 'insertion' ? '' : (diff.type === 'edit' ? diff.originalCode : ''), // Insert->Empty, Edit->Original. Deletion is tricky logic here, simplification.
-                      forceMoveMarkers: true,
-                    }])
-                    
-                    // For deletion, we need to re-insert. computeDiffs logic:
-                    // Deletion: startLine is where it WAS.
-                    // Wait, if I deleted lines, the startLine in diff refers to the line currently there.
-                    // If I 'rejected' a deletion, I insert originalCode at startLine.
-                    if (diff.type === 'deletion') {
-                      editor.executeEdits('ai-reject', [{
-                        range: new monacoInstance.Range(diff.startLine, 1, diff.startLine, 1),
-                        text: diff.originalCode + '\n',
-                        forceMoveMarkers: true
-                      }])
-                    }
-                  } finally {
-                    historyService.resume(uri)
-                  }
-                }
-
-                // Clear UI
-                editor.deltaDecorations(ids, [])
-                if (deletedViewZoneId) {
-                  editor.changeViewZones(accessor => accessor.removeZone(deletedViewZoneId!))
-                }
-                widgetRoot.unmount()
-                editor.removeContentWidget(widget)
-              }
+              acceptDiff,
+              rejectDiff
             )
+            widget = widgetResult.widget
+            widgetRoot = widgetResult.root
+            pendingAction.accept = acceptDiff
+            pendingAction.reject = rejectDiff
             widgets.push({ widget, root: widgetRoot })
+            pendingDiffActions.push(pendingAction)
           }
           
           if (activeZoneRef.current) {
             activeZoneRef.current.decorationIds = newDecorationIds
+            activeZoneRef.current.deletedViewZoneIds = deletedViewZoneIds
             activeZoneRef.current.widgets = widgets
+            activeZoneRef.current.pendingDiffActions = pendingDiffActions
           }
           
           // Push snapshot (AI Applied state)
@@ -511,22 +586,72 @@ export function useAIAssist(onChange?: (value: string) => void): UseAIAssistRetu
 
     quickEditHandlerRef.current = quickEditHandler
     quickEditAction.registerKeybinding(quickEditHandler)
+
+    const runPendingDiffShortcut = (action: 'accept' | 'reject'): boolean => {
+      const pendingActions =
+        activeZoneRef.current?.pendingDiffActions?.filter((item) => !item.resolved) ?? []
+      if (pendingActions.length === 0) return false
+
+      const orderedActions =
+        action === 'reject'
+          ? [...pendingActions].sort((a, b) => b.startLine - a.startLine)
+          : [...pendingActions].sort((a, b) => a.startLine - b.startLine)
+
+      orderedActions.forEach((pendingAction) => {
+        if (pendingAction.resolved) return
+        if (action === 'accept') {
+          void pendingAction.accept()
+          return
+        }
+        void pendingAction.reject()
+      })
+
+      return true
+    }
+
+    const handlePendingDiffShortcut = (event: KeyboardEvent) => {
+      const isPrimaryModifier = event.metaKey || event.ctrlKey
+      if (!isPrimaryModifier || event.altKey || event.shiftKey) return
+
+      const key = event.key.toLowerCase()
+      if (key !== 'n' && key !== 'y') return
+
+      const editorDomNode = editor.getDomNode()
+      const targetNode = event.target instanceof Node ? event.target : null
+      const isTargetInsideEditor = !!(editorDomNode && targetNode && editorDomNode.contains(targetNode))
+      if (!editor.hasTextFocus() && !isTargetInsideEditor) return
+
+      const didHandle = key === 'n'
+        ? runPendingDiffShortcut('reject')
+        : runPendingDiffShortcut('accept')
+
+      if (!didHandle) return
+      event.preventDefault()
+      event.stopPropagation()
+      event.stopImmediatePropagation()
+    }
+
+    if (typeof window !== 'undefined') {
+      window.addEventListener('keydown', handlePendingDiffShortcut, true)
+    }
     
     // Listen for History Rewind events
-    const restoreListener = ({ uri, snapshot }: { uri: string, snapshot: any }) => {
+    const restoreListener = ({ uri, snapshot }: { uri: string, snapshot: RestoreSnapshot }) => {
         // Verify this event is for the current editor
         const currentModel = editor.getModel()
         if (currentModel && currentModel.uri.toString() === uri) {
             // Restore Diffs and Widgets
             // 1. Clear existing
-            cleanupActiveZone(editor, activeZoneRef.current!) 
+            cleanupActiveZone(editor, activeZoneRef.current)
             activeZoneRef.current = null
 
             // 2. Re-apply diffs if they exist
             if (snapshot.aiState && snapshot.aiState.diffs && snapshot.aiState.diffs.length > 0) {
                  const diffs = snapshot.aiState.diffs
                  const newDecorationIds: string[] = []
+                 const restoredDeletedViewZoneIds: string[] = []
                  const newWidgets: { widget: editor.IContentWidget, root: Root }[] = []
+                 const restoredPendingDiffActions: PendingDiffAction[] = []
                  
                   for (const diff of diffs) {
                     const ids = addDiffDecorations(editor, monacoInstance, diff)
@@ -535,98 +660,162 @@ export function useAIAssist(onChange?: (value: string) => void): UseAIAssistRetu
                     let deletedViewZoneId: string | null = null
                     if (diff.type === 'deletion' || diff.type === 'edit') {
                        deletedViewZoneId = addDeletedLinesViewZone(editor, diff, diff.startLine - 1)
+                       if (deletedViewZoneId) {
+                         restoredDeletedViewZoneIds.push(deletedViewZoneId)
+                       }
                     }
 
-                    const { widget, root: widgetRoot } = createAcceptRejectWidget(
-                        editor,
-                        monacoInstance,
-                        diff,
-                        async () => {
-                             // ON ACCEPT
-                             // 1. Clear UI
-                             editor.deltaDecorations(ids, [])
-                             if (deletedViewZoneId) {
-                                editor.changeViewZones(accessor => accessor.removeZone(deletedViewZoneId!))
-                             }
-                             widgetRoot.unmount()
-                             editor.removeContentWidget(widget)
-                             
-                             // 2. Push new snapshot (Accepted state)
-                             historyService.push(uri, {
-                                type: 'ai_state',
-                                label: 'Accept AI',
-                                snapshot: {
-                                    text: editor.getValue(),
-                                    versionId: editor.getModel()!.getVersionId(),
-                                    aiState: null // Clean
-                                }
-                             })
-                        },
-                        async () => {
-                             // ON REJECT
-                             // 1. Revert Text
-                             const model = editor.getModel()
-                             if (model) {
-                               const uri = model.uri.toString()
-                               historyService.suspend(uri)
-                               try {
-                                const range = new monacoInstance.Range(
-                                    diff.startLine,
-                                    1,
-                                    diff.endLine,
-                                    model.getLineMaxColumn(diff.endLine)
-                                )
-                                
-                                // Logic from main handleAIAssist onReject
-                                if (diff.type === 'deletion') {
-                                     editor.executeEdits('ai-reject', [{
-                                        range: new monacoInstance.Range(diff.startLine, 1, diff.startLine, 1),
-                                        text: diff.originalCode + '\n',
-                                        forceMoveMarkers: true
-                                     }])
-                                } else {
-                                     editor.executeEdits('ai-reject', [{
-                                        range,
-                                        text: diff.type === 'insertion' ? '' : diff.originalCode,
-                                        forceMoveMarkers: true
-                                     }])
-                                }
-                               } finally {
-                                 historyService.resume(uri)
-                               }
-                             }
+                    const clearDeletedZone = () => {
+                      if (!deletedViewZoneId) return
+                      const zoneId = deletedViewZoneId
+                      editor.changeViewZones((accessor) => accessor.removeZone(zoneId))
+                      if (activeZoneRef.current?.deletedViewZoneIds) {
+                        activeZoneRef.current.deletedViewZoneIds =
+                          activeZoneRef.current.deletedViewZoneIds.filter((id) => id !== zoneId)
+                      }
+                      deletedViewZoneId = null
+                    }
+                    const pendingAction: PendingDiffAction = {
+                      diffId: diff.diffId,
+                      startLine: diff.startLine,
+                      resolved: false,
+                      accept: () => {},
+                      reject: () => {},
+                    }
+                    let widget: editor.IContentWidget | null = null
+                    let widgetRoot: Root | null = null
 
-                             // 2. Clear UI
-                             editor.deltaDecorations(ids, [])
-                             if (deletedViewZoneId) {
-                                editor.changeViewZones(accessor => accessor.removeZone(deletedViewZoneId!))
-                             }
-                             widgetRoot.unmount()
-                             editor.removeContentWidget(widget)
-                             
-                             // 3. Push new snapshot (Rejected state)
-                             historyService.push(uri, {
-                                type: 'ai_state',
-                                label: 'Reject AI',
-                                snapshot: {
-                                    text: editor.getValue(), 
-                                    versionId: editor.getModel()!.getVersionId(),
-                                    aiState: null
-                                }
-                             })
+                    const unregisterPendingAction = () => {
+                      if (activeZoneRef.current?.pendingDiffActions) {
+                        activeZoneRef.current.pendingDiffActions =
+                          activeZoneRef.current.pendingDiffActions.filter((item) => item !== pendingAction)
+                      }
+                    }
+
+                    const clearWidget = () => {
+                      if (!widget || !widgetRoot) return
+                      widgetRoot.unmount()
+                      editor.removeContentWidget(widget)
+                      if (activeZoneRef.current?.widgets) {
+                        activeZoneRef.current.widgets =
+                          activeZoneRef.current.widgets.filter((item) => item.widget !== widget)
+                      }
+                      widget = null
+                      widgetRoot = null
+                    }
+
+                    const markResolved = () => {
+                      if (pendingAction.resolved) return false
+                      pendingAction.resolved = true
+                      unregisterPendingAction()
+                      return true
+                    }
+
+                    const acceptDiff = async () => {
+                      if (!markResolved()) return
+
+                      // ON ACCEPT
+                      // 1. Clear UI
+                      editor.deltaDecorations(ids, [])
+                      clearDeletedZone()
+                      clearWidget()
+
+                      // 2. Push new snapshot (Accepted state)
+                      historyService.push(uri, {
+                        type: 'ai_state',
+                        label: 'Accept AI',
+                        snapshot: {
+                          text: editor.getValue(),
+                          versionId: editor.getModel()!.getVersionId(),
+                          aiState: null // Clean
                         }
+                      })
+                    }
+
+                    const rejectDiff = async () => {
+                      if (!markResolved()) return
+
+                      // ON REJECT
+                      // 1. Revert Text
+                      const model = editor.getModel()
+                      if (model) {
+                        const uri = model.uri.toString()
+                        historyService.suspend(uri)
+                        try {
+                          const range = new monacoInstance.Range(
+                            diff.startLine,
+                            1,
+                            diff.endLine,
+                            model.getLineMaxColumn(diff.endLine)
+                          )
+
+                          // Logic from main handleAIAssist onReject
+                          if (diff.type === 'deletion') {
+                            editor.executeEdits('ai-reject', [{
+                              range: new monacoInstance.Range(diff.startLine, 1, diff.startLine, 1),
+                              text: diff.originalCode + '\n',
+                              forceMoveMarkers: true
+                            }])
+                          } else {
+                            editor.executeEdits('ai-reject', [{
+                              range,
+                              text: diff.type === 'insertion' ? '' : diff.originalCode,
+                              forceMoveMarkers: true
+                            }])
+                          }
+                        } finally {
+                          historyService.resume(uri)
+                        }
+                      }
+
+                      // 2. Clear UI
+                      editor.deltaDecorations(ids, [])
+                      clearDeletedZone()
+                      clearWidget()
+
+                      // 3. Push new snapshot (Rejected state)
+                      historyService.push(uri, {
+                        type: 'ai_state',
+                        label: 'Reject AI',
+                        snapshot: {
+                          text: editor.getValue(),
+                          versionId: editor.getModel()!.getVersionId(),
+                          aiState: null
+                        }
+                      })
+                    }
+
+                    const widgetResult = createAcceptRejectWidget(
+                      editor,
+                      monacoInstance,
+                      diff,
+                      acceptDiff,
+                      rejectDiff
                     )
+                    widget = widgetResult.widget
+                    widgetRoot = widgetResult.root
+                    pendingAction.accept = acceptDiff
+                    pendingAction.reject = rejectDiff
                     newWidgets.push({ widget, root: widgetRoot })
+                    restoredPendingDiffActions.push(pendingAction)
                  }
                  
                  // Manually populate activeZoneRef so we can clean it up later
+                 const noopRoot: Root = {
+                   render: (children: React.ReactNode) => {
+                     void children
+                   },
+                   unmount: () => {},
+                 }
                  activeZoneRef.current = {
                     viewZoneId: '', // Dummy if no input zone
                     domNode: document.createElement('div'), // Dummy
-                    root: { render: () => {}, unmount: () => {} } as any, // Dummy
+                    root: noopRoot,
                     abortController: new AbortController(),
                     decorationIds: newDecorationIds,
-                    widgets: newWidgets
+                    deletedViewZoneIds: restoredDeletedViewZoneIds,
+                    widgets: newWidgets,
+                    pendingDiffActions: restoredPendingDiffActions,
                  }
             }
         }
@@ -645,6 +834,9 @@ export function useAIAssist(onChange?: (value: string) => void): UseAIAssistRetu
       emitQuickEditInputVisibility(false)
       quickEditAction.dispose()
       historyService.off('restore', restoreListener)
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('keydown', handlePendingDiffShortcut, true)
+      }
     }
   }, [])
   
@@ -670,19 +862,15 @@ function cleanupInputZone(
 // Full cleanup helper
 function cleanupActiveZone(
   editor: editor.IStandaloneCodeEditor,
-  zone: {
-    viewZoneId: string
-    domNode: HTMLElement
-    root: Root
-    abortController: AbortController
-    decorationIds: string[]
-    widgets: { widget: editor.IContentWidget, root: Root }[]
-    listeners?: monaco.IDisposable[]
-  }
+  zone: ActiveZoneState | null | undefined
 ) {
+  if (!zone) return
   zone.abortController.abort()
   zone.root.unmount()
   removeDecorations(editor, zone.decorationIds)
+  zone.pendingDiffActions.forEach((action) => {
+    action.resolved = true
+  })
   
   // Dispose listeners
   zone.listeners?.forEach(l => l.dispose())
@@ -695,6 +883,7 @@ function cleanupActiveZone(
     })
   }
   editor.changeViewZones(accessor => {
+    zone.deletedViewZoneIds?.forEach((id) => accessor.removeZone(id))
     if (zone.viewZoneId) accessor.removeZone(zone.viewZoneId)
   })
 }

@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Switch } from '@/components/ui/switch'
 import LatexError from './latex-error'
 import { Label } from '@/components/ui/label'
-import { ZoomIn, ZoomOut, RotateCcw, Play, Loader2, Download, FileType, RefreshCw, ScrollText } from 'lucide-react'
+import { ZoomIn, ZoomOut, RotateCcw, Play, Loader2, Download, FileType, RefreshCw, ScrollText, MessageSquare } from 'lucide-react'
 import { savePdfToStorage, savePreviewToStorage } from '@/lib/utils/db-utils'
 import { useProject } from '@/contexts/ProjectContext'
 import { createPathname } from '@/lib/utils/client-utils'
@@ -549,6 +549,8 @@ export function PDFNavContent({
   scale,
   projectId,
   onCompile,
+  onChatToggle,
+  isChatVisible,
   onZoomIn,
   onZoomOut,
   onResetZoom,
@@ -561,6 +563,8 @@ export function PDFNavContent({
   scale: number
   projectId: string
   onCompile: () => void
+  onChatToggle?: () => void
+  isChatVisible?: boolean
   onZoomIn: () => void
   onZoomOut: () => void
   onResetZoom: () => void
@@ -611,6 +615,22 @@ export function PDFNavContent({
           <div className="flex items-center justify-center bg-white/20 rounded px-1.5 py-0.5 ml-1">
              <span className="text-[9px] font-semibold text-white/90">⌘+S</span>
           </div>
+        </Button>
+
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={onChatToggle}
+          className={cn(
+            'h-7 px-2.5 rounded-md gap-1.5 text-xs font-medium border shrink-0 transition-all',
+            isChatVisible
+              ? 'border-[#6D78E7]/70 bg-[#6D78E7]/15 text-[#A9B1FF] hover:bg-[#6D78E7]/25'
+              : 'border-white/10 text-zinc-400 hover:text-white hover:bg-white/5'
+          )}
+          title={isChatVisible ? 'Hide AI Chat' : 'Show AI Chat'}
+        >
+          <MessageSquare className="w-3.5 h-3.5" />
+          <span>AI Chat</span>
         </Button>
 
         <Button 

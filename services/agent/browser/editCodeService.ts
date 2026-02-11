@@ -11,6 +11,7 @@
 import * as monaco from 'monaco-editor'
 import type { editor } from 'monaco-editor'
 import { chatService } from '@/services/agent/browser/quick-edit/chatService'
+import type { ComputedDiff } from '@/services/agent/browser/quick-edit/types'
 // Services from quick-edit
 import { 
   computeDiffs, 
@@ -40,6 +41,44 @@ export interface QuickEditOptions {
   instructions: string
   onChange: (value: string) => void
   setIsStreaming?: (isStreaming: boolean) => void
+}
+
+export type FileSuggestionApplyMode = 'replace_file' | 'search_replace'
+
+export interface FileSuggestionApplyResult {
+  mode: FileSuggestionApplyMode
+  nextContent: string
+  changed: boolean
+  diffs: ComputedDiff[]
+  firstChangedLine: number
+  appliedOperations: number
+  warnings: string[]
+  summary: {
+    insertions: number
+    deletions: number
+    edits: number
+    totalChangedBlocks: number
+  }
+}
+
+interface SearchReplaceBlock {
+  search: string
+  replace: string
+}
+
+interface ActiveEditorBinding {
+  editor: editor.IStandaloneCodeEditor
+  monacoInstance: typeof monaco
+  onChange?: (value: string) => void
+}
+
+interface InlineDiffPreviewEntry {
+  diff: ComputedDiff
+  decorationIds: string[]
+  viewZoneId: string | null
+  widget: editor.IContentWidget | null
+  root: any | null
+  resolved: boolean
 }
 
 interface DiffZone {
@@ -86,12 +125,200 @@ interface PendingToken {
 class EditCodeService {
   private diffZones: Map<string, DiffZone> = new Map()
   private currentStreaming: string | null = null
+  private activeEditorBinding: ActiveEditorBinding | null = null
+  private inlinePreviewEntries: InlineDiffPreviewEntry[] = []
+
+  bindActiveEditor(binding: ActiveEditorBinding): void {
+    this.activeEditorBinding = binding
+  }
+
+  unbindActiveEditor(editorInstance: editor.IStandaloneCodeEditor): void {
+    if (!this.activeEditorBinding || this.activeEditorBinding.editor !== editorInstance) return
+    this.clearInlinePreview()
+    this.activeEditorBinding = null
+  }
+
+  /**
+   * Apply an AI suggestion to the full file content and compute a diff summary.
+   * This is reusable by Chat Apply so insertion/edit behavior uses one engine.
+   */
+  applySuggestionToFile(
+    currentContent: string,
+    suggestedContent: string,
+    mode?: FileSuggestionApplyMode
+  ): FileSuggestionApplyResult {
+    const normalizedCurrent = this.normalizeLineEndings(currentContent ?? '')
+    const normalizedSuggested = this.normalizeLineEndings(suggestedContent ?? '')
+
+    const resolvedMode =
+      mode ??
+      (this.containsSearchReplaceBlocks(normalizedSuggested) ? 'search_replace' : 'replace_file')
+
+    let nextContent = normalizedCurrent
+    let appliedOperations = 0
+    const warnings: string[] = []
+
+    if (resolvedMode === 'search_replace') {
+      const replaceResult = this.applySearchReplaceBlocks(normalizedCurrent, normalizedSuggested)
+      nextContent = replaceResult.nextContent
+      appliedOperations = replaceResult.appliedBlocks
+      warnings.push(...replaceResult.warnings)
+    } else {
+      nextContent = normalizedSuggested
+      appliedOperations = normalizedCurrent === nextContent ? 0 : 1
+    }
+
+    const diffs = computeDiffs(normalizedCurrent, nextContent, 1)
+    const changed = normalizedCurrent !== nextContent
+    const firstChangedLine =
+      diffs.length > 0
+        ? Math.max(
+            1,
+            Math.min(
+              ...diffs.map((diff) =>
+                diff.type === 'deletion'
+                  ? Math.max(1, diff.originalStartLine)
+                  : Math.max(1, diff.startLine)
+              )
+            )
+          )
+        : 1
+
+    const summary = diffs.reduce(
+      (acc, diff) => {
+        if (diff.type === 'insertion') acc.insertions += 1
+        else if (diff.type === 'deletion') acc.deletions += 1
+        else acc.edits += 1
+        return acc
+      },
+      { insertions: 0, deletions: 0, edits: 0 }
+    )
+
+    return {
+      mode: resolvedMode,
+      nextContent,
+      changed,
+      diffs,
+      firstChangedLine,
+      appliedOperations,
+      warnings,
+      summary: {
+        ...summary,
+        totalChangedBlocks: diffs.length,
+      },
+    }
+  }
+
+  previewSuggestionInActiveEditor(
+    suggestedContent: string,
+    mode?: FileSuggestionApplyMode
+  ): (FileSuggestionApplyResult & { appliedInEditor: boolean }) | null {
+    const binding = this.activeEditorBinding
+    if (!binding) return null
+
+    const { editor: activeEditor, monacoInstance, onChange } = binding
+    const model = activeEditor.getModel()
+    if (!model) return null
+    if (activeEditor.getOption(monacoInstance.editor.EditorOption.readOnly)) {
+      return null
+    }
+
+    const currentContent = model.getValue()
+    const result = this.applySuggestionToFile(currentContent, suggestedContent, mode)
+    if (!result.changed) {
+      this.clearInlinePreview()
+      return { ...result, appliedInEditor: false }
+    }
+
+    this.clearInlinePreview()
+
+    const fullRange = model.getFullModelRange()
+    activeEditor.executeEdits('ai-chat-apply-preview', [
+      {
+        range: fullRange,
+        text: result.nextContent,
+        forceMoveMarkers: true,
+      },
+    ])
+
+    this.inlinePreviewEntries = result.diffs.map((diff) => {
+      const decorationIds = addDiffDecorations(activeEditor, monacoInstance, diff)
+      const viewZoneId =
+        diff.type === 'deletion' || diff.type === 'edit'
+          ? addDeletedLinesViewZone(activeEditor, diff, Math.max(0, diff.startLine - 1))
+          : null
+
+      const entry: InlineDiffPreviewEntry = {
+        diff,
+        decorationIds,
+        viewZoneId: viewZoneId ?? null,
+        widget: null,
+        root: null,
+        resolved: false,
+      }
+
+      const clearEntryUI = () => {
+        if (entry.decorationIds.length > 0) {
+          activeEditor.deltaDecorations(entry.decorationIds, [])
+          entry.decorationIds = []
+        }
+
+        if (entry.viewZoneId) {
+          const zoneId = entry.viewZoneId
+          activeEditor.changeViewZones((accessor) => accessor.removeZone(zoneId))
+          entry.viewZoneId = null
+        }
+
+        if (entry.widget && entry.root) {
+          entry.root.unmount()
+          activeEditor.removeContentWidget(entry.widget)
+          entry.widget = null
+          entry.root = null
+        }
+      }
+
+      const markResolved = (): boolean => {
+        if (entry.resolved) return false
+        entry.resolved = true
+        return true
+      }
+
+      const acceptDiff = () => {
+        if (!markResolved()) return
+        clearEntryUI()
+        onChange?.(activeEditor.getValue())
+      }
+
+      const rejectDiff = () => {
+        if (!markResolved()) return
+        this.revertInlineDiff(activeEditor, monacoInstance, entry.diff)
+        clearEntryUI()
+        onChange?.(activeEditor.getValue())
+      }
+
+      const widgetResult = createAcceptRejectWidget(
+        activeEditor,
+        monacoInstance,
+        diff,
+        acceptDiff,
+        rejectDiff
+      )
+
+      entry.widget = widgetResult.widget
+      entry.root = widgetResult.root
+      return entry
+    })
+
+    onChange?.(activeEditor.getValue())
+    return { ...result, appliedInEditor: true }
+  }
 
   /**
    * Start a quick edit session (Cmd+K flow)
    */
   async startQuickEdit(opts: QuickEditOptions): Promise<void> {
     const zoneId = `zone-${Date.now()}`
+    this.clearInlinePreview()
     
     // Create DiffZone
     const zone: DiffZone = {
@@ -546,6 +773,146 @@ class EditCodeService {
     return model.getValueInRange(
       new monaco.Range(startLine, 1, endLine, model.getLineMaxColumn(endLine))
     )
+  }
+
+  private clearInlinePreview(): void {
+    if (!this.activeEditorBinding) {
+      this.inlinePreviewEntries = []
+      return
+    }
+
+    const activeEditor = this.activeEditorBinding.editor
+    for (const entry of this.inlinePreviewEntries) {
+      if (entry.decorationIds.length > 0) {
+        activeEditor.deltaDecorations(entry.decorationIds, [])
+        entry.decorationIds = []
+      }
+
+      if (entry.viewZoneId) {
+        const zoneId = entry.viewZoneId
+        activeEditor.changeViewZones((accessor) => accessor.removeZone(zoneId))
+        entry.viewZoneId = null
+      }
+
+      if (entry.widget && entry.root) {
+        entry.root.unmount()
+        activeEditor.removeContentWidget(entry.widget)
+        entry.widget = null
+        entry.root = null
+      }
+    }
+
+    this.inlinePreviewEntries = []
+  }
+
+  private revertInlineDiff(
+    activeEditor: editor.IStandaloneCodeEditor,
+    monacoInstance: typeof monaco,
+    diff: ComputedDiff
+  ): void {
+    const model = activeEditor.getModel()
+    if (!model) return
+
+    if (diff.type === 'deletion') {
+      const insertLine = Math.max(1, Math.min(diff.startLine, model.getLineCount() + 1))
+      const original = diff.originalCode.trimEnd()
+      if (!original) return
+      activeEditor.executeEdits('ai-chat-apply-reject', [
+        {
+          range: new monacoInstance.Range(insertLine, 1, insertLine, 1),
+          text: `${original}\n`,
+          forceMoveMarkers: true,
+        },
+      ])
+      return
+    }
+
+    if (model.getLineCount() === 0) return
+    const safeStartLine = Math.max(1, Math.min(diff.startLine, model.getLineCount()))
+    const safeEndLine = Math.max(safeStartLine, Math.min(diff.endLine, model.getLineCount()))
+    const safeEndColumn = model.getLineMaxColumn(safeEndLine)
+
+    const replacement = diff.type === 'edit' ? diff.originalCode : ''
+    activeEditor.executeEdits('ai-chat-apply-reject', [
+      {
+        range: new monacoInstance.Range(safeStartLine, 1, safeEndLine, safeEndColumn),
+        text: replacement,
+        forceMoveMarkers: true,
+      },
+    ])
+  }
+
+  private normalizeLineEndings(value: string): string {
+    return value.replace(/\r\n/g, '\n')
+  }
+
+  private containsSearchReplaceBlocks(value: string): boolean {
+    return /<<<<<<<\s*SEARCH[\s\S]*?=======/.test(value) && />>>>>>>\s*REPLACE/.test(value)
+  }
+
+  private parseSearchReplaceBlocks(value: string): SearchReplaceBlock[] {
+    const blocks: SearchReplaceBlock[] = []
+    const regex = /<<<<<<<\s*SEARCH\s*\n([\s\S]*?)\n=======\s*\n([\s\S]*?)\n>>>>>>>\s*REPLACE/gm
+
+    let match: RegExpExecArray | null
+    while ((match = regex.exec(value)) !== null) {
+      blocks.push({
+        search: match[1],
+        replace: match[2],
+      })
+    }
+
+    return blocks
+  }
+
+  private applySearchReplaceBlocks(
+    currentContent: string,
+    payload: string
+  ): { nextContent: string; appliedBlocks: number; warnings: string[] } {
+    const blocks = this.parseSearchReplaceBlocks(payload)
+    if (!blocks.length) {
+      return {
+        nextContent: currentContent,
+        appliedBlocks: 0,
+        warnings: ['No SEARCH/REPLACE blocks were found in suggestion.'],
+      }
+    }
+
+    let next = currentContent
+    let applied = 0
+    const warnings: string[] = []
+
+    for (let index = 0; index < blocks.length; index += 1) {
+      const block = blocks[index]
+      const exactIndex = block.search ? next.indexOf(block.search) : -1
+
+      if (exactIndex !== -1) {
+        next = `${next.slice(0, exactIndex)}${block.replace}${next.slice(exactIndex + block.search.length)}`
+        applied += 1
+        continue
+      }
+
+      const trimmedSearch = block.search.trim()
+      if (trimmedSearch) {
+        const fuzzyIndex = next.indexOf(trimmedSearch)
+        if (fuzzyIndex !== -1) {
+          next = `${next.slice(0, fuzzyIndex)}${block.replace}${next.slice(fuzzyIndex + trimmedSearch.length)}`
+          applied += 1
+          warnings.push(
+            `SEARCH/REPLACE block #${index + 1} applied with trimmed fallback match.`
+          )
+          continue
+        }
+      }
+
+      warnings.push(`SEARCH/REPLACE block #${index + 1} could not find a matching SEARCH region.`)
+    }
+
+    return {
+      nextContent: next,
+      appliedBlocks: applied,
+      warnings,
+    }
   }
 }
 

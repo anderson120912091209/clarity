@@ -8,7 +8,7 @@ import SidebarToggle from '@/components/layout/sidebar-toggle'
 import LatexRenderer from '@/components/latex-render/latex'
 import CursorEditorContainer from '@/components/editor/cursor-editor-container'
 import type { EditorSelectionPayload } from '@/components/editor/editor'
-import { ChatPanel, ChatNavContent } from '@/features/agent'
+import { ChatPanel } from '@/features/agent'
 import { ProjectProvider } from '@/contexts/ProjectContext'
 import { useParams } from 'next/navigation'
 import { useProject } from '@/contexts/ProjectContext'
@@ -23,6 +23,12 @@ import {
   syncSourceToPdf,
   type SynctexPdfPosition,
 } from '@/lib/utils/synctex-utils'
+import {
+  applyAssistantInsertBlock,
+  parseAssistantInsertBlocks,
+  type InsertMode,
+} from '@/features/agent/lib/assistant-insert'
+import { editCodeService, type FileSuggestionApplyMode } from '@/services/agent/browser/editCodeService'
 
 export const maxDuration = 30
 
@@ -333,6 +339,158 @@ function EditorLayout() {
     [files, resolveFilePath]
   )
 
+  const handleInsertAssistantContent = useCallback(
+    async (messageContent: string) => {
+      const trimmed = messageContent.trim()
+      if (!trimmed) return
+
+      const parsedBlocks = parseAssistantInsertBlocks(trimmed)
+      const blocksToApply =
+        parsedBlocks.length > 0
+          ? parsedBlocks
+          : [
+              {
+                code: trimmed,
+                insertMode: 'append' as InsertMode,
+              },
+            ]
+
+      const stagedByFileId = new Map<string, { file: any; content: string; focusLine: number }>()
+      let primaryTarget: { fileId: string; focusLine: number } | null = null
+
+      for (const block of blocksToApply) {
+        const explicitTargetPath = block.filePath?.trim()
+        const targetFile = explicitTargetPath
+          ? findFileByPath(explicitTargetPath)
+          : currentlyOpen
+
+        if (!targetFile?.id) {
+          console.warn(
+            explicitTargetPath
+              ? `[AI Chat Insert] Unable to resolve target file "${explicitTargetPath}".`
+              : '[AI Chat Insert] No active file available for insertion.'
+          )
+          continue
+        }
+
+        const baseContent =
+          stagedByFileId.get(targetFile.id)?.content ??
+          liveFileContentOverrides[targetFile.id] ??
+          targetFile.content ??
+          ''
+
+        const isEditMode =
+          block.insertMode === 'replace_file' || block.insertMode === 'search_replace'
+
+        const { nextContent, focusLine } = isEditMode
+          ? (() => {
+              const editMode: FileSuggestionApplyMode =
+                block.insertMode === 'search_replace' ? 'search_replace' : 'replace_file'
+              const result = editCodeService.applySuggestionToFile(
+                baseContent,
+                block.code,
+                editMode
+              )
+
+              if (result.warnings.length > 0) {
+                console.warn(
+                  `[AI Chat Apply] ${targetFile.name}: ${result.warnings.join(' ')}`
+                )
+              }
+
+              console.info(
+                `[AI Chat Apply] ${targetFile.name}: mode=${result.mode}, changedBlocks=${result.summary.totalChangedBlocks}, insertions=${result.summary.insertions}, deletions=${result.summary.deletions}, edits=${result.summary.edits}`
+              )
+
+              return {
+                nextContent: result.nextContent,
+                focusLine: result.firstChangedLine,
+              }
+            })()
+          : applyAssistantInsertBlock(baseContent, block)
+
+        if (nextContent === baseContent) continue
+
+        stagedByFileId.set(targetFile.id, {
+          file: targetFile,
+          content: nextContent,
+          focusLine,
+        })
+
+        if (!primaryTarget) {
+          primaryTarget = { fileId: targetFile.id, focusLine }
+        }
+      }
+
+      if (!stagedByFileId.size) return
+
+      const previewedFileIds = new Set<string>()
+      stagedByFileId.forEach((entry, fileId) => {
+        if (fileId !== currentlyOpen?.id) return
+
+        const preview = editCodeService.previewSuggestionInActiveEditor(
+          entry.content,
+          'replace_file'
+        )
+        if (!preview || !preview.appliedInEditor) return
+
+        previewedFileIds.add(fileId)
+        entry.focusLine = preview.firstChangedLine
+        console.info(
+          `[AI Chat Apply Preview] ${entry.file.name}: changedBlocks=${preview.summary.totalChangedBlocks}, insertions=${preview.summary.insertions}, deletions=${preview.summary.deletions}, edits=${preview.summary.edits}`
+        )
+      })
+
+      stagedByFileId.forEach((entry, fileId) => {
+        if (previewedFileIds.has(fileId)) return
+        handleLiveFileContentChange(fileId, entry.content)
+      })
+
+      console.info(
+        `[AI Chat Insert] Applying ${blocksToApply.length} block(s) across ${stagedByFileId.size} file(s). Previewed: ${previewedFileIds.size}.`
+      )
+
+      const operations: any[] = []
+      stagedByFileId.forEach((entry, fileId) => {
+        if (previewedFileIds.has(fileId)) return
+        const updatePayload: Record<string, any> = { content: entry.content }
+        if (primaryTarget?.fileId === fileId) {
+          updatePayload.isOpen = true
+        }
+        operations.push(tx.files[fileId].update(updatePayload))
+      })
+
+      if (primaryTarget) {
+        operations.push(tx.projects[projectId].update({ activeFileId: primaryTarget.fileId }))
+      }
+
+      if (operations.length > 0) {
+        try {
+          await db.transact(operations)
+        } catch (error) {
+          console.warn('Failed to persist assistant insertion to file:', error)
+        }
+      }
+
+      if (primaryTarget) {
+        editorGotoNonceRef.current += 1
+        setEditorGotoRequest({
+          fileId: primaryTarget.fileId,
+          lineNumber: Math.max(1, primaryTarget.focusLine),
+          column: 1,
+          nonce: editorGotoNonceRef.current,
+        })
+      }
+    },
+    [
+      currentlyOpen,
+      findFileByPath,
+      handleLiveFileContentChange,
+      liveFileContentOverrides,
+      projectId,
+    ]
+  )
+
   const handleEditorCursorClick = useCallback(
     ({
       lineNumber,
@@ -544,6 +702,8 @@ function EditorLayout() {
             scale={scale}
             projectId={currentlyOpen?.projectId || ''}
             onCompile={compile}
+            onChatToggle={() => setIsChatVisible((prev) => !prev)}
+            isChatVisible={isChatVisible}
             onZoomIn={handleZoomIn}
             onZoomOut={handleZoomOut}
             onResetZoom={handleResetZoom}
@@ -552,12 +712,6 @@ function EditorLayout() {
             showLogs={showLogs}
           />
         </div>
-        {/* Chat controls when visible */}
-        {isChatVisible && (
-           <div className="flex items-center ml-2 border-l border-white/10 pl-2 shrink-0">
-             <ChatNavContent onToggle={() => setIsChatVisible(false)} />
-           </div>
-         )}
     </div>
   )
 
@@ -609,6 +763,8 @@ function EditorLayout() {
                 fileContent={fileContent}
                 isVisible={isChatVisible}
                 onToggle={() => setIsChatVisible(false)}
+                activeFileName={currentlyOpen?.name}
+                onInsertIntoEditor={handleInsertAssistantContent}
               />
             </ResizablePanel>
           </>

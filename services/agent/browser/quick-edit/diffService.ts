@@ -11,9 +11,9 @@
 
 import * as monaco from 'monaco-editor'
 import type { editor } from 'monaco-editor'
-import { ComputedDiff, DiffType, generateId } from './types'
+import { ComputedDiff } from './types'
 import React from 'react'
-import { createRoot } from 'react-dom/client'
+import { createRoot, type Root } from 'react-dom/client'
 import { AcceptRejectWidget } from '../react/quick-edit/AcceptRejectWidget'
 
 // ============================================================================
@@ -283,34 +283,71 @@ export function addDeletedLinesViewZone(
   let viewZoneId: string | null = null
   
   editor.changeViewZones(accessor => {
+    const lineHeight = editor.getOption(monaco.editor.EditorOption.lineHeight) || 20
+    const fontInfo = editor.getOption(monaco.editor.EditorOption.fontInfo)
+    const contentWidth = Math.max(120, editor.getLayoutInfo().contentWidth - 20)
+    const averageCharWidth = Math.max(1, fontInfo.typicalHalfwidthCharacterWidth || 7)
+    const maxCharsPerVisualLine = Math.max(1, Math.floor(contentWidth / averageCharWidth))
+    const sourceLines = diff.originalCode.split('\n')
+    const estimatedVisualLines = sourceLines.reduce((total, sourceLine) => {
+      const logicalLength = Math.max(1, sourceLine.length)
+      return total + Math.max(1, Math.ceil(logicalLength / maxCharsPerVisualLine))
+    }, 0)
+
     const domNode = document.createElement('div')
     domNode.className = DIFF_DECORATION_CLASSES.redLine
     domNode.style.backgroundColor = 'rgba(255, 85, 85, 0.15)'
     domNode.style.width = '100%'
     domNode.style.overflow = 'hidden'
-    domNode.style.whiteSpace = 'pre'
+    domNode.style.boxSizing = 'border-box'
+    domNode.style.padding = '0 12px 0 10px'
     domNode.style.fontFamily = 'var(--monaco-font-family, monospace)'
     domNode.style.fontSize = 'var(--monaco-font-size, 13px)'
     domNode.style.lineHeight = 'var(--monaco-line-height, 20px)'
     
-    const lines = diff.originalCode.split('\n')
-    lines.forEach(line => {
+    sourceLines.forEach(line => {
       const lineDiv = document.createElement('div')
       lineDiv.style.textDecoration = 'line-through'
       lineDiv.style.opacity = '0.7'
       lineDiv.style.color = 'var(--vscode-editor-foreground, inherit)'
+      lineDiv.style.whiteSpace = 'pre-wrap'
+      lineDiv.style.wordBreak = 'break-word'
+      lineDiv.style.overflowWrap = 'anywhere'
+      lineDiv.style.lineHeight = `${lineHeight}px`
+      lineDiv.style.minHeight = `${lineHeight}px`
+      lineDiv.style.boxSizing = 'border-box'
       lineDiv.textContent = line || '\u00a0'  // Non-breaking space for empty lines
       domNode.appendChild(lineDiv)
     })
     
     const viewZone: editor.IViewZone = {
-      afterLineNumber: afterLine,
-      heightInLines: lines.length,
+      afterLineNumber: Math.max(0, afterLine),
+      heightInLines: Math.max(sourceLines.length, estimatedVisualLines),
       domNode,
       suppressMouseDown: false,
     }
     
     viewZoneId = accessor.addZone(viewZone)
+
+    if (viewZoneId) {
+      const zoneId = viewZoneId
+      requestAnimationFrame(() => {
+        if (!zoneId) return
+        const measuredHeight = Math.max(lineHeight, domNode.scrollHeight)
+        const measuredVisualLines = Math.max(1, Math.ceil(measuredHeight / lineHeight))
+        const currentHeightInLines = Math.max(1, viewZone.heightInLines ?? sourceLines.length)
+        if (measuredVisualLines <= currentHeightInLines) return
+
+        viewZone.heightInLines = measuredVisualLines
+        editor.changeViewZones((layoutAccessor) => {
+          try {
+            layoutAccessor.layoutZone(zoneId)
+          } catch {
+            // Zone was removed before deferred layout executed.
+          }
+        })
+      })
+    }
   })
   
   return viewZoneId
@@ -325,7 +362,7 @@ export function createAcceptRejectWidget(
   diff: ComputedDiff,
   onAccept: () => void,
   onReject: () => void
-): { widget: editor.IContentWidget, root: any } {
+): { widget: editor.IContentWidget, root: Root } {
   const widgetId = `qe-widget-${diff.diffId}-${Date.now()}`
   const domNode = document.createElement('div')
   domNode.className = 'qe-accept-reject-widget-container'

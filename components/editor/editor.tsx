@@ -6,6 +6,7 @@ import { useEditorTheme } from './hooks/useEditorTheme'
 import { editorDefaultOptions } from './constants/editorDefaults'
 import { Loader2 } from 'lucide-react'
 import { historyService } from '@/services/agent/browser/history/historyService'
+import { editCodeService } from '@/services/agent/browser/editCodeService'
 import { setupShikiMonaco } from './utils/shiki-monaco'
 import { useTheme } from 'next-themes'
 import type { editor as MonacoEditorNamespace, IDisposable } from 'monaco-editor'
@@ -191,6 +192,17 @@ export const CodeEditor = ({
   }, [onActionsReady])
 
   useEffect(() => {
+    const editor = editorRef.current
+    const monaco = monacoRef.current
+    if (!editor || !monaco) return
+    editCodeService.bindActiveEditor({
+      editor,
+      monacoInstance: monaco,
+      onChange,
+    })
+  }, [editorRef, onChange])
+
+  useEffect(() => {
     if (!gotoRequest) return
     const editor = editorRef.current
     const model = editor?.getModel()
@@ -221,9 +233,15 @@ export const CodeEditor = ({
         if (!originalSetThemeRef.current) {
           originalSetThemeRef.current = monaco.editor.setTheme
         }
+        editCodeService.bindActiveEditor({
+          editor,
+          monacoInstance: monaco,
+          onChange,
+        })
         handleEditorDidMount(editor, monaco)
         const cleanupAIAssist = handleAIAssist(editor, monaco, setIsStreaming, onChange)
         editor.onDidDispose(() => {
+          editCodeService.unbindActiveEditor(editor)
           if (typeof cleanupAIAssist === 'function') {
             cleanupAIAssist()
           }
