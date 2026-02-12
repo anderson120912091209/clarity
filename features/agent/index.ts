@@ -4,6 +4,7 @@
 // Real hook export
 export { useAIAssist } from './hooks/useAIAssist'
 export { useChangeManagerState } from './hooks/useChangeManagerState'
+export { useChatThreadsState } from './hooks/useChatThreadsState'
 export { ChatPanel } from './components/chat-panel'
 
 // Component stubs - to be replaced during full agent rebuild

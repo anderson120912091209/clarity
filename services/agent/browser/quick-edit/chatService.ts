@@ -3,6 +3,8 @@
  * Connects to the backend /api/agent/chat route for Gemini streaming.
  */
 
+import type { AgentChatContext } from '@/features/agent/types/chat-context'
+
 export interface StreamDelta {
   content?: string
   error?: string
@@ -19,6 +21,7 @@ export interface GenerateOptions {
   stream?: boolean
   abortSignal?: AbortSignal
   model?: string
+  context?: AgentChatContext
 }
 
 export interface GenerateResult {
@@ -47,7 +50,11 @@ class RealChatService implements IChatService {
       const response = await fetch('/api/agent/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messages: opts.messages, model: opts.model }),
+        body: JSON.stringify({
+          messages: opts.messages,
+          model: opts.model,
+          context: opts.context,
+        }),
         signal: controller.signal,
       })
 
@@ -62,7 +69,7 @@ class RealChatService implements IChatService {
       // Handle streaming response (raw text stream)
       const reader = response.body.getReader()
       const decoder = new TextDecoder()
-      const self = this
+      const abortControllers = this.abortControllers
 
       async function* streamIterator(): AsyncIterable<StreamDelta> {
         try {
@@ -78,12 +85,13 @@ class RealChatService implements IChatService {
               yield { content: chunk }
             }
           }
-        } catch (err: any) {
-          if (err.name === 'AbortError') return
-          yield { error: err.message || 'Streaming error' }
+        } catch (err: unknown) {
+          if (err instanceof DOMException && err.name === 'AbortError') return
+          const message = err instanceof Error ? err.message : 'Streaming error'
+          yield { error: message }
         } finally {
           reader.releaseLock()
-          self.abortControllers.delete(requestId)
+          abortControllers.delete(requestId)
           yield { done: true }
         }
       }
@@ -93,12 +101,13 @@ class RealChatService implements IChatService {
         requestId,
       }
 
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Network error'
       console.error('[ChatService] Error:', error)
       this.abortControllers.delete(requestId)
       // Return a generator that yields the error immediately
       async function* errorGenerator(): AsyncIterable<StreamDelta> {
-        yield { error: error.message || 'Network error' }
+        yield { error: message }
       }
       return {
         output: errorGenerator(),

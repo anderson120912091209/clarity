@@ -37,6 +37,61 @@ const rules = {
     },
     bind: ["isOwner", "auth.id != null && auth.id == data.user_id"],
   },
+
+  // AI threads are user-owned and project-scoped.
+  ai_threads: {
+    allow: {
+      view: "isOwner",
+      create: "isOwner",
+      update: "isOwner",
+      delete: "isOwner",
+    },
+    bind: ["isOwner", "auth.id != null && auth.id == data.user_id"],
+  },
+
+  // AI messages are user-owned and belong to a thread.
+  ai_messages: {
+    allow: {
+      view: "isOwner",
+      create: "isOwner",
+      update: "isOwner",
+      delete: "isOwner",
+    },
+    bind: ["isOwner", "auth.id != null && auth.id == data.user_id"],
+  },
+
+  // AI runs are user-owned execution records.
+  ai_runs: {
+    allow: {
+      view: "isOwner",
+      create: "isOwner",
+      update: "isOwner",
+      delete: "isOwner",
+    },
+    bind: ["isOwner", "auth.id != null && auth.id == data.user_id"],
+  },
+
+  // Extracted memory items are also user-owned.
+  ai_memory_items: {
+    allow: {
+      view: "isOwner",
+      create: "isOwner",
+      update: "isOwner",
+      delete: "isOwner",
+    },
+    bind: ["isOwner", "auth.id != null && auth.id == data.user_id"],
+  },
+
+  // Optional checkpoints for thread restores.
+  ai_thread_checkpoints: {
+    allow: {
+      view: "isOwner",
+      create: "isOwner",
+      update: "isOwner",
+      delete: "isOwner",
+    },
+    bind: ["isOwner", "auth.id != null && auth.id == data.user_id"],
+  },
   
   // Users entity - users can view and update their own user record
   users: {

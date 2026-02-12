@@ -4,19 +4,21 @@ import React from 'react'
 import Link from 'next/link'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
-import { User, Search, Pencil, ChevronDown, Plus, SquarePen } from 'lucide-react'
+import { User, Search, Pencil, ChevronDown, Plus, SquarePen, Loader2 } from 'lucide-react'
 import { db } from '@/lib/constants'
 import { useRouter, usePathname } from 'next/navigation'
 import { useState } from 'react'
 import { useSidebar } from '@/contexts/SidebarContext'
 import { SidebarShell } from '@/components/layout/sidebar-shell'
 import Image from 'next/image'
+import { startStripeCheckout } from '@/lib/stripe/checkout'
 
 export default function DashboardSidebar() {
   const router = useRouter()
   const pathname = usePathname()
   const { user } = db.useAuth()
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
+  const [isUpgrading, setIsUpgrading] = useState(false)
   const { isCollapsed } = useSidebar()
   
   const isProjectsActive = pathname?.startsWith('/projects')
@@ -24,6 +26,23 @@ export default function DashboardSidebar() {
   const handleSignOut = () => {
     db.auth.signOut()
     router.push('/')
+  }
+
+  const handleUpgrade = async () => {
+    setIsUpgrading(true)
+
+    try {
+      await startStripeCheckout({
+        customerEmail: user?.email ?? null,
+        successPath: '/projects?checkout=success',
+        cancelPath: '/projects?checkout=cancel',
+      })
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'Unable to start checkout. Please try again.'
+      window.alert(message)
+      setIsUpgrading(false)
+    }
   }
 
   return (
@@ -69,6 +88,16 @@ export default function DashboardSidebar() {
                   <div className="text-[10px] text-white/50">Free Plan</div>
                 </div>
                 <div className="p-1">
+                  <button
+                    onClick={handleUpgrade}
+                    disabled={isUpgrading}
+                    className="flex items-center justify-between px-2 py-1.5 hover:bg-[#151619] rounded-md text-left w-full transition-colors group mx-0.5 outline-none focus:bg-white/[0.06] disabled:opacity-60 disabled:cursor-not-allowed"
+                  >
+                    <span className="text-[12px] text-white/80 group-hover:text-white">
+                      {isUpgrading ? 'Opening checkout...' : 'Upgrade plan'}
+                    </span>
+                    {isUpgrading && <Loader2 className="h-3.5 w-3.5 text-white/60 animate-spin" />}
+                  </button>
                   <button
                     onClick={handleSignOut}
                     className="flex items-center justify-between px-2 py-1.5 hover:bg-[#151619] rounded-md text-left w-full transition-colors group mx-0.5 outline-none focus:bg-white/[0.06]"

@@ -3,7 +3,7 @@
 import { i } from '@instantdb/core'
 
 const _schema = i.schema({
-  // We inferred 24 attributes!
+  // Schema includes project files plus AI chat/thread persistence entities.
   // Take a look at this schema, and if everything looks good,
   // run `push schema` again to enforce the types.
   entities: {
@@ -42,6 +42,67 @@ const _schema = i.schema({
       user_id: i.string().optional(),
       word_count: i.number().optional(),
       activeFileId: i.string().optional(),
+      activeChatThreadId: i.string().optional(),
+    }),
+    ai_threads: i.entity({
+      projectId: i.string().indexed().optional(),
+      user_id: i.string().indexed().optional(),
+      title: i.string().optional(),
+      status: i.string().indexed().optional(), // active | archived
+      lastMessagePreview: i.string().optional(),
+      lastMessageAt: i.string().indexed().optional(),
+      summary: i.string().optional(),
+      summaryVersion: i.number().optional(),
+      created_at: i.string().indexed().optional(),
+      updated_at: i.string().indexed().optional(),
+    }),
+    ai_messages: i.entity({
+      threadId: i.string().indexed().optional(),
+      projectId: i.string().indexed().optional(),
+      user_id: i.string().indexed().optional(),
+      role: i.string().indexed().optional(), // system | user | assistant | tool
+      content: i.string().optional(),
+      seq: i.number().indexed().optional(),
+      status: i.string().indexed().optional(), // completed | error | interrupted | streaming
+      error: i.string().optional(),
+      sourceMessageId: i.string().optional(),
+      tokenEstimate: i.number().optional(),
+      created_at: i.string().indexed().optional(),
+      updated_at: i.string().indexed().optional(),
+    }),
+    ai_runs: i.entity({
+      threadId: i.string().indexed().optional(),
+      messageId: i.string().indexed().optional(),
+      user_id: i.string().indexed().optional(),
+      requestId: i.string().indexed().optional(),
+      status: i.string().indexed().optional(), // streaming | completed | failed | aborted
+      model: i.string().optional(),
+      started_at: i.string().indexed().optional(),
+      ended_at: i.string().optional(),
+      failureReason: i.string().optional(),
+      created_at: i.string().indexed().optional(),
+      updated_at: i.string().indexed().optional(),
+    }),
+    ai_memory_items: i.entity({
+      user_id: i.string().indexed().optional(),
+      projectId: i.string().indexed().optional(),
+      threadId: i.string().indexed().optional(),
+      scope: i.string().indexed().optional(), // user | project | thread
+      kind: i.string().indexed().optional(), // preference | fact | constraint | summary
+      content: i.string().optional(),
+      sourceMessageId: i.string().optional(),
+      salience: i.number().optional(), // 0-1
+      lastUsedAt: i.string().optional(),
+      created_at: i.string().indexed().optional(),
+      updated_at: i.string().indexed().optional(),
+    }),
+    ai_thread_checkpoints: i.entity({
+      threadId: i.string().indexed().optional(),
+      user_id: i.string().indexed().optional(),
+      messageSeq: i.number().indexed().optional(),
+      label: i.string().optional(),
+      payload: i.any().optional(),
+      created_at: i.string().indexed().optional(),
     }),
     users: i.entity({
       app_id: i.string().optional(),

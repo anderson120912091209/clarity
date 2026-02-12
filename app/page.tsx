@@ -1,5 +1,6 @@
 import { Navbar } from '@/components/landing/navbar'
 import { Hero } from '@/components/landing/hero'
+import { Pricing } from '@/components/landing/pricing'
 import { Button } from '@/components/ui/button'
 import Link from 'next/link'
 
@@ -13,6 +14,7 @@ export default function Home() {
       
       <main className="relative z-10 w-full">
         <Hero />
+        <Pricing />
         
         {/* Bottom CTA */}
         <section className="py-24 px-6 text-center">

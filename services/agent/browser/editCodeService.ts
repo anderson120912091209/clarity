@@ -57,6 +57,8 @@ export interface FileSuggestionApplyResult {
     insertions: number
     deletions: number
     edits: number
+    linesAdded: number
+    linesDeleted: number
     totalChangedBlocks: number
   }
 }
@@ -197,12 +199,20 @@ class EditCodeService {
 
     const summary = diffs.reduce(
       (acc, diff) => {
-        if (diff.type === 'insertion') acc.insertions += 1
-        else if (diff.type === 'deletion') acc.deletions += 1
-        else acc.edits += 1
+        if (diff.type === 'insertion') {
+          acc.insertions += 1
+          acc.linesAdded += Math.max(0, diff.endLine - diff.startLine + 1)
+        } else if (diff.type === 'deletion') {
+          acc.deletions += 1
+          acc.linesDeleted += Math.max(0, diff.originalEndLine - diff.originalStartLine + 1)
+        } else {
+          acc.edits += 1
+          acc.linesAdded += Math.max(0, diff.endLine - diff.startLine + 1)
+          acc.linesDeleted += Math.max(0, diff.originalEndLine - diff.originalStartLine + 1)
+        }
         return acc
       },
-      { insertions: 0, deletions: 0, edits: 0 }
+      { insertions: 0, deletions: 0, edits: 0, linesAdded: 0, linesDeleted: 0 }
     )
 
     return {
@@ -899,18 +909,43 @@ class EditCodeService {
   }
 
   private containsSearchReplaceBlocks(value: string): boolean {
-    return /<<<<<<<\s*SEARCH[\s\S]*?=======/.test(value) && />>>>>>>\s*REPLACE/.test(value)
+    return /<<<<<<<[\s\S]*?=======[\s\S]*?>>>>>>>/m.test(value)
   }
 
   private parseSearchReplaceBlocks(value: string): SearchReplaceBlock[] {
     const blocks: SearchReplaceBlock[] = []
-    const regex = /<<<<<<<\s*SEARCH\s*\n([\s\S]*?)\n=======\s*\n([\s\S]*?)\n>>>>>>>\s*REPLACE/gm
+    const lines = this.normalizeLineEndings(value).split('\n')
+    let cursor = 0
 
-    let match: RegExpExecArray | null
-    while ((match = regex.exec(value)) !== null) {
+    while (cursor < lines.length) {
+      const line = lines[cursor].trimStart()
+      if (!line.startsWith('<<<<<<<')) {
+        cursor += 1
+        continue
+      }
+
+      cursor += 1
+      const searchLines: string[] = []
+      while (cursor < lines.length && !lines[cursor].trimStart().startsWith('=======')) {
+        searchLines.push(lines[cursor])
+        cursor += 1
+      }
+
+      if (cursor >= lines.length) break
+      cursor += 1 // skip =======
+
+      const replaceLines: string[] = []
+      while (cursor < lines.length && !lines[cursor].trimStart().startsWith('>>>>>>>')) {
+        replaceLines.push(lines[cursor])
+        cursor += 1
+      }
+
+      if (cursor >= lines.length) break
+      cursor += 1 // skip >>>>>>>
+
       blocks.push({
-        search: match[1],
-        replace: match[2],
+        search: searchLines.join('\n'),
+        replace: replaceLines.join('\n'),
       })
     }
 

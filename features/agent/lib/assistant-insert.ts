@@ -18,7 +18,7 @@ export interface AssistantInsertBlock {
 }
 
 const SEARCH_REPLACE_BLOCK_PATTERN =
-  /<<<<<<<\s*SEARCH[\s\S]*?=======\s*[\s\S]*?>>>>>>>\s*REPLACE/
+  /<<<<<<<[\s\S]*?=======\s*[\s\S]*?>>>>>>>/m
 
 export function stripWrappingQuotes(value: string): string {
   const trimmed = value.trim()
@@ -175,6 +175,94 @@ function getTrailingMetadataLines(segment: string): string[] {
   return collected
 }
 
+function normalizeInlineBlockContent(value: string): string {
+  const normalized = value.replace(/\r\n/g, '\n')
+  return normalized.replace(/^\n+/, '').replace(/\n+$/, '')
+}
+
+function toSearchReplaceConflictBlock(search: string, replace: string): string {
+  return [
+    '<<<<<<< ORIGINAL',
+    normalizeInlineBlockContent(search),
+    '=======',
+    normalizeInlineBlockContent(replace),
+    '>>>>>>> UPDATED',
+  ].join('\n')
+}
+
+function parseInlineSearchReplacePairs(segment: string): Array<{ search: string; replace: string }> {
+  const pairs: Array<{ search: string; replace: string }> = []
+  const normalized = segment.replace(/\r\n/g, '\n')
+  const pairRegex = /SEARCH\s*:\s*([\s\S]*?)\s*REPLACE\s*:\s*([\s\S]*?)(?=(?:\n\s*SEARCH\s*:)|$)/gi
+
+  let pairMatch: RegExpExecArray | null
+  while ((pairMatch = pairRegex.exec(normalized)) !== null) {
+    const search = normalizeInlineBlockContent(pairMatch[1] ?? '')
+    const replace = normalizeInlineBlockContent(pairMatch[2] ?? '')
+
+    if (!search && !replace) continue
+    pairs.push({ search, replace })
+  }
+
+  return pairs
+}
+
+function parseInlineInstructionBlocks(message: string): AssistantInsertBlock[] {
+  const normalizedMessage = message.replace(/\r\n/g, '\n')
+  const directiveRegex = /@file\s*:/gi
+  const directiveIndexes: number[] = []
+  let directiveMatch: RegExpExecArray | null
+
+  while ((directiveMatch = directiveRegex.exec(normalizedMessage)) !== null) {
+    directiveIndexes.push(directiveMatch.index)
+  }
+
+  if (!directiveIndexes.length) return []
+
+  const blocks: AssistantInsertBlock[] = []
+  for (let index = 0; index < directiveIndexes.length; index += 1) {
+    const start = directiveIndexes[index]
+    const end = index + 1 < directiveIndexes.length ? directiveIndexes[index + 1] : normalizedMessage.length
+    const segment = normalizedMessage.slice(start, end).trim()
+    if (!segment) continue
+
+    const fileMatch = /@file\s*:\s*([^\n]+?)(?=(?:\s+@insert\s*:)|\n|$)/i.exec(segment)
+    const filePath = fileMatch ? stripWrappingQuotes(fileMatch[1]) : undefined
+
+    const insertMatch = /@insert\s*:\s*([^\n]+?)(?=(?:\s+SEARCH\s*:)|(?:\s+REPLACE\s*:)|\n|$)/i.exec(segment)
+    const insertValue = insertMatch ? stripWrappingQuotes(insertMatch[1]) : ''
+    const insert = parseInsertInstruction(insertValue)
+
+    const parsed: AssistantInsertBlock = {
+      filePath,
+      insertMode: insert.insertMode,
+      hasExplicitInsertMode: Boolean(insertMatch),
+      line: insert.line,
+      anchorText: insert.anchorText,
+      code: '',
+    }
+
+    if (parsed.insertMode === 'search_replace') {
+      const pairs = parseInlineSearchReplacePairs(segment)
+      if (!pairs.length) continue
+      parsed.code = pairs
+        .map((pair) => toSearchReplaceConflictBlock(pair.search, pair.replace))
+        .join('\n\n')
+      blocks.push(parsed)
+      continue
+    }
+
+    const metadataTailStart = insertMatch ? insertMatch.index + insertMatch[0].length : 0
+    const remainder = segment.slice(metadataTailStart).trim()
+    if (!remainder) continue
+
+    parsed.code = remainder
+    blocks.push(parsed)
+  }
+
+  return blocks
+}
+
 export function parseAssistantInsertBlocks(message: string): AssistantInsertBlock[] {
   const blocks: AssistantInsertBlock[] = []
   const codeFenceRegex = /```([^\n`]*)\n([\s\S]*?)```/g
@@ -229,6 +317,10 @@ export function parseAssistantInsertBlocks(message: string): AssistantInsertBloc
     parsed.code = code
     blocks.push(parsed)
     previousFenceEnd = codeFenceRegex.lastIndex
+  }
+
+  if (blocks.length === 0) {
+    return parseInlineInstructionBlocks(message)
   }
 
   return blocks

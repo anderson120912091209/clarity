@@ -4,6 +4,8 @@ export interface ChangeDiffSummary {
   insertions: number
   deletions: number
   edits: number
+  linesAdded: number
+  linesDeleted: number
   totalChangedBlocks: number
 }
 

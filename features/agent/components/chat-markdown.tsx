@@ -11,6 +11,7 @@ import { loadMathJax } from '@/features/source-editor/utils/mathjax-loader'
 interface ChatMarkdownProps {
   content: string
   className?: string
+  hideFencedCodeBlocks?: boolean
 }
 
 const HAS_MATH_PATTERN =
@@ -60,6 +61,13 @@ function extractLanguage(className?: string): string {
   return match?.[1]?.toLowerCase() ?? 'text'
 }
 
+function stripFencedCodeBlocks(content: string): string {
+  return content
+    .replace(/```[\s\S]*?```/g, '')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim()
+}
+
 function CodeBlock({
   language,
   className,
@@ -106,8 +114,12 @@ function CodeBlock({
   )
 }
 
-export function ChatMarkdown({ content, className }: ChatMarkdownProps) {
-  const normalizedContent = useMemo(() => normalizeMathMarkdown(content), [content])
+export function ChatMarkdown({ content, className, hideFencedCodeBlocks = false }: ChatMarkdownProps) {
+  const normalizedContent = useMemo(() => {
+    const normalized = normalizeMathMarkdown(content)
+    if (!hideFencedCodeBlocks) return normalized
+    return stripFencedCodeBlocks(normalized)
+  }, [content, hideFencedCodeBlocks])
   const containerRef = useRef<HTMLDivElement | null>(null)
   const shouldTypesetMath = useMemo(() => HAS_MATH_PATTERN.test(normalizedContent), [normalizedContent])
 

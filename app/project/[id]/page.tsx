@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@/components/ui/resizable'
 import { AppLayout } from '@/components/layout/app-layout'
 import EditorSidebar from '@/components/layout/editor-sidebar'
@@ -9,6 +9,7 @@ import LatexRenderer from '@/components/latex-render/latex'
 import CursorEditorContainer from '@/components/editor/cursor-editor-container'
 import type { EditorSelectionPayload } from '@/components/editor/editor'
 import { ChatPanel, useChangeManagerState } from '@/features/agent'
+import { useFrontend } from '@/contexts/FrontendContext'
 import { ProjectProvider } from '@/contexts/ProjectContext'
 import { useParams } from 'next/navigation'
 import { useProject } from '@/contexts/ProjectContext'
@@ -30,6 +31,7 @@ import {
 } from '@/features/agent/lib/assistant-insert'
 import { editCodeService, type FileSuggestionApplyMode } from '@/services/agent/browser/editCodeService'
 import { changeManagerService, type StagedFileChange } from '@/features/agent/services/change-manager'
+import type { AgentWorkspaceFileContext } from '@/features/agent/types/chat-context'
 
 export const maxDuration = 30
 
@@ -166,6 +168,7 @@ function buildSelectionHighlightBoxes(
 
 function EditorLayout() {
   const [isChatVisible, setIsChatVisible] = useState(false)
+  const { user } = useFrontend()
   const { currentlyOpen, project, files: projectFiles, projectId } = useProject()
   const { files: stagedChanges, anyStreaming: anyStagedStreaming } = useChangeManagerState()
   const isPdfNavigationEnabled = project?.isPdfCaretNavigationEnabled ?? true
@@ -178,7 +181,59 @@ function EditorLayout() {
   const [editorSyntaxTheme, setEditorSyntaxTheme] = useState<EditorSyntaxTheme>(DEFAULT_EDITOR_SYNTAX_THEME)
   const [liveFileContentOverrides, setLiveFileContentOverrides] = useState<Record<string, string>>({})
   const fileContent = (currentlyOpen?.id ? liveFileContentOverrides[currentlyOpen.id] : undefined) ?? currentlyOpen?.content ?? ''
+  const workspaceFilesForChat = useMemo<AgentWorkspaceFileContext[]>(() => {
+    if (!Array.isArray(projectFiles) || projectFiles.length === 0) return []
 
+    type ProjectFileEntry = {
+      id?: string
+      name?: string
+      type?: string
+      parent_id?: string | null
+      content?: string | null
+    }
+
+    const projectFileEntries = projectFiles as ProjectFileEntry[]
+    const fileMap = new Map<string, ProjectFileEntry>()
+    for (const file of projectFileEntries) {
+      if (!file?.id) continue
+      fileMap.set(file.id, file)
+    }
+
+    const computePath = (file: ProjectFileEntry): string | null => {
+      if (!file?.name) return null
+      const segments = [file.name]
+      let current = file
+      const seen = new Set<string>()
+
+      while (current?.parent_id && fileMap.has(current.parent_id)) {
+        if (seen.has(current.parent_id)) break
+        seen.add(current.parent_id)
+        const parent = fileMap.get(current.parent_id)
+        if (!parent) break
+        current = parent
+        if (!current?.name) break
+        segments.unshift(current.name)
+      }
+
+      return segments.join('/')
+    }
+
+    return projectFileEntries
+      .filter(
+        (file): file is ProjectFileEntry & { id: string; type: 'file' } =>
+          file?.type === 'file' && typeof file.id === 'string'
+      )
+      .map((file) => {
+        const path = computePath(file) ?? file.name ?? 'untitled'
+        const overrideContent = liveFileContentOverrides[file.id]
+        const content = overrideContent ?? file.content ?? ''
+        return {
+          fileId: file.id,
+          path,
+          content,
+        }
+      })
+  }, [liveFileContentOverrides, projectFiles])
   useEffect(() => {
     try {
       const saved = window.localStorage.getItem('editor.syntaxTheme')
@@ -343,11 +398,21 @@ function EditorLayout() {
   )
 
   const handleInsertAssistantContent = useCallback(
-    (messageContent: string) => {
+    (
+      messageContent: string,
+      options?: {
+        auto?: boolean
+        sourceMessageId?: string
+        skipEditorFocus?: boolean
+      }
+    ) => {
       const trimmed = messageContent.trim()
       if (!trimmed) return
 
       const parsedBlocks = parseAssistantInsertBlocks(trimmed)
+      if (options?.auto && parsedBlocks.length === 0) {
+        return
+      }
       const blocksToApply =
         parsedBlocks.length > 0
           ? parsedBlocks
@@ -400,22 +465,43 @@ function EditorLayout() {
 
         const baseContent =
           stagedByFileId.get(targetFile.id)?.proposedContent ??
+          changeManagerService.getChange(targetFile.id)?.proposedContent ??
           liveFileContentOverrides[targetFile.id] ??
           targetFile.content ??
           ''
+        const existingStage = changeManagerService.getChange(targetFile.id)
 
         const isEditMode =
           block.insertMode === 'replace_file' || block.insertMode === 'search_replace'
 
         const { nextContent, focusLine } = isEditMode
           ? (() => {
-              const editMode: FileSuggestionApplyMode =
+              const requestedMode: FileSuggestionApplyMode =
                 block.insertMode === 'search_replace' ? 'search_replace' : 'replace_file'
-              const result = editCodeService.applySuggestionToFile(
+              let result = editCodeService.applySuggestionToFile(
                 baseContent,
                 block.code,
-                editMode
+                requestedMode
               )
+
+              if (
+                requestedMode === 'search_replace' &&
+                result.warnings.some((warning) =>
+                  warning.includes('No SEARCH/REPLACE blocks were found in suggestion.')
+                )
+              ) {
+                const fallback = editCodeService.applySuggestionToFile(
+                  baseContent,
+                  block.code,
+                  'replace_file'
+                )
+                if (fallback.changed) {
+                  console.warn(
+                    `[AI Chat Apply] ${targetFile.name}: SEARCH/REPLACE metadata did not contain parseable SEARCH/REPLACE markers. Falling back to replace_file for this block.`
+                  )
+                  result = fallback
+                }
+              }
 
               if (result.warnings.length > 0) {
                 console.warn(
@@ -424,7 +510,7 @@ function EditorLayout() {
               }
 
               console.info(
-                `[AI Chat Apply] ${targetFile.name}: mode=${result.mode}, changedBlocks=${result.summary.totalChangedBlocks}, insertions=${result.summary.insertions}, deletions=${result.summary.deletions}, edits=${result.summary.edits}`
+                `[AI Chat Apply] ${targetFile.name}: mode=${result.mode}, changedBlocks=${result.summary.totalChangedBlocks}, +lines=${result.summary.linesAdded}, -lines=${result.summary.linesDeleted}, insertions=${result.summary.insertions}, deletions=${result.summary.deletions}, edits=${result.summary.edits}`
               )
 
               return {
@@ -446,7 +532,7 @@ function EditorLayout() {
 
         stagedByFileId.set(targetFile.id, {
           file: targetFile,
-          originalContent: baseContent,
+          originalContent: existingStage?.originalContent ?? baseContent,
           proposedContent: stageResult.nextContent,
           focusLine: stageResult.firstChangedLine || focusLine,
           diffs: stageResult.diffs,
@@ -465,8 +551,16 @@ function EditorLayout() {
 
       const stagedPayload: Array<Omit<StagedFileChange, 'updatedAt'>> = []
       stagedByFileId.forEach((entry, fileId) => {
+        const existingStage = changeManagerService.getChange(fileId)
         let isPreviewApplied = false
-        if (fileId === currentlyOpen?.id) {
+        if (
+          existingStage &&
+          existingStage.proposedContent === entry.proposedContent &&
+          existingStage.isPreviewApplied
+        ) {
+          isPreviewApplied = true
+          entry.focusLine = existingStage.firstChangedLine
+        } else if (fileId === currentlyOpen?.id) {
           const preview = editCodeService.previewSuggestionInActiveEditor(
             entry.proposedContent,
             'replace_file',
@@ -476,7 +570,7 @@ function EditorLayout() {
             isPreviewApplied = true
             entry.focusLine = preview.firstChangedLine
             console.info(
-              `[AI Chat Apply Preview] ${entry.file.name}: changedBlocks=${preview.summary.totalChangedBlocks}, insertions=${preview.summary.insertions}, deletions=${preview.summary.deletions}, edits=${preview.summary.edits}`
+              `[AI Chat Apply Preview] ${entry.file.name}: changedBlocks=${preview.summary.totalChangedBlocks}, +lines=${preview.summary.linesAdded}, -lines=${preview.summary.linesDeleted}, insertions=${preview.summary.insertions}, deletions=${preview.summary.deletions}, edits=${preview.summary.edits}`
             )
           }
         }
@@ -492,6 +586,7 @@ function EditorLayout() {
           firstChangedLine: entry.focusLine,
           isStreaming: false,
           isPreviewApplied,
+          sourceMessageId: options?.sourceMessageId,
         })
       })
 
@@ -505,7 +600,11 @@ function EditorLayout() {
         `[AI Chat Stage] Staged ${blocksToApply.length} block(s) across ${stagedByFileId.size} file(s).`
       )
 
-      if (primaryTarget && primaryTarget.fileId === currentlyOpen?.id) {
+      if (
+        primaryTarget &&
+        primaryTarget.fileId === currentlyOpen?.id &&
+        !options?.skipEditorFocus
+      ) {
         editorGotoNonceRef.current += 1
         setEditorGotoRequest({
           fileId: primaryTarget.fileId,
@@ -918,10 +1017,18 @@ function EditorLayout() {
             </ResizableHandle>
             <ResizablePanel defaultSize={20} minSize={20} maxSize={45} collapsible={true}>
               <ChatPanel 
+                projectId={projectId}
+                userId={user?.id ?? ''}
+                initialActiveThreadId={project?.activeChatThreadId ?? null}
                 fileContent={fileContent}
                 isVisible={isChatVisible}
                 onToggle={() => setIsChatVisible(false)}
+                activeFileId={currentlyOpen?.id}
                 activeFileName={currentlyOpen?.name}
+                activeFilePath={currentlyOpen ? resolveFilePath(currentlyOpen) ?? currentlyOpen.name : undefined}
+                workspaceFiles={workspaceFilesForChat}
+                compileLogs={logs}
+                compileError={error}
                 onInsertIntoEditor={handleInsertAssistantContent}
                 stagedChanges={stagedChanges}
                 anyStagedStreaming={anyStagedStreaming}
