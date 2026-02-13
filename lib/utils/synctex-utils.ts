@@ -32,27 +32,12 @@ interface SyncOptions {
   signal?: AbortSignal
 }
 
-function createTraceId(prefix: 's2p' | 'p2s'): string {
-  return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
-}
 
 export async function syncSourceToPdf(
   context: SynctexContext,
   params: SyncFromCodeParams,
   options: SyncOptions = {}
 ): Promise<SynctexPdfPosition[]> {
-  const traceId = createTraceId('s2p')
-  const start = performance.now()
-
-  console.log('[SyncTeX] syncSourceToPdf:start', {
-    traceId,
-    projectId: context.projectId,
-    buildId: context.buildId,
-    file: normalizeComparablePath(params.file),
-    line: params.line,
-    column: params.column,
-  })
-
   const search = new URLSearchParams({
     buildId: context.buildId,
     file: normalizeComparablePath(params.file),
@@ -60,44 +45,20 @@ export async function syncSourceToPdf(
     column: String(params.column),
   });
 
-  try {
-    const response = await fetch(
-      `${context.clsiBaseUrl}/project/${context.projectId}/sync/code?${search.toString()}`,
-      {
-        method: 'GET',
-        signal: options.signal,
-      }
-    );
-
-    if (!response.ok) {
-      console.warn('[SyncTeX] syncSourceToPdf:http-error', {
-        traceId,
-        status: response.status,
-        statusText: response.statusText,
-        durationMs: Math.round((performance.now() - start) * 100) / 100,
-      })
-      throw new Error(`SyncTeX source->pdf request failed: ${response.status} ${response.statusText}`);
+  const response = await fetch(
+    `${context.clsiBaseUrl}/project/${context.projectId}/sync/code?${search.toString()}`,
+    {
+      method: 'GET',
+      signal: options.signal,
     }
+  );
 
-    const payload = (await response.json()) as { pdf?: unknown };
-    const positions = parsePdfPositions(payload.pdf)
-    console.log('[SyncTeX] syncSourceToPdf:success', {
-      traceId,
-      resultCount: positions.length,
-      durationMs: Math.round((performance.now() - start) * 100) / 100,
-    })
-    return positions
-  } catch (error) {
-    const aborted = options.signal?.aborted || (error as { name?: string })?.name === 'AbortError'
-    const log = aborted ? console.log : console.error
-    log('[SyncTeX] syncSourceToPdf:failed', {
-      traceId,
-      aborted,
-      durationMs: Math.round((performance.now() - start) * 100) / 100,
-      error: error instanceof Error ? error.message : String(error),
-    })
-    throw error
+  if (!response.ok) {
+    throw new Error(`SyncTeX source->pdf request failed: ${response.status} ${response.statusText}`);
   }
+
+  const payload = (await response.json()) as { pdf?: unknown };
+  return parsePdfPositions(payload.pdf);
 }
 
 export async function syncPdfToSource(
@@ -105,18 +66,6 @@ export async function syncPdfToSource(
   params: SyncFromPdfParams,
   options: SyncOptions = {}
 ): Promise<SynctexCodePosition[]> {
-  const traceId = createTraceId('p2s')
-  const start = performance.now()
-
-  console.log('[SyncTeX] syncPdfToSource:start', {
-    traceId,
-    projectId: context.projectId,
-    buildId: context.buildId,
-    page: params.page,
-    h: params.h,
-    v: params.v,
-  })
-
   const search = new URLSearchParams({
     buildId: context.buildId,
     page: String(params.page),
@@ -124,44 +73,20 @@ export async function syncPdfToSource(
     v: String(params.v),
   });
 
-  try {
-    const response = await fetch(
-      `${context.clsiBaseUrl}/project/${context.projectId}/sync/pdf?${search.toString()}`,
-      {
-        method: 'GET',
-        signal: options.signal,
-      }
-    );
-
-    if (!response.ok) {
-      console.warn('[SyncTeX] syncPdfToSource:http-error', {
-        traceId,
-        status: response.status,
-        statusText: response.statusText,
-        durationMs: Math.round((performance.now() - start) * 100) / 100,
-      })
-      throw new Error(`SyncTeX pdf->source request failed: ${response.status} ${response.statusText}`);
+  const response = await fetch(
+    `${context.clsiBaseUrl}/project/${context.projectId}/sync/pdf?${search.toString()}`,
+    {
+      method: 'GET',
+      signal: options.signal,
     }
+  );
 
-    const payload = (await response.json()) as { code?: unknown };
-    const positions = parseCodePositions(payload.code)
-    console.log('[SyncTeX] syncPdfToSource:success', {
-      traceId,
-      resultCount: positions.length,
-      durationMs: Math.round((performance.now() - start) * 100) / 100,
-    })
-    return positions
-  } catch (error) {
-    const aborted = options.signal?.aborted || (error as { name?: string })?.name === 'AbortError'
-    const log = aborted ? console.log : console.error
-    log('[SyncTeX] syncPdfToSource:failed', {
-      traceId,
-      aborted,
-      durationMs: Math.round((performance.now() - start) * 100) / 100,
-      error: error instanceof Error ? error.message : String(error),
-    })
-    throw error
+  if (!response.ok) {
+    throw new Error(`SyncTeX pdf->source request failed: ${response.status} ${response.statusText}`);
   }
+
+  const payload = (await response.json()) as { code?: unknown };
+  return parseCodePositions(payload.code);
 }
 
 export function normalizeComparablePath(input: string): string {
@@ -186,18 +111,7 @@ function parsePdfPositions(value: unknown): SynctexPdfPosition[] {
     const height = numberField(item, 'height');
     if (page === null || h === null || v === null || width === null || height === null) continue;
 
-    const normalizedWidth = Math.max(0, width)
-    const normalizedHeight = Math.max(0, height)
-    // `synctex view` reports `v` near baseline/depth; convert to top-left y for UI overlays.
-    const normalizedTop = Math.max(0, v - normalizedHeight)
-
-    parsed.push({
-      page,
-      h,
-      v: normalizedTop,
-      width: normalizedWidth,
-      height: normalizedHeight,
-    });
+    parsed.push({ page, h, v, width, height });
   }
 
   return parsed;
