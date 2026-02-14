@@ -10,7 +10,7 @@ import { getFileExtension } from '@/lib/utils/client-utils'
 import ImageViewer from './image-viewer'
 import { Command, ChevronRight, File } from 'lucide-react'
 import type { EditorSyntaxTheme } from '@/components/editor/types'
-import { editCodeService } from '@/services/agent/browser/editCodeService'
+import { chatApplyService } from '@/services/agent/browser/chat/chatApplyService'
 
 const QUICK_EDIT_INPUT_VISIBILITY_EVENT = 'editor.quick-edit-input-visibility'
 
@@ -47,6 +47,7 @@ const CursorEditorContainer: React.FC<CursorEditorContainerProps> = ({
   onFindSelectionInPdf,
   isPdfNavigationEnabled = true,
 }) => {
+  const isAiChatEnabled = process.env.NEXT_PUBLIC_ENABLE_AI_CHAT === 'true'
   const { theme, systemTheme } = useTheme()
   const [localContent, setLocalContent] = useState('')
   const [openFile, setOpenFile] = useState<any>(null)
@@ -239,12 +240,12 @@ const CursorEditorContainer: React.FC<CursorEditorContainerProps> = ({
       localContentRef.current = newCode
       setLocalContent(newCode)
       onFileContentChange?.(openFile.id, newCode)
-      if (editCodeService.consumeProgrammaticPersistBypass()) {
+      if (isAiChatEnabled && chatApplyService.consumeProgrammaticPersistBypass()) {
         return
       }
       schedulePersist(openFile.id, newCode)
     },
-    [openFile, isImageFile, isPdfFile, onFileContentChange, schedulePersist]
+    [openFile, isAiChatEnabled, isImageFile, isPdfFile, onFileContentChange, schedulePersist]
   )
   
   // ... other handlers ...

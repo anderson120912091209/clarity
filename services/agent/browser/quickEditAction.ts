@@ -5,12 +5,11 @@
  * 1. Registering keybindings
  * 2. Validating context (guard clauses)
  * 3. Capturing and normalizing user selection
- * 4. Delegating to editCodeService for actual editing
+ * 4. Normalizing selection payload for downstream quick-edit flow
  */
 
 import * as monaco from 'monaco-editor'
 import type { editor } from 'monaco-editor'
-import { editCodeService } from './editCodeService'
 
 /**
  * Configuration for how to handle empty selections

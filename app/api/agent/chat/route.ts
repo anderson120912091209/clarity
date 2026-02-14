@@ -3,8 +3,13 @@ import { streamText, tool, type CoreMessage } from 'ai'
 import { z } from 'zod'
 import { GEMINI_DEFAULT_MODEL, resolveGeminiModel } from '@/lib/constants/gemini-models'
 import type { AgentChatContext, AgentChatSettingsContext } from '@/features/agent/types/chat-context'
+import {
+  listTypstSkillDocs,
+  readTypstSkillDoc,
+  searchTypstSkillDocs,
+} from '@/lib/agent/typst-skill-library'
 
-export const runtime = 'edge'
+export const runtime = 'nodejs'
 
 interface ChatRequestBody {
   messages: Array<{
@@ -185,6 +190,48 @@ function getLineMatches(content: string, query: string, maxMatches: number): Arr
   return matches
 }
 
+function supportsTypstLibrary(context: NormalizedChatContext, latestUserMessage: string): boolean {
+  const activePath = context.activeFilePath?.toLowerCase() ?? ''
+  const hasTypstActiveFile = activePath.endsWith('.typ')
+  const hasTypstWorkspaceFile = context.workspaceFiles.some((file) =>
+    file.path.toLowerCase().endsWith('.typ')
+  )
+  const mentionsTypst = /\btypst\b|\btouying\b|\.typ\b/i.test(latestUserMessage)
+
+  return hasTypstActiveFile || hasTypstWorkspaceFile || mentionsTypst
+}
+
+function shouldEnableTypstLibrary(context: NormalizedChatContext, latestUserMessage: string): boolean {
+  return context.settings.libraryEnabled || supportsTypstLibrary(context, latestUserMessage)
+}
+
+function isLikelyEditIntent(latestUserMessage: string): boolean {
+  const text = latestUserMessage.toLowerCase()
+  if (!text.trim()) return false
+
+  if (/@file\s*:|@insert\s*:|search\s*:|replace\s*:/i.test(latestUserMessage)) {
+    return true
+  }
+
+  const editSignals = [
+    /\bedit\b/,
+    /\bfix\b/,
+    /\bupdate\b/,
+    /\brewrite\b/,
+    /\brefactor\b/,
+    /\bconvert\b/,
+    /\bchange\b/,
+    /\badjust\b/,
+    /\bmodify\b/,
+    /\bapply\b/,
+    /\bremove\b/,
+    /\badd\b/,
+    /\bformat\b/,
+  ]
+
+  return editSignals.some((pattern) => pattern.test(text))
+}
+
 function buildWorkspaceSummary(context: NormalizedChatContext): string {
   const parts: string[] = []
 
@@ -231,49 +278,86 @@ function buildWorkspaceSummary(context: NormalizedChatContext): string {
   return parts.join('\n\n')
 }
 
-function buildSystemPrompt(context: NormalizedChatContext, extraInstructions: string[]): string {
+function buildSystemPrompt(
+  context: NormalizedChatContext,
+  extraInstructions: string[],
+  options: { typstLibraryEnabled: boolean; forceStructuredEdits: boolean }
+): string {
   const base = [
-    'You are an AI assistant for a LaTeX/Typst + PDF editing workspace.',
-    'Be concise, technical, and directly actionable.',
-    'When compile errors are involved, inspect compile logs before proposing fixes.',
-    'When context is missing, use tools instead of guessing.',
-    'Prefer targeted edits over full-file rewrites whenever possible.',
-    'For code meant to be applied in-editor, output fenced code blocks and include metadata lines before code.',
-    'Metadata format: @file: relative/path/to/file.ext and @insert: replace_file | search_replace | after_line N | before_line N | line N | after <anchor> | before <anchor> | append.',
-    'For partial edits, prefer @insert: search_replace with SEARCH/REPLACE blocks.',
-    'You have a MathJax render environment.',
-    'Any LaTeX text between single dollar sign ($) will be rendered as a TeX formula.',
-    'Use $(tex_formula)$ in-line delimiters to display equations instead of backslash delimiters.',
-    'The render environment only uses $ (single dollar sign) as a container delimiter; never output $$.',
-    'Example: $x^2 + 3x$ is output for "x² + 3x" to appear as TeX.',
+    'You are LaTeX Architect, an expert coding assistant dedicated to helping users create, debug, and optimize LaTeX and Typst documents.',
+    '',
+    '## Core Responsibilities',
+    '',
+    '### Syntax Identification',
+    '- Analyze before responding: identify LaTeX (\\documentclass, \\usepackage, \\begin) vs Typst (#, set, show, let).',
+    '- If ambiguous, ask for clarification or default to LaTeX.',
+    '',
+    '### Code Generation',
+    '- Create complete documents based on user descriptions.',
+    '- Generate specific snippets for complex elements (tables, figures, equations).',
+    '- Always use modern packages/functions and best practices.',
+    '',
+    '### Debugging & Optimization',
+    '- Analyze user code to find errors, deprecated packages, or formatting issues.',
+    '- Provide corrected code alongside a clear explanation.',
+    '- When a compile error is reported, ALWAYS call get_compile_logs first before suggesting fixes.',
+    '',
+    '## File Editing (CRITICAL)',
+    '',
+    'When the user asks you to edit, fix, or create code in their files:',
+    '- **ALWAYS use the `apply_file_edit` tool** to propose file changes.',
+    '- **NEVER output raw @file: or @insert: metadata in your text response.**',
+    '- **NEVER output raw SEARCH:/REPLACE: blocks in your text response.**',
+    '- For partial edits, use editType: "search_replace" with the exact text to find and replace.',
+    '- For full file rewrites, use editType: "replace_file" with the complete new content.',
+    '- You may call apply_file_edit multiple times for multiple files or multiple edits.',
+    '- After calling the tool, provide a brief explanation of what you changed in your text response.',
+    '',
+    '## Guidelines',
+    '',
+    '- Structure: Full documents need preamble + \\begin{document}...\\end{document}.',
+    '- Math: Use amsmath. Prefer \\begin{align}/\\begin{equation} over $$.',
+    '- Tables: Use booktabs. Avoid vertical lines (|).',
+    '- Be concise: code first, then explanation.',
+    '',
+    '## MathJax Rendering',
+    '- You have a MathJax render environment for chat display.',
+    '- Use $(tex_formula)$ inline delimiters (single dollar sign only).',
+    '- Never output $$ (double dollar sign) in your chat text.',
+    '- Example: $x^2 + 3x$ renders as "x² + 3x".',
   ].join('\n')
 
   const sections = [base, buildWorkspaceSummary(context)]
+  if (options.typstLibraryEnabled) {
+    sections.push(
+      [
+        'Typst skill mode:',
+        '- Use `search_typst_skill_docs` before proposing Typst or Touying syntax.',
+        '- Use `read_typst_skill_doc` to confirm exact function names and parameters.',
+        '- If docs conflict with memory, trust the retrieved docs.',
+      ].join('\n')
+    )
+  }
+
+  if (options.forceStructuredEdits) {
+    sections.push(
+      [
+        'Structured edit mode (enforced):',
+        '- The user asked for file edits.',
+        '- You must call `apply_file_edit` for every edit you intend to make.',
+        '- Do not claim edits were applied unless you actually emitted apply_file_edit tool calls.',
+        '- Do not respond with plain narrative-only plans for edit requests.',
+      ].join('\n')
+    )
+  }
+
   if (extraInstructions.length > 0) {
     sections.push(`Additional UI instructions:\n${extraInstructions.join('\n\n')}`)
   }
   return sections.join('\n\n')
 }
 
-function buildStrictEditOutputInstruction(latestUserMessage: string): string | null {
-  const lowered = latestUserMessage.toLowerCase()
-  const looksLikeExplicitEditDirective =
-    /@file\s*:/.test(lowered) ||
-    /@insert\s*:/.test(lowered) ||
-    /search_replace/.test(lowered) ||
-    /search\s*:/.test(lowered) ||
-    /replace\s*:/.test(lowered)
-
-  if (!looksLikeExplicitEditDirective) return null
-
-  return [
-    'Strict edit output mode:',
-    '- Output only edit blocks that can be directly applied.',
-    '- Do not output explanations, bullet lists, or prose.',
-    '- Prefer @file + @insert: search_replace blocks with concrete SEARCH and REPLACE content.',
-    '- If SEARCH/REPLACE cannot be done safely, emit @insert: replace_file with full final file content.',
-  ].join('\n')
-}
+// buildStrictEditOutputInstruction removed — edits are now handled via the apply_file_edit tool
 
 function normalizeConversationMessages(
   messages: ChatRequestBody['messages']
@@ -304,6 +388,13 @@ function normalizeConversationMessages(
 }
 
 export async function POST(req: Request) {
+  const isAiChatEnabled =
+    process.env.ENABLE_AI_CHAT === 'true' ||
+    process.env.NEXT_PUBLIC_ENABLE_AI_CHAT === 'true'
+  if (!isAiChatEnabled) {
+    return new Response('AI chat is disabled.', { status: 403 })
+  }
+
   const requestId =
     typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
       ? crypto.randomUUID()
@@ -323,10 +414,20 @@ export async function POST(req: Request) {
 
   const context = normalizeContext(payload.context)
   const latestUserMessage = conversation[conversation.length - 1]?.content ?? ''
-  const strictEditInstruction = buildStrictEditOutputInstruction(latestUserMessage)
+  const typstLibraryEnabled = shouldEnableTypstLibrary(context, latestUserMessage)
+  const forceStructuredEdits = isLikelyEditIntent(latestUserMessage)
+
+  // Auto-inject compile error awareness
+  if (context.compileError) {
+    uiSystemInstructions.push(
+      '⚠️ There is an active compile error. Call get_compile_logs to investigate before suggesting fixes.'
+    )
+  }
+
   const systemPrompt = buildSystemPrompt(
     context,
-    strictEditInstruction ? [...uiSystemInstructions, strictEditInstruction] : uiSystemInstructions
+    uiSystemInstructions,
+    { typstLibraryEnabled, forceStructuredEdits }
   )
 
   const apiKey = process.env.GOOGLE_GENERATIVE_AI_API_KEY || process.env.GOOGLE_GENERATION_AI_API_KEY
@@ -337,14 +438,21 @@ export async function POST(req: Request) {
   const google = createGoogleGenerativeAI({ apiKey })
   const selectedModel = resolveGeminiModel(payload.model)
 
+  console.info(`[Agent Chat ${requestId}] request`, {
+    model: selectedModel,
+    workspaceFiles: context.workspaceFiles.length,
+    typstLibraryEnabled,
+    forceStructuredEdits,
+  })
+
   const runWithModel = (modelId: string) =>
     streamText({
       model: google(modelId),
       system: systemPrompt,
       messages: conversation,
       temperature: 0.1,
-      maxSteps: 8,
-      toolChoice: 'auto',
+      maxSteps: forceStructuredEdits ? 12 : 8,
+      toolChoice: forceStructuredEdits ? 'required' : 'auto',
       tools: {
         list_workspace_files: tool({
           description: 'List files currently available in the workspace snapshot.',
@@ -455,6 +563,96 @@ export async function POST(req: Request) {
             }
           },
         }),
+        list_typst_skill_docs: tool({
+          description:
+            'List indexed Typst/Touying local skill documents available for grounded syntax lookups.',
+          parameters: z.object({
+            limit: z.number().int().min(1).max(200).optional(),
+          }),
+          execute: async ({ limit = 120 }) => {
+            if (!typstLibraryEnabled) {
+              return {
+                enabled: false,
+                message:
+                  'Typst skill library is disabled for this request. Enable library mode or open a .typ file.',
+              }
+            }
+
+            const docs = await listTypstSkillDocs(limit)
+
+            console.info(`[Agent Chat ${requestId}] tool=list_typst_skill_docs`, {
+              limit,
+              returned: docs.docs.length,
+            })
+
+            return {
+              enabled: true,
+              ...docs,
+            }
+          },
+        }),
+        search_typst_skill_docs: tool({
+          description:
+            'Search Typst/Touying local skill docs by query and return top matching snippets with paths.',
+          parameters: z.object({
+            query: z.string().min(1),
+            limit: z.number().int().min(1).max(20).optional(),
+          }),
+          execute: async ({ query, limit = 8 }) => {
+            if (!typstLibraryEnabled) {
+              return {
+                enabled: false,
+                message:
+                  'Typst skill library is disabled for this request. Enable library mode or open a .typ file.',
+              }
+            }
+
+            const results = await searchTypstSkillDocs(query, limit)
+
+            console.info(`[Agent Chat ${requestId}] tool=search_typst_skill_docs`, {
+              query,
+              totalMatches: results.totalMatches,
+              returned: results.results.length,
+            })
+
+            return {
+              enabled: true,
+              ...results,
+            }
+          },
+        }),
+        read_typst_skill_doc: tool({
+          description:
+            'Read a specific Typst/Touying skill document by relative path and optional line range.',
+          parameters: z.object({
+            path: z.string().min(1),
+            startLine: z.number().int().min(1).optional(),
+            endLine: z.number().int().min(1).optional(),
+          }),
+          execute: async ({ path, startLine, endLine }) => {
+            if (!typstLibraryEnabled) {
+              return {
+                enabled: false,
+                message:
+                  'Typst skill library is disabled for this request. Enable library mode or open a .typ file.',
+              }
+            }
+
+            const result = await readTypstSkillDoc(path, startLine, endLine)
+
+            console.info(`[Agent Chat ${requestId}] tool=read_typst_skill_doc`, {
+              requestedPath: path,
+              found: result.found,
+              startLine,
+              endLine,
+            })
+
+            return {
+              enabled: true,
+              ...result,
+            }
+          },
+        }),
         get_compile_logs: tool({
           description: 'Get the most recent compile logs and compile error state.',
           parameters: z.object({
@@ -501,6 +699,64 @@ export async function POST(req: Request) {
             return payload
           },
         }),
+        apply_file_edit: tool({
+        description:
+          'Apply a code edit to a file in the workspace. Use this tool whenever the user asks you to edit, fix, create, or modify code. For partial edits, use editType "search_replace". For full file rewrites, use editType "replace_file".',
+        parameters: z.object({
+          filePath: z
+            .string()
+            .min(1)
+            .describe('Relative path of the file to edit (e.g. "main.tex", "src/chapter1.typ").'),
+          editType: z
+            .enum(['search_replace', 'replace_file'])
+            .describe(
+              'Edit strategy: "search_replace" replaces a specific section, "replace_file" replaces the entire file content.'
+            ),
+          searchContent: z
+            .string()
+            .optional()
+            .describe(
+              'For search_replace: the exact text to find in the file. Must match the existing file content precisely.'
+            ),
+          replaceContent: z
+            .string()
+            .describe(
+              'The replacement content. For search_replace: replaces the searchContent. For replace_file: the complete new file content.'
+            ),
+          description: z
+            .string()
+            .optional()
+            .describe('Brief human-readable description of what this edit does.'),
+        }),
+        execute: async ({ filePath, editType, searchContent, replaceContent, description }) => {
+          console.info(`[Agent Chat ${requestId}] tool=apply_file_edit`, {
+            filePath,
+            editType,
+            description,
+            searchContentLength: searchContent?.length ?? 0,
+            replaceContentLength: replaceContent.length,
+          })
+
+          // Validate search_replace has searchContent
+          if (editType === 'search_replace' && !searchContent) {
+            return {
+              applied: false,
+              error: 'searchContent is required for search_replace edit type.',
+            }
+          }
+
+          // The actual file edit is applied on the frontend via changeManager.
+          // We return the edit instruction so the frontend can stage it.
+          return {
+            applied: true,
+            filePath,
+            editType,
+            searchContent: searchContent ?? null,
+            replaceContent,
+            description: description ?? `Edit ${filePath}`,
+          }
+        },
+      }),
       },
       onStepFinish: (event) => {
         console.info(`[Agent Chat ${requestId}] step finished`, {
@@ -530,7 +786,7 @@ export async function POST(req: Request) {
       result = await runWithModel(GEMINI_DEFAULT_MODEL)
     }
 
-    return result.toTextStreamResponse()
+    return result.toDataStreamResponse()
   } catch (error) {
     console.error(`[Agent Chat ${requestId}] Error:`, error)
     return new Response('Internal Server Error', { status: 500 })

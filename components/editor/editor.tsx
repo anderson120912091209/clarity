@@ -6,7 +6,7 @@ import { useEditorTheme } from './hooks/useEditorTheme'
 import { editorDefaultOptions } from './constants/editorDefaults'
 import { Loader2 } from 'lucide-react'
 import { historyService } from '@/services/agent/browser/history/historyService'
-import { editCodeService } from '@/services/agent/browser/editCodeService'
+import { chatApplyService } from '@/services/agent/browser/chat/chatApplyService'
 import { setupShikiMonaco } from './utils/shiki-monaco'
 import { useTheme } from 'next-themes'
 import type { editor as MonacoEditorNamespace, IDisposable } from 'monaco-editor'
@@ -79,6 +79,7 @@ export const CodeEditor = ({
   onActionsReady,
   gotoRequest,
 }: CodeEditorProps) => {
+  const isAiChatEnabled = process.env.NEXT_PUBLIC_ENABLE_AI_CHAT === 'true'
   const activeLanguage = useMemo<EditorLanguageId>(
     () => resolveEditorLanguageId(fileName),
     [fileName]
@@ -192,15 +193,16 @@ export const CodeEditor = ({
   }, [onActionsReady])
 
   useEffect(() => {
+    if (!isAiChatEnabled) return
     const editor = editorRef.current
     const monaco = monacoRef.current
     if (!editor || !monaco) return
-    editCodeService.bindActiveEditor({
+    chatApplyService.bindActiveEditor({
       editor,
       monacoInstance: monaco,
       onChange,
     })
-  }, [editorRef, onChange])
+  }, [editorRef, isAiChatEnabled, onChange])
 
   useEffect(() => {
     if (!gotoRequest) return
@@ -233,15 +235,19 @@ export const CodeEditor = ({
         if (!originalSetThemeRef.current) {
           originalSetThemeRef.current = monaco.editor.setTheme
         }
-        editCodeService.bindActiveEditor({
-          editor,
-          monacoInstance: monaco,
-          onChange,
-        })
+        if (isAiChatEnabled) {
+          chatApplyService.bindActiveEditor({
+            editor,
+            monacoInstance: monaco,
+            onChange,
+          })
+        }
         handleEditorDidMount(editor, monaco)
         const cleanupAIAssist = handleAIAssist(editor, monaco, setIsStreaming, onChange)
         editor.onDidDispose(() => {
-          editCodeService.unbindActiveEditor(editor)
+          if (isAiChatEnabled) {
+            chatApplyService.unbindActiveEditor(editor)
+          }
           if (typeof cleanupAIAssist === 'function') {
             cleanupAIAssist()
           }
@@ -257,9 +263,9 @@ export const CodeEditor = ({
         // Inline chat hint on focused empty lines
         const hintNode = document.createElement('div')
         hintNode.className = 'inline-chat-hint'
-        hintNode.textContent = isMac
-          ? '⌘+L to chat, ⌘+K to generate'
-          : 'Ctrl+L to chat, Ctrl+K to generate'
+        hintNode.textContent = isAiChatEnabled
+          ? (isMac ? '⌘+L to chat, ⌘+K to generate' : 'Ctrl+L to chat, Ctrl+K to generate')
+          : (isMac ? '⌘+K to generate' : 'Ctrl+K to generate')
 
         let hintPosition: { lineNumber: number; column: number } | null = null
         const hintWidget: MonacoEditorNamespace.IContentWidget = {

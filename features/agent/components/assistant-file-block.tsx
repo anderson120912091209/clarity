@@ -1,6 +1,6 @@
 'use client'
 
-import { Check, Loader2, X } from 'lucide-react'
+import { Check, FileCode, Loader2, X, Eye } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { StagedFileChange } from '@/features/agent/services/change-manager'
 
@@ -58,57 +58,77 @@ export function AssistantFileBlock({
   const actionDisabled = disabled || change.isStreaming
 
   return (
-    <div className="flex items-center gap-2 rounded-md border border-white/10 bg-[#12131a] px-2 py-1.5">
-      <button
-        type="button"
-        onClick={onOpen}
-        disabled={actionDisabled || !onOpen}
-        className={cn(
-          'min-w-0 flex-1 rounded-sm px-0.5 text-left transition-colors',
-          actionDisabled || !onOpen
-            ? 'cursor-default'
-            : 'cursor-pointer hover:bg-white/5'
-        )}
-      >
-        <div className="truncate text-[12px] font-medium text-zinc-200">{change.fileName}</div>
-        <div className="truncate text-[10px] text-zinc-500">{change.filePath}</div>
-        <div className="mt-0.5 flex items-center gap-2 text-[10px]">
-          <span className="font-medium text-emerald-300">+{linesAdded}</span>
-          <span className="font-medium text-rose-300">-{linesDeleted}</span>
-          <span className="text-zinc-500">
-            {change.summary.totalChangedBlocks} diff
-            {change.summary.totalChangedBlocks === 1 ? '' : 's'}
-          </span>
-          {isOpening ? (
-            <span className="inline-flex items-center gap-1 text-zinc-400">
-              <Loader2 className="h-2.5 w-2.5 animate-spin" />
-              <span>Opening</span>
-            </span>
-          ) : (
-            <span className="text-zinc-500">{change.isStreaming ? 'Streaming' : 'Ready'}</span>
-          )}
+    <div className="group relative flex flex-col gap-2 rounded-lg border border-white/5 bg-[#18181b]/50 p-3 transition-colors hover:border-white/10 hover:bg-[#18181b]">
+      {/* Header: File Info & Stats */}
+      <div className="flex items-start justify-between gap-4">
+        <div className="flex min-w-0 flex-1 items-center gap-3">
+          <div className="flex h-8 w-8 items-center justify-center rounded-md bg-white/5 text-zinc-400">
+            <FileCode className="h-4 w-4" />
+          </div>
+          <div className="flex min-w-0 flex-col">
+            <div className="truncate text-sm font-medium text-zinc-200">{change.fileName}</div>
+            <div className="truncate text-xs text-zinc-500">{change.filePath}</div>
+          </div>
         </div>
-      </button>
 
-      <div className="flex items-center gap-1">
+        {/* Stats Badge */}
+        <div className="flex items-center gap-3 rounded-md bg-black/20 px-2 py-1 text-xs font-medium border border-white/5">
+          <span className="text-emerald-400">+{linesAdded}</span>
+          <span className="text-rose-400">-{linesDeleted}</span>
+          <span className="h-3 w-px bg-white/10" />
+          <span className="text-zinc-500">
+            {change.summary.totalChangedBlocks} chunk{change.summary.totalChangedBlocks !== 1 && 's'}
+          </span>
+        </div>
+      </div>
+
+      {/* Footer: Actions */}
+      <div className="flex items-center justify-between pt-1">
         <button
-          type="button"
-          onClick={onReject}
-          disabled={actionDisabled || !onReject}
-          className="inline-flex h-6 items-center gap-1 rounded-md border border-[#3b3d46] px-2 text-[11px] text-zinc-300 transition-colors hover:bg-white/5 disabled:cursor-not-allowed disabled:opacity-45"
+          onClick={onOpen}
+          disabled={actionDisabled || !onOpen}
+          className={cn(
+            "flex items-center gap-1.5 text-xs font-medium transition-colors",
+            actionDisabled || !onOpen
+              ? "text-zinc-600 cursor-not-allowed"
+              : "text-zinc-400 hover:text-zinc-200"
+          )}
         >
-          {isRejecting ? <Loader2 className="h-3 w-3 animate-spin" /> : <X className="h-3 w-3" />}
-          <span>Reject</span>
+          {isOpening ? (
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+          ) : (
+            <Eye className="h-3.5 w-3.5" />
+          )}
+          <span>{isOpening ? 'Opening...' : 'View Diff'}</span>
         </button>
-        <button
-          type="button"
-          onClick={onAccept}
-          disabled={actionDisabled || !onAccept}
-          className="inline-flex h-6 items-center gap-1 rounded-md bg-[#6D78E7] px-2 text-[11px] text-white transition-colors hover:bg-[#5b65d6] disabled:cursor-not-allowed disabled:opacity-45"
-        >
-          {isAccepting ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3" />}
-          <span>Accept</span>
-        </button>
+
+        <div className="flex items-center gap-2">
+          <button
+            onClick={onReject}
+            disabled={actionDisabled || !onReject}
+            className={cn(
+              "flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-all",
+              "border border-white/5 bg-white/5 text-zinc-400 hover:bg-white/10 hover:text-zinc-200",
+              (actionDisabled || !onReject) && "opacity-50 cursor-not-allowed hover:bg-white/5 hover:text-zinc-400"
+            )}
+          >
+            {isRejecting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <X className="h-3.5 w-3.5" />}
+            <span>Reject</span>
+          </button>
+          
+          <button
+            onClick={onAccept}
+            disabled={actionDisabled || !onAccept}
+            className={cn(
+              "flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-all shadow-sm",
+              "bg-[#6D78E7] text-white hover:bg-[#5b65d6] hover:shadow-md hover:shadow-[#6D78E7]/20",
+              (actionDisabled || !onAccept) && "opacity-50 cursor-not-allowed hover:bg-[#6D78E7] hover:shadow-none"
+            )}
+          >
+            {isAccepting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
+            <span>Apply Edit</span>
+          </button>
+        </div>
       </div>
     </div>
   )

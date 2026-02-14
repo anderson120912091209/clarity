@@ -550,6 +550,7 @@ export function PDFNavContent({
   projectId,
   onCompile,
   onChatToggle,
+  isChatEnabled = true,
   isChatVisible,
   onZoomIn,
   onZoomOut,
@@ -564,6 +565,7 @@ export function PDFNavContent({
   projectId: string
   onCompile: () => void
   onChatToggle?: () => void
+  isChatEnabled?: boolean
   isChatVisible?: boolean
   onZoomIn: () => void
   onZoomOut: () => void
@@ -617,21 +619,23 @@ export function PDFNavContent({
           </div>
         </Button>
 
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={onChatToggle}
-          className={cn(
-            'h-7 px-2.5 rounded-md gap-1.5 text-xs font-medium border shrink-0 transition-all',
-            isChatVisible
-              ? 'border-[#6D78E7]/70 bg-[#6D78E7]/15 text-[#A9B1FF] hover:bg-[#6D78E7]/25'
-              : 'border-white/10 text-zinc-400 hover:text-white hover:bg-white/5'
-          )}
-          title={isChatVisible ? 'Hide AI Chat' : 'Show AI Chat'}
-        >
-          <MessageSquare className="w-3.5 h-3.5" />
-          <span>AI Chat</span>
-        </Button>
+        {isChatEnabled ? (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onChatToggle}
+            className={cn(
+              'h-7 px-2.5 rounded-md gap-1.5 text-xs font-medium border shrink-0 transition-all',
+              isChatVisible
+                ? 'border-[#6D78E7]/70 bg-[#6D78E7]/15 text-[#A9B1FF] hover:bg-[#6D78E7]/25'
+                : 'border-white/10 text-zinc-400 hover:text-white hover:bg-white/5'
+            )}
+            title={isChatVisible ? 'Hide AI Chat' : 'Show AI Chat'}
+          >
+            <MessageSquare className="w-3.5 h-3.5" />
+            <span>AI Chat</span>
+          </Button>
+        ) : null}
 
         <Button 
            variant={showLogs ? "secondary" : "ghost"}

@@ -29,11 +29,12 @@ import {
   parseAssistantInsertBlocks,
   type InsertMode,
 } from '@/features/agent/lib/assistant-insert'
-import { editCodeService, type FileSuggestionApplyMode } from '@/services/agent/browser/editCodeService'
+import { chatApplyService, type FileSuggestionApplyMode } from '@/services/agent/browser/chat/chatApplyService'
 import { changeManagerService, type StagedFileChange } from '@/features/agent/services/change-manager'
 import type { AgentWorkspaceFileContext } from '@/features/agent/types/chat-context'
 
 export const maxDuration = 30
+const AI_CHAT_ENABLED = process.env.NEXT_PUBLIC_ENABLE_AI_CHAT === 'true'
 
 export default function Home() {
   const { id } = useParams<{ id: string }>()
@@ -70,6 +71,61 @@ interface HighlightCluster {
   bottom: number
   minLeft: number
   maxRight: number
+}
+
+interface StructuredFileEditPayload {
+  filePath: string
+  editType: 'search_replace' | 'replace_file'
+  searchContent: string | null
+  replaceContent: string
+}
+
+function buildSearchReplaceConflictBlock(search: string, replace: string): string {
+  return [
+    '<<<<<<< ORIGINAL',
+    search,
+    '=======',
+    replace,
+    '>>>>>>> UPDATED',
+  ].join('\n')
+}
+
+function parseStructuredFileEditPayloads(messageContent: string): StructuredFileEditPayload[] {
+  const trimmed = messageContent.trim()
+  if (!trimmed || trimmed[0] !== '{' && trimmed[0] !== '[') return []
+
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(trimmed)
+  } catch {
+    return []
+  }
+
+  const candidates = Array.isArray(parsed) ? parsed : [parsed]
+  const payloads: StructuredFileEditPayload[] = []
+
+  for (const candidate of candidates) {
+    if (!candidate || typeof candidate !== 'object') continue
+    const raw = candidate as {
+      filePath?: unknown
+      editType?: unknown
+      searchContent?: unknown
+      replaceContent?: unknown
+    }
+
+    if (typeof raw.filePath !== 'string' || !raw.filePath.trim()) continue
+    if (raw.editType !== 'search_replace' && raw.editType !== 'replace_file') continue
+    if (typeof raw.replaceContent !== 'string') continue
+
+    payloads.push({
+      filePath: raw.filePath.trim(),
+      editType: raw.editType,
+      searchContent: typeof raw.searchContent === 'string' ? raw.searchContent : null,
+      replaceContent: raw.replaceContent,
+    })
+  }
+
+  return payloads
 }
 
 function sampleLineNumbers(startLine: number, endLine: number, maxPoints = 24): number[] {
@@ -168,6 +224,7 @@ function buildSelectionHighlightBoxes(
 
 function EditorLayout() {
   const [isChatVisible, setIsChatVisible] = useState(false)
+  const isAiChatEnabled = AI_CHAT_ENABLED
   const { user } = useFrontend()
   const { currentlyOpen, project, files: projectFiles, projectId } = useProject()
   const { files: stagedChanges, anyStreaming: anyStagedStreaming } = useChangeManagerState()
@@ -409,13 +466,26 @@ function EditorLayout() {
       const trimmed = messageContent.trim()
       if (!trimmed) return
 
+      const structuredEdits = parseStructuredFileEditPayloads(trimmed)
+      const structuredBlocks = structuredEdits.map((edit) => ({
+        filePath: edit.filePath,
+        insertMode: edit.editType === 'search_replace' ? ('search_replace' as InsertMode) : ('replace_file' as InsertMode),
+        hasExplicitInsertMode: true,
+        code:
+          edit.editType === 'search_replace' && edit.searchContent
+            ? buildSearchReplaceConflictBlock(edit.searchContent, edit.replaceContent)
+            : edit.replaceContent,
+      }))
+
       const parsedBlocks = parseAssistantInsertBlocks(trimmed)
-      if (options?.auto && parsedBlocks.length === 0) {
+      const machineBlocks = parsedBlocks.length > 0 ? parsedBlocks : structuredBlocks
+
+      if (options?.auto && machineBlocks.length === 0) {
         return
       }
       const blocksToApply =
-        parsedBlocks.length > 0
-          ? parsedBlocks
+        machineBlocks.length > 0
+          ? machineBlocks
           : [
               {
                 code: trimmed,
@@ -437,7 +507,7 @@ function EditorLayout() {
 
       for (const block of blocksToApply) {
         if (
-          parsedBlocks.length > 0 &&
+          machineBlocks.length > 0 &&
           block.insertMode === 'append' &&
           !block.hasExplicitInsertMode &&
           !block.anchorText &&
@@ -478,7 +548,7 @@ function EditorLayout() {
           ? (() => {
               const requestedMode: FileSuggestionApplyMode =
                 block.insertMode === 'search_replace' ? 'search_replace' : 'replace_file'
-              let result = editCodeService.applySuggestionToFile(
+              let result = chatApplyService.applySuggestionToFile(
                 baseContent,
                 block.code,
                 requestedMode
@@ -490,7 +560,7 @@ function EditorLayout() {
                   warning.includes('No SEARCH/REPLACE blocks were found in suggestion.')
                 )
               ) {
-                const fallback = editCodeService.applySuggestionToFile(
+                const fallback = chatApplyService.applySuggestionToFile(
                   baseContent,
                   block.code,
                   'replace_file'
@@ -522,7 +592,7 @@ function EditorLayout() {
 
         if (nextContent === baseContent) continue
 
-        const stageResult = editCodeService.applySuggestionToFile(
+        const stageResult = chatApplyService.applySuggestionToFile(
           baseContent,
           nextContent,
           'replace_file'
@@ -561,7 +631,7 @@ function EditorLayout() {
           isPreviewApplied = true
           entry.focusLine = existingStage.firstChangedLine
         } else if (fileId === currentlyOpen?.id) {
-          const preview = editCodeService.previewSuggestionInActiveEditor(
+          const preview = chatApplyService.previewSuggestionInActiveEditor(
             entry.proposedContent,
             'replace_file',
             { suppressPersistence: true }
@@ -640,7 +710,7 @@ function EditorLayout() {
       for (const entry of entries) {
         handleLiveFileContentChange(entry.fileId, entry.proposedContent)
         if (entry.fileId === currentlyOpen?.id) {
-          editCodeService.clearActiveInlinePreview()
+          chatApplyService.clearActiveInlinePreview()
         }
         changeManagerService.removeChange(entry.fileId)
       }
@@ -664,10 +734,10 @@ function EditorLayout() {
 
       for (const entry of entries) {
         if (entry.fileId === currentlyOpen?.id) {
-          editCodeService.replaceActiveEditorContent(entry.originalContent, {
+          chatApplyService.replaceActiveEditorContent(entry.originalContent, {
             suppressPersistence: true,
           })
-          editCodeService.clearActiveInlinePreview()
+          chatApplyService.clearActiveInlinePreview()
         }
 
         handleLiveFileContentChange(entry.fileId, entry.originalContent)
@@ -731,7 +801,7 @@ function EditorLayout() {
       })
 
       window.setTimeout(() => {
-        const preview = editCodeService.previewSuggestionInActiveEditor(
+        const preview = chatApplyService.previewSuggestionInActiveEditor(
           entry.proposedContent,
           'replace_file',
           { suppressPersistence: true }
@@ -959,8 +1029,9 @@ function EditorLayout() {
             scale={scale}
             projectId={currentlyOpen?.projectId || ''}
             onCompile={compile}
-            onChatToggle={() => setIsChatVisible((prev) => !prev)}
-            isChatVisible={isChatVisible}
+            onChatToggle={isAiChatEnabled ? () => setIsChatVisible((prev) => !prev) : undefined}
+            isChatVisible={isAiChatEnabled ? isChatVisible : false}
+            isChatEnabled={isAiChatEnabled}
             onZoomIn={handleZoomIn}
             onZoomOut={handleZoomOut}
             onResetZoom={handleResetZoom}
@@ -1010,7 +1081,7 @@ function EditorLayout() {
             isPdfNavigationEnabled={isPdfNavigationEnabled}
           />
         </ResizablePanel>
-        {isChatVisible && (
+        {isAiChatEnabled && isChatVisible && (
           <>
             <ResizableHandle className="w-2 bg-transparent flex items-center justify-center group outline-none">
               <div className="h-8 w-1 bg-zinc-700 rounded-full opacity-0 group-hover:opacity-100 transition-all" />

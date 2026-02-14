@@ -7,6 +7,7 @@ import remarkGfm from 'remark-gfm'
 import rehypeHighlight from 'rehype-highlight'
 import { cn } from '@/lib/utils'
 import { loadMathJax } from '@/features/source-editor/utils/mathjax-loader'
+import { stripEditMetadataLines } from '@/features/agent/services/response-parser'
 
 interface ChatMarkdownProps {
   content: string
@@ -116,9 +117,10 @@ function CodeBlock({
 
 export function ChatMarkdown({ content, className, hideFencedCodeBlocks = false }: ChatMarkdownProps) {
   const normalizedContent = useMemo(() => {
-    const normalized = normalizeMathMarkdown(content)
-    if (!hideFencedCodeBlocks) return normalized
-    return stripFencedCodeBlocks(normalized)
+    let normalized = stripEditMetadataLines(content)
+    normalized = normalizeMathMarkdown(normalized)
+    if (hideFencedCodeBlocks) normalized = stripFencedCodeBlocks(normalized)
+    return normalized
   }, [content, hideFencedCodeBlocks])
   const containerRef = useRef<HTMLDivElement | null>(null)
   const shouldTypesetMath = useMemo(() => HAS_MATH_PATTERN.test(normalizedContent), [normalizedContent])

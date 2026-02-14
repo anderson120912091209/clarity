@@ -37,7 +37,8 @@ import {
   type PersistedMemoryItem,
 } from '@/features/agent/services/chat-memory-store'
 import { extractMemoryCandidatesFromUserMessage } from '@/features/agent/services/memory-extractor'
-import { chatService, type ChatMessage } from '@/services/agent/browser/quick-edit/chatService'
+import { chatService, type ChatMessage, type FileEditDelta } from '@/services/agent/browser/chat/chatService'
+import { parseRawResponse } from '@/features/agent/services/response-parser'
 import { cn } from '@/lib/utils'
 import { ChatMarkdown } from './chat-markdown'
 import { AssistantFileBlock } from './assistant-file-block'
@@ -77,12 +78,20 @@ interface ChatPanelProps {
   onRejectAllStaged?: () => void | Promise<void>
 }
 
+interface ToolCallInfo {
+  toolCallId: string
+  toolName: string
+  status: 'running' | 'completed'
+}
+
 interface PanelMessage {
   id: string
   role: 'user' | 'assistant'
   content: string
   isStreaming?: boolean
   isError?: boolean
+  toolCalls?: ToolCallInfo[]
+  fileEdits?: FileEditDelta[]
 }
 
 const MAX_ACTIVE_FILE_CHARS = 36000
@@ -95,11 +104,7 @@ function trimWithNotice(value: string, maxChars: number): string {
   return `${value.slice(0, maxChars)}\n\n[Truncated]`
 }
 
-function countClosedCodeBlocks(content: string): number {
-  if (!content) return 0
-  const matches = content.match(/```[\s\S]*?```/g)
-  return matches ? matches.length : 0
-}
+// countClosedCodeBlocks removed — edits are now handled via structured tool calls
 
 function buildThreadTitle(prompt: string): string {
   const singleLine = prompt.trim().replace(/\s+/g, ' ')
@@ -287,6 +292,11 @@ export function ChatPanel({
     return trimWithNotice(normalized, MAX_ACTIVE_FILE_CHARS)
   }, [fileContent, showCurrentDocument])
 
+  const libraryEnabled = useMemo(() => {
+    if (activeFilePath?.toLowerCase().endsWith('.typ')) return true
+    return workspaceFiles.some((file) => file.path?.toLowerCase().endsWith('.typ'))
+  }, [activeFilePath, workspaceFiles])
+
   const requestContext = useMemo<AgentChatContext>(() => {
     let remainingWorkspaceBudget = MAX_WORKSPACE_TOTAL_CHARS
     const normalizedWorkspaceFiles: AgentWorkspaceFileContext[] = []
@@ -323,7 +333,7 @@ export function ChatPanel({
       settings: {
         includeCurrentDocument: showCurrentDocument,
         webEnabled: false,
-        libraryEnabled: false,
+        libraryEnabled,
       },
     }
   }, [
@@ -333,6 +343,7 @@ export function ChatPanel({
     compileError,
     compileLogs,
     currentDocumentContext,
+    libraryEnabled,
     showCurrentDocument,
     workspaceFiles,
   ])
@@ -465,7 +476,7 @@ export function ChatPanel({
 
       let runId: string | null = null
       let streamedResponse = ''
-      let lastAutoAppliedClosedBlockCount = 0
+      const collectedFileEdits: FileEditDelta[] = []
 
       setSubmitError(null)
       setIsSubmitting(true)
@@ -530,20 +541,59 @@ export function ChatPanel({
 
         for await (const delta of output) {
           if (delta.error) throw new Error(delta.error)
-          if (!delta.content) continue
+          if (delta.done) break
 
-          streamedResponse += delta.content
-          setLiveAssistantMessage((prev) =>
-            prev && prev.id === assistantMessageId
-              ? { ...prev, content: streamedResponse, isStreaming: true }
-              : prev
-          )
+          // Handle text content
+          if (delta.content) {
+            streamedResponse += delta.content
+            setLiveAssistantMessage((prev) =>
+              prev && prev.id === assistantMessageId
+                ? { ...prev, content: streamedResponse, isStreaming: true }
+                : prev
+            )
+          }
 
-          if (onInsertIntoEditor) {
-            const closedBlockCount = countClosedCodeBlocks(streamedResponse)
-            if (closedBlockCount > lastAutoAppliedClosedBlockCount) {
-              lastAutoAppliedClosedBlockCount = closedBlockCount
-              void onInsertIntoEditor(streamedResponse, {
+          // Handle tool call start (show status pill)
+          if (delta.toolCall) {
+            const tc = delta.toolCall
+            setLiveAssistantMessage((prev) => {
+              if (!prev || prev.id !== assistantMessageId) return prev
+              const existing = prev.toolCalls ?? []
+              const alreadyTracked = existing.some((t) => t.toolCallId === tc.toolCallId)
+              if (alreadyTracked) return prev
+              return {
+                ...prev,
+                toolCalls: [...existing, { toolCallId: tc.toolCallId, toolName: tc.toolName, status: 'running' as const }],
+              }
+            })
+          }
+
+          // Handle tool result (mark complete, stage file edits)
+          if (delta.toolResult) {
+            setLiveAssistantMessage((prev) => {
+              if (!prev || prev.id !== assistantMessageId) return prev
+              const updated = (prev.toolCalls ?? []).map((t) =>
+                t.toolCallId === delta.toolResult!.toolCallId
+                  ? { ...t, status: 'completed' as const }
+                  : t
+              )
+              return { ...prev, toolCalls: updated }
+            })
+          }
+
+          // Handle file edit from apply_file_edit tool
+          if (delta.fileEdit) {
+            const edit = delta.fileEdit
+            collectedFileEdits.push(edit)
+
+            setLiveAssistantMessage((prev) => {
+              if (!prev || prev.id !== assistantMessageId) return prev
+              return { ...prev, fileEdits: [...collectedFileEdits] }
+            })
+
+            // Stage the change via changeManager so it shows as an AssistantFileBlock
+            if (onInsertIntoEditor) {
+              void onInsertIntoEditor(JSON.stringify(edit), {
                 auto: true,
                 sourceMessageId: assistantMessageId,
                 skipEditorFocus: true,
@@ -551,10 +601,24 @@ export function ChatPanel({
             }
           }
         }
+        // Apply fallback parsing to clean any raw @file: metadata that leaked through
+        const parsed = parseRawResponse(streamedResponse)
+        const finalContent = parsed.displayText.trim().length > 0
+          ? parsed.displayText
+          : streamedResponse.trim().length > 0
+            ? streamedResponse
+            : 'No response received.'
 
-        const finalContent = streamedResponse.trim().length > 0
-          ? streamedResponse
-          : 'No response received.'
+        // If fallback parser found edits, stage them too
+        if (parsed.fileEdits.length > 0 && onInsertIntoEditor) {
+          for (const edit of parsed.fileEdits) {
+            void onInsertIntoEditor(JSON.stringify(edit), {
+              auto: true,
+              sourceMessageId: assistantMessageId,
+              skipEditorFocus: true,
+            })
+          }
+        }
 
         await upsertThreadMessage({
           messageId: assistantMessageId,
@@ -570,14 +634,6 @@ export function ChatPanel({
 
         if (runId) {
           await finishRun(runId, 'completed')
-        }
-
-        if (onInsertIntoEditor && finalContent.trim().length > 0) {
-          void onInsertIntoEditor(finalContent, {
-            auto: true,
-            sourceMessageId: assistantMessageId,
-            skipEditorFocus: true,
-          })
         }
       } catch (error) {
         const aborted = manualStopRef.current || controller.signal.aborted
