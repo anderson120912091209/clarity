@@ -27,14 +27,8 @@ export default function Home() {
 
       <footer className="py-12 border-t border-white/5 relative z-10 bg-[#050505]">
           <div className="max-w-5xl mx-auto px-6 flex flex-col md:flex-row justify-between items-center gap-6">
-              <div className="text-zinc-500 text-xs">
+              <div className="text-zinc-500 text-xs text-center md:text-left w-full">
                   © 2026 Clarity Research. All rights reserved.
-              </div>
-              <div className="flex gap-6 text-xs text-zinc-500 font-medium">
-                  <Link href="#" className="hover:text-white transition-colors">Privacy</Link>
-                  <Link href="#" className="hover:text-white transition-colors">Terms</Link>
-                  <Link href="#" className="hover:text-white transition-colors">Twitter</Link>
-                  <Link href="#" className="hover:text-white transition-colors">GitHub</Link>
               </div>
           </div>
       </footer>

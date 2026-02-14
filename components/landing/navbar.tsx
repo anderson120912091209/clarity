@@ -18,11 +18,8 @@ export function Navbar({ minimal = false }: { minimal?: boolean }) {
         {!minimal && (
           <>
             <nav className="hidden md:flex items-center gap-8 text-[13px] font-medium text-zinc-400">
-              <Link href="#features" className="hover:text-white transition-colors">Features</Link>
-              <Link href="#ai" className="hover:text-white transition-colors">Templates</Link>
               <Link href="#pricing" className="hover:text-white transition-colors">Pricing</Link>
-              <Link href="#" className="hover:text-white transition-colors">Blogs</Link>
-              <Link href="#" className="hover:text-white transition-colors">Support</Link>
+              <Link href="https://discord.gg/JHQhC8VstM" className="hover:text-white transition-colors">Support</Link>
             </nav>
 
             <div className="flex items-center gap-4">

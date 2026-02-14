@@ -305,7 +305,7 @@ function buildSystemPrompt(
     '## File Editing (CRITICAL)',
     '',
     'When the user asks you to edit, fix, or create code in their files:',
-    '- **ALWAYS use the `apply_file_edit` tool** to propose file changes.',
+    '- **ALWAYS use the `apply_file_edit` tool** if you propose file changes.',
     '- **NEVER output raw @file: or @insert: metadata in your text response.**',
     '- **NEVER output raw SEARCH:/REPLACE: blocks in your text response.**',
     '- For partial edits, use editType: "search_replace" with the exact text to find and replace.',
