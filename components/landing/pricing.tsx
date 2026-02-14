@@ -29,7 +29,7 @@ export function Pricing() {
     <section id="pricing" className="py-24 px-6 bg-[#0c0c0e] border-y border-white/5">
       <div className="max-w-5xl mx-auto">
         <div className="text-center mb-12">
-          <h2 className="text-3xl md:text-4xl font-bold text-zinc-100">Simple pricing</h2>
+          <h2 className="text-3xl md:text-4xl font-bold text-zinc-100">Pricing Plans</h2>
           <p className="text-zinc-400 mt-4 text-base md:text-lg">
             Start free, then upgrade when you are ready to collaborate at scale.
           </p>
@@ -82,20 +82,20 @@ export function Pricing() {
             <div className="relative z-10">
               <div className="mb-6">
                 <p className="text-[#9ea7ff] text-sm uppercase tracking-wide font-medium">Pro</p>
-                <h3 className="text-4xl font-semibold text-white mt-2">$9 <span className="text-lg text-zinc-400 font-normal">/ month</span></h3>
+                <h3 className="text-4xl font-semibold text-white mt-2">$9 <span className="text-lg text-zinc-300 font-normal">/ month</span></h3>
                 <p className="text-zinc-300 mt-2">Research, organize, write and publish. </p>
               </div>
 
               <ul className="space-y-3 mb-8">
-                <li className="flex items-start gap-2 text-zinc-200 text-sm">
+                <li className="flex items-start gap-2 text-zinc-300 text-sm">
                   <Check className="w-4 h-4 mt-0.5 text-[#6D78E7]" />
                   Unlimited projects
                 </li>
-                <li className="flex items-start gap-2 text-zinc-200 text-sm">
+                <li className="flex items-start gap-2 text-zinc-300 text-sm">
                   <Check className="w-4 h-4 mt-0.5 text-[#6D78E7]" />
-                  More AI usage and superior models
+                  Team collaboration controls
                 </li>
-                <li className="flex items-start gap-2 text-zinc-200 text-sm">
+                <li className="flex items-start gap-2 text-zinc-300 text-sm">
                   <Check className="w-4 h-4 mt-0.5 text-[#6D78E7]" />
                   Priority compute for faster builds
                 </li>
