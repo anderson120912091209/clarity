@@ -5,8 +5,9 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.createRoutes = createRoutes;
 const express_1 = __importDefault(require("express"));
+const SynctexManager_js_1 = require("../core/SynctexManager.js");
 const schemas_js_1 = require("./schemas.js");
-function createRoutes(compileManager, cacheManager) {
+function createRoutes(compileManager, cacheManager, typstLivePreviewManager, synctexManager) {
     const router = express_1.default.Router();
     /**
      * POST /project/:projectId/compile
@@ -19,6 +20,24 @@ function createRoutes(compileManager, cacheManager) {
             const body = schemas_js_1.compileRequestSchema.parse(req.body);
             // Execute compilation
             const result = await compileManager.compile({
+                projectId,
+                ...body,
+            });
+            res.json(result);
+        }
+        catch (error) {
+            next(error);
+        }
+    });
+    /**
+     * POST /project/:projectId/typst/live/preview
+     * Compile Typst document using a warm live-preview session.
+     */
+    router.post('/project/:projectId/typst/live/preview', async (req, res, next) => {
+        try {
+            const { projectId } = req.params;
+            const body = schemas_js_1.typstLivePreviewRequestSchema.parse(req.body);
+            const result = await typstLivePreviewManager.preview({
                 projectId,
                 ...body,
             });
@@ -43,12 +62,27 @@ function createRoutes(compileManager, cacheManager) {
         }
     });
     /**
+     * DELETE /project/:projectId/typst/live
+     * Stop Typst live-preview session for a project.
+     */
+    router.delete('/project/:projectId/typst/live', async (req, res, next) => {
+        try {
+            const { projectId } = req.params;
+            await typstLivePreviewManager.stopProject(projectId);
+            res.json({ success: true });
+        }
+        catch (error) {
+            next(error);
+        }
+    });
+    /**
      * DELETE /project/:projectId
      * Clear all cached builds for a project
      */
     router.delete('/project/:projectId', async (req, res, next) => {
         try {
             const { projectId } = req.params;
+            await typstLivePreviewManager.stopProject(projectId);
             await compileManager.clearCache(projectId);
             res.json({ success: true });
         }
@@ -78,10 +112,64 @@ function createRoutes(compileManager, cacheManager) {
         }
     });
     /**
+     * GET /project/:projectId/sync/code
+     * Sync from source (file/line/column) to PDF coordinates.
+     */
+    router.get('/project/:projectId/sync/code', async (req, res, next) => {
+        try {
+            const { projectId } = req.params;
+            const file = String(req.query.file || '');
+            const line = Number(req.query.line);
+            const column = Number(req.query.column);
+            const buildId = String(req.query.buildId || '');
+            const result = await synctexManager.syncFromCode(projectId, {
+                buildId,
+                file,
+                line,
+                column,
+            });
+            res.json(result);
+        }
+        catch (error) {
+            if (error instanceof SynctexManager_js_1.SynctexNotFoundError) {
+                res.status(404).send('Not Found');
+                return;
+            }
+            next(error);
+        }
+    });
+    /**
+     * GET /project/:projectId/sync/pdf
+     * Sync from PDF coordinates to source (file/line/column).
+     */
+    router.get('/project/:projectId/sync/pdf', async (req, res, next) => {
+        try {
+            const { projectId } = req.params;
+            const page = Number(req.query.page);
+            const h = Number(req.query.h);
+            const v = Number(req.query.v);
+            const buildId = String(req.query.buildId || '');
+            const result = await synctexManager.syncFromPdf(projectId, {
+                buildId,
+                page,
+                h,
+                v,
+            });
+            res.json(result);
+        }
+        catch (error) {
+            if (error instanceof SynctexManager_js_1.SynctexNotFoundError) {
+                res.status(404).send('Not Found');
+                return;
+            }
+            next(error);
+        }
+    });
+    /**
      * GET /status
      * Health check
      */
-    router.get('/status', (req, res) => {
+    router.get('/status', (_req, res) => {
         res.json({
             status: 'ok',
             service: 'CLSI',

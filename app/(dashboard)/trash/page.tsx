@@ -5,6 +5,10 @@ import Link from 'next/link'
 import { ArrowLeft, SearchIcon, Trash2 } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
+import {
+  SettingsPageHeader,
+  SettingsSectionCard,
+} from '@/components/settings/settings-page-ui'
 import { useFrontend } from '@/contexts/FrontendContext'
 import { useDashboardSettings } from '@/contexts/DashboardSettingsContext'
 import { getAllProjects, getAllUserFiles } from '@/hooks/data'
@@ -13,6 +17,7 @@ import TrashedProjectRow from '@/components/projects/trashed-project-row'
 
 type TrashSort = 'deleted' | 'name'
 
+// Force rebuild
 export default function TrashPage() {
   const { user } = useFrontend()
   const { settings } = useDashboardSettings()
@@ -94,15 +99,11 @@ export default function TrashPage() {
   }
 
   return (
-    <>
-      <div className="mb-6 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-        <div>
-          <h1 className="text-[20px] font-semibold text-white/90">Trash</h1>
-          <p className="mt-1 text-[12px] text-zinc-500">
-            Deleted projects stay here until you restore them or remove them permanently.
-          </p>
-        </div>
-
+    <div className="mx-auto max-w-4xl pb-20 pt-8">
+      <SettingsPageHeader
+        title="Trash"
+        description="Deleted projects stay here until you restore them or remove them permanently."
+      >
         <div className="flex items-center gap-2">
           <Button
             type="button"
@@ -122,65 +123,68 @@ export default function TrashPage() {
             {isEmptyingTrash ? 'Emptying...' : 'Empty trash'}
           </Button>
         </div>
-      </div>
+      </SettingsPageHeader>
 
-      <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-        <div className="relative w-full max-w-sm group">
-          <div className="pointer-events-none absolute inset-y-0 left-2.5 flex items-center">
-            <SearchIcon className="h-3.5 w-3.5 text-zinc-600 group-focus-within:text-zinc-400 transition-colors" />
+      <SettingsSectionCard
+        title="Deleted projects"
+        description={`${filteredProjects.length} ${
+          filteredProjects.length === 1 ? 'project' : 'projects'
+        } found`}
+      >
+        <div className="mb-4 border-b border-white/[0.04] pb-4">
+          <div className="relative w-full">
+            <div className="pointer-events-none absolute inset-y-0 left-2.5 flex items-center">
+              <SearchIcon className="h-3.5 w-3.5 text-zinc-600 group-focus-within:text-zinc-400 transition-colors" />
+            </div>
+            <Input
+              className="h-8 rounded-[4px] border-white/[0.08] bg-white/[0.03] pl-8 text-[12px] text-zinc-300 placeholder:text-zinc-600 focus:bg-white/[0.06] focus:border-white/20 focus:ring-0"
+              placeholder="Search trash..."
+              value={searchTerm}
+              onChange={(event) => setSearchTerm(event.target.value)}
+              aria-label="Search trash"
+            />
           </div>
-          <Input
-            className="h-8 rounded-[4px] border-white/[0.08] bg-white/[0.03] pl-8 text-[12px] text-zinc-300 placeholder:text-zinc-600 focus:bg-white/[0.06] focus:border-white/20 focus:ring-0"
-            placeholder="Search trash..."
-            value={searchTerm}
-            onChange={(event) => setSearchTerm(event.target.value)}
-            aria-label="Search trash"
-          />
         </div>
 
-        <div className="text-[11px] text-zinc-500">
-          {filteredProjects.length} {filteredProjects.length === 1 ? 'project' : 'projects'}
-        </div>
-      </div>
-
-      {isLoadingProjects ? (
-        <div className="rounded-md border border-white/[0.08] bg-white/[0.02] px-4 py-10 text-center text-[12px] text-zinc-500">
-          Loading trash...
-        </div>
-      ) : filteredProjects.length === 0 ? (
-        <div className="rounded-md border border-white/[0.08] bg-white/[0.02] px-4 py-12 text-center">
-          <div className="mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-full bg-white/[0.04] text-zinc-500">
-            <Trash2 className="h-4 w-4" />
+        {isLoadingProjects ? (
+          <div className="py-10 text-center text-[12px] text-zinc-500">
+            Loading trash...
           </div>
-          <p className="text-[13px] font-medium text-zinc-300">
-            {searchTerm ? 'No matching projects in trash' : 'Trash is empty'}
-          </p>
-          <p className="mt-1 text-[11px] text-zinc-500">
-            {searchTerm ? 'Try another keyword.' : 'Deleted projects will show up here.'}
-          </p>
-          <Button asChild variant="ghost" className="mt-4 h-8 px-2.5 text-[11px] text-zinc-300 hover:text-white hover:bg-white/5">
-            <Link href="/projects">
-              <ArrowLeft className="mr-1.5 h-3.5 w-3.5" />
-              Back to projects
-            </Link>
-          </Button>
-        </div>
-      ) : (
-        <div className={`flex flex-col ${settings.density === 'compact' ? 'gap-2' : 'gap-3'}`}>
-          {filteredProjects.map((project: any) => {
-            const fileMeta = fileMetaByProjectId.get(project.id)
-            return (
-              <TrashedProjectRow
-                key={project.id}
-                project={project}
-                userId={user?.id || ''}
-                fileIds={fileMeta?.fileIds || []}
-                isTypst={fileMeta?.isTypst || false}
-              />
-            )
-          })}
-        </div>
-      )}
-    </>
+        ) : filteredProjects.length === 0 ? (
+          <div className="py-12 text-center">
+            <div className="mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-full bg-white/[0.04] text-zinc-500">
+              <Trash2 className="h-4 w-4" />
+            </div>
+            <p className="text-[13px] font-medium text-zinc-300">
+              {searchTerm ? 'No matching projects' : 'Trash is empty'}
+            </p>
+            <p className="mt-1 text-[11px] text-zinc-500">
+              {searchTerm ? 'Try another keyword.' : 'Deleted projects will show up here.'}
+            </p>
+            <Button asChild variant="ghost" className="mt-4 h-8 px-2.5 text-[11px] text-zinc-300 hover:text-white hover:bg-white/5">
+              <Link href="/projects">
+                <ArrowLeft className="mr-1.5 h-3.5 w-3.5" />
+                Back to projects
+              </Link>
+            </Button>
+          </div>
+        ) : (
+          <div className="divide-y divide-white/[0.04]">
+            {filteredProjects.map((project: any) => {
+              const fileMeta = fileMetaByProjectId.get(project.id)
+              return (
+                <TrashedProjectRow
+                  key={project.id}
+                  project={project}
+                  userId={user?.id || ''}
+                  fileIds={fileMeta?.fileIds || []}
+                  isTypst={fileMeta?.isTypst || false}
+                />
+              )
+            })}
+          </div>
+        )}
+      </SettingsSectionCard>
+    </div>
   )
 }

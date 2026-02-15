@@ -1,4 +1,4 @@
-import type { OutputFile } from '../../src/types/index.js';
+import type { OutputFile } from '../types/index.js';
 /**
  * CacheManager - Manages output file caching with expiry
  *
@@ -12,7 +12,7 @@ export declare class CacheManager {
     /**
      * Save output files and return buildId
      */
-    saveOutputFiles(projectId: string, compileDir: string, resourceList: string[]): Promise<{
+    saveOutputFiles(projectId: string, compileDir: string, _resourceList: string[]): Promise<{
         buildId: string;
         outputFiles: OutputFile[];
     }>;
@@ -28,5 +28,9 @@ export declare class CacheManager {
      * Get path to cached output file
      */
     getOutputPath(projectId: string, buildId: string, filename: string): string;
+    /**
+     * Get path to a cached build directory.
+     */
+    getBuildPath(projectId: string, buildId: string): string;
 }
 //# sourceMappingURL=CacheManager.d.ts.map

@@ -1,9 +1,11 @@
 interface CLSISettings {
+    host: string;
     port: number;
     compileDir: string;
     outputDir: string;
     texliveImage: string;
     typstImage: string;
+    typstAllowNetwork: boolean;
     compileTimeout: number;
     maxCompileSize: number;
     cacheAge: number;

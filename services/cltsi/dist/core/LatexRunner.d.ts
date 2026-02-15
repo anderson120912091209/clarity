@@ -1,5 +1,5 @@
-import type { LatexOptions } from '../../src/types/index.js';
-import { DockerExecutor } from '../../src/core/DockerExecutor.js';
+import type { LatexOptions } from '../types/index.js';
+import { DockerExecutor } from './DockerExecutor.js';
 /**
  * LatexRunner - Builds and executes latexmk commands
  *

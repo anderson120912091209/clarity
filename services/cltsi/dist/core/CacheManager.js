@@ -22,7 +22,7 @@ class CacheManager {
     /**
      * Save output files and return buildId
      */
-    async saveOutputFiles(projectId, compileDir, resourceList) {
+    async saveOutputFiles(projectId, compileDir, _resourceList) {
         const buildId = this.generateBuildId();
         const cacheDir = node_path_1.default.join(settings_js_1.default.outputDir, projectId, 'builds', buildId);
         // Create cache directory
@@ -109,6 +109,12 @@ class CacheManager {
      */
     getOutputPath(projectId, buildId, filename) {
         return node_path_1.default.join(settings_js_1.default.outputDir, projectId, 'builds', buildId, filename);
+    }
+    /**
+     * Get path to a cached build directory.
+     */
+    getBuildPath(projectId, buildId) {
+        return node_path_1.default.join(settings_js_1.default.outputDir, projectId, 'builds', buildId);
     }
 }
 exports.CacheManager = CacheManager;

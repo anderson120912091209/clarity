@@ -29,7 +29,8 @@ class DockerExecutor {
      */
     async run(options) {
         const containerName = `clarity-compile-${options.projectId}-${Date.now()}`;
-        logger_js_1.default.info({ projectId: options.projectId, command: options.command }, 'Starting Docker compilation');
+        const networkDisabled = options.networkDisabled ?? true;
+        logger_js_1.default.info({ projectId: options.projectId, command: options.command, networkDisabled }, 'Starting Docker compilation');
         // Load seccomp profile
         const seccompProfile = await this.loadSeccompProfile();
         const containerOptions = {
@@ -38,7 +39,7 @@ class DockerExecutor {
             Cmd: options.command,
             WorkingDir: '/compile',
             // SECURITY: Disable all network access
-            NetworkDisabled: true,
+            NetworkDisabled: networkDisabled,
             // Run as root (TeX Live image doesn't have 'tex' user)
             // Still secure due to container isolation
             User: undefined,
@@ -63,7 +64,7 @@ class DockerExecutor {
                         Hard: Math.floor(options.timeout / 1000) + 10,
                     }],
                 // Disable container logging to save resources
-                LogConfig: { Type: 'none' },
+                LogConfig: { Type: 'none', Config: {} },
                 // CLEANUP: Auto-remove container after exit
                 AutoRemove: true,
             },
@@ -182,9 +183,9 @@ class DockerExecutor {
             this.docker.pull(imageName, (err, stream) => {
                 if (err)
                     return reject(err);
-                this.docker.modem.followProgress(stream, (err) => {
-                    if (err)
-                        return reject(err);
+                this.docker.modem.followProgress(stream, (followErr) => {
+                    if (followErr)
+                        return reject(followErr);
                     logger_js_1.default.info({ image: imageName }, 'Image pulled successfully');
                     resolve();
                 });

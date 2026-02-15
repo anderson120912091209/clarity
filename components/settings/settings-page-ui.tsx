@@ -6,27 +6,17 @@ export const SETTINGS_SELECT_TRIGGER_CLASS = 'h-8 w-[190px] text-[12px]'
 interface SettingsPageHeaderProps {
   title: string
   description?: string
+  children?: ReactNode
 }
 
-interface SettingsSectionCardProps {
-  title: string
-  description?: string
-  children: ReactNode
-  className?: string
-}
-
-interface SettingsRowProps {
-  label: string
-  description?: string
-  children: ReactNode
-  className?: string
-}
-
-export function SettingsPageHeader({ title, description }: SettingsPageHeaderProps) {
+export function SettingsPageHeader({ title, description, children }: SettingsPageHeaderProps) {
   return (
-    <header className="mb-8">
-      <h1 className="text-[20px] font-medium text-white">{title}</h1>
-      {description && <p className="mt-1 text-[12px] text-zinc-500">{description}</p>}
+    <header className="mb-8 flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+      <div>
+        <h1 className="text-[20px] font-medium text-white">{title}</h1>
+        {description && <p className="mt-1 text-[12px] text-zinc-500">{description}</p>}
+      </div>
+      {children && <div className="flex-shrink-0">{children}</div>}
     </header>
   )
 }

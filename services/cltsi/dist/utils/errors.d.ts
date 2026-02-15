@@ -1,2 +1,2 @@
-export { CompilationError, TimeoutError, ValidationError } from '../../src/types/index.js';
+export { CompilationError, TimeoutError, ValidationError } from '../types/index.js';
 //# sourceMappingURL=errors.d.ts.map

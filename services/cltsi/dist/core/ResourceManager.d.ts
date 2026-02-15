@@ -1,4 +1,4 @@
-import type { CompileRequest } from '../../src/types/index.js';
+import type { CompileRequest } from '../types/index.js';
 /**
  * ResourceManager - Handles file synchronization to compile directory
  *

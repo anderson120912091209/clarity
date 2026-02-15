@@ -1,4 +1,4 @@
-import type { Lock } from '../../src/types/index.js';
+import type { Lock } from '../types/index.js';
 /**
  * LockManager - Ensures only one compilation per project at a time
  *

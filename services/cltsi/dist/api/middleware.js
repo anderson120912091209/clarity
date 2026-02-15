@@ -11,7 +11,7 @@ const logger_js_1 = __importDefault(require("../utils/logger.js"));
 /**
  * Error handling middleware
  */
-function errorHandler(err, req, res, next) {
+function errorHandler(err, req, res, _next) {
     logger_js_1.default.error({ err, path: req.path, method: req.method }, 'Request error');
     // Validation errors
     if (err instanceof zod_1.z.ZodError) {

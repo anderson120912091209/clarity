@@ -31,6 +31,7 @@ class TypstRunner {
             image: settings_js_1.default.typstImage,
             timeout: options.timeout,
             environment: {},
+            networkDisabled: !this.resolveNetworkEnabled(options.allowNetwork),
         });
         await this.writeOutputLog(options.directory, result);
         if (result.exitCode !== 0) {
@@ -44,14 +45,22 @@ class TypstRunner {
         };
     }
     buildCommand(options) {
+        // The official Typst Docker image uses `typst` as ENTRYPOINT.
+        // So command args must start with the subcommand (e.g. `compile`),
+        // not `typst compile`, otherwise it becomes `typst typst compile ...`.
         return [
-            'typst',
             'compile',
             '--root',
             '/compile',
             options.mainFile,
             '/compile/output.pdf',
         ];
+    }
+    resolveNetworkEnabled(requestedAllowNetwork) {
+        if (typeof requestedAllowNetwork === 'boolean') {
+            return requestedAllowNetwork;
+        }
+        return settings_js_1.default.typstAllowNetwork;
     }
     async writeOutputLog(compileDirectory, result) {
         const logPath = node_path_1.default.join(compileDirectory, 'output.log');

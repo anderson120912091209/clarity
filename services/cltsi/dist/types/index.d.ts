@@ -8,6 +8,7 @@ export interface CompileRequest {
     timeout?: number;
     draft?: boolean;
     stopOnFirstError?: boolean;
+    allowNetwork?: boolean;
     resources: Resource[];
 }
 export interface Resource {
@@ -40,6 +41,7 @@ export interface TypstOptions {
     directory: string;
     mainFile: string;
     timeout: number;
+    allowNetwork?: boolean;
 }
 export interface DockerRunOptions {
     projectId: string;
@@ -48,6 +50,7 @@ export interface DockerRunOptions {
     image: string;
     timeout: number;
     environment: Record<string, string>;
+    networkDisabled?: boolean;
 }
 export interface DockerResult {
     stdout: string;

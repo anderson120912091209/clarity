@@ -1,5 +1,5 @@
-import { DockerExecutor } from '../../src/core/DockerExecutor.js';
-import type { TypstOptions } from '../../src/types/index.js';
+import { DockerExecutor } from './DockerExecutor.js';
+import type { TypstOptions } from '../types/index.js';
 /**
  * TypstRunner - Compiles Typst documents using the Typst CLI in Docker.
  */
@@ -11,6 +11,7 @@ export declare class TypstRunner {
         stderr: string;
     }>;
     private buildCommand;
+    private resolveNetworkEnabled;
     private writeOutputLog;
 }
 //# sourceMappingURL=TypstRunner.d.ts.map

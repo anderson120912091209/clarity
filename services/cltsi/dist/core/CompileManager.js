@@ -5,6 +5,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.CompileManager = void 0;
 const node_path_1 = __importDefault(require("node:path"));
+const promises_1 = __importDefault(require("node:fs/promises"));
 const errors_js_1 = require("../utils/errors.js");
 const logger_js_1 = __importDefault(require("../utils/logger.js"));
 const settings_js_1 = __importDefault(require("../config/settings.js"));
@@ -14,7 +15,7 @@ const settings_js_1 = __importDefault(require("../config/settings.js"));
  * Flow:
  * 1. Acquire project lock
  * 2. Sync resources to disk
- * 3. Run LaTeX compilation in Docker
+ * 3. Run compiler (LaTeX/Typst) in Docker
  * 4. Save output files and generate buildId
  * 5. Release lock (even on error)
  */
@@ -32,7 +33,7 @@ class CompileManager {
         this.cacheManager = cacheManager;
     }
     /**
-     * Compile a LaTeX project
+     * Compile a document project
      */
     async compile(request) {
         const { projectId } = request;
@@ -43,6 +44,8 @@ class CompileManager {
         try {
             // Step 2: Sync resources to disk
             const resourceList = await this.resourceManager.syncResourcesToDisk(request, compileDir);
+            // Clear previous compiler outputs so stale artifacts don't leak into this build.
+            await this.clearPreviousOutputs(compileDir);
             // Step 3: Run compilation
             try {
                 await this.runCompilation(projectId, request, compileDir);
@@ -60,13 +63,6 @@ class CompileManager {
                 const { buildId, outputFiles } = await this.cacheManager.saveOutputFiles(projectId, compileDir, resourceList);
                 logger_js_1.default.warn({ projectId, buildId, err: error }, 'Compilation failed');
                 // Determine error type
-                let status = 'error';
-                if (error instanceof Error) {
-                    if (error.name === 'TimeoutError')
-                        status = 'timeout';
-                    if (error.message.includes('terminated'))
-                        status = 'terminated';
-                }
                 throw new errors_js_1.CompilationError(error instanceof Error ? error.message : 'Compilation failed', { buildId, outputFiles });
             }
         }
@@ -98,6 +94,7 @@ class CompileManager {
                 directory: compileDir,
                 mainFile: request.rootResourcePath,
                 timeout,
+                allowNetwork: request.allowNetwork,
             });
             return;
         }
@@ -108,6 +105,20 @@ class CompileManager {
             timeout,
             stopOnFirstError: request.stopOnFirstError,
         });
+    }
+    async clearPreviousOutputs(compileDir) {
+        const outputFiles = [
+            'output.pdf',
+            'output.log',
+            'output.synctex.gz',
+            'output.aux',
+            'output.out',
+            'output.fdb_latexmk',
+            'output.fls',
+            'output.bbl',
+            'output.blg',
+        ];
+        await Promise.all(outputFiles.map((file) => promises_1.default.rm(node_path_1.default.join(compileDir, file), { force: true })));
     }
 }
 exports.CompileManager = CompileManager;

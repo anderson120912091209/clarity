@@ -1,4 +1,4 @@
-import type { DockerRunOptions, DockerResult } from '../../src/types/index.js';
+import type { DockerRunOptions, DockerResult } from '../types/index.js';
 /**
  * DockerExecutor - Manages sandboxed LaTeX compilation in Docker containers
  *

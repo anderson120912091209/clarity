@@ -2,7 +2,7 @@ import type { Request, Response, NextFunction } from 'express';
 /**
  * Error handling middleware
  */
-export declare function errorHandler(err: Error, req: Request, res: Response, next: NextFunction): Response<any, Record<string, any>>;
+export declare function errorHandler(err: Error, req: Request, res: Response, _next: NextFunction): Response<any, Record<string, any>>;
 /**
  * Request logger middleware
  */

@@ -62,7 +62,7 @@ export default function TrashedProjectRow({
 
   return (
     <div
-      className={`flex items-center justify-between gap-4 rounded-md border border-white/[0.08] bg-white/[0.02] transition-colors hover:border-white/[0.14] ${
+      className={`group flex items-center justify-between gap-4 rounded-md transition-colors hover:bg-white/[0.04] ${
         compact ? 'px-3 py-2' : 'px-4 py-3'
       }`}
     >
