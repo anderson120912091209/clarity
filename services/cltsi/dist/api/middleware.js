@@ -1,32 +1,25 @@
-"use strict";
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.errorHandler = errorHandler;
-exports.requestLogger = requestLogger;
-const zod_1 = require("zod");
-const errors_js_1 = require("../utils/errors.js");
-const logger_js_1 = __importDefault(require("../utils/logger.js"));
+import { z } from 'zod';
+import { ValidationError, CompilationError, TimeoutError } from '../utils/errors.js';
+import logger from '../utils/logger.js';
 /**
  * Error handling middleware
  */
-function errorHandler(err, req, res, _next) {
-    logger_js_1.default.error({ err, path: req.path, method: req.method }, 'Request error');
+export function errorHandler(err, req, res, _next) {
+    logger.error({ err, path: req.path, method: req.method }, 'Request error');
     // Validation errors
-    if (err instanceof zod_1.z.ZodError) {
+    if (err instanceof z.ZodError) {
         return res.status(400).json({
             error: 'Validation failed',
             details: err.errors,
         });
     }
-    if (err instanceof errors_js_1.ValidationError) {
+    if (err instanceof ValidationError) {
         return res.status(400).json({
             error: err.message,
         });
     }
     // Compilation errors (return 200 with error status)
-    if (err instanceof errors_js_1.CompilationError) {
+    if (err instanceof CompilationError) {
         return res.status(200).json({
             status: 'error',
             buildId: err.details.buildId,
@@ -34,7 +27,7 @@ function errorHandler(err, req, res, _next) {
             message: err.message,
         });
     }
-    if (err instanceof errors_js_1.TimeoutError) {
+    if (err instanceof TimeoutError) {
         return res.status(200).json({
             status: 'timeout',
             message: err.message,
@@ -49,11 +42,11 @@ function errorHandler(err, req, res, _next) {
 /**
  * Request logger middleware
  */
-function requestLogger(req, res, next) {
+export function requestLogger(req, res, next) {
     const start = Date.now();
     res.on('finish', () => {
         const duration = Date.now() - start;
-        logger_js_1.default.info({
+        logger.info({
             method: req.method,
             path: req.path,
             status: res.statusCode,

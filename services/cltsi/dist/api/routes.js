@@ -1,14 +1,8 @@
-"use strict";
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.createRoutes = createRoutes;
-const express_1 = __importDefault(require("express"));
-const SynctexManager_js_1 = require("../core/SynctexManager.js");
-const schemas_js_1 = require("./schemas.js");
-function createRoutes(compileManager, cacheManager, typstLivePreviewManager, synctexManager) {
-    const router = express_1.default.Router();
+import express from 'express';
+import { SynctexNotFoundError } from '../core/SynctexManager.js';
+import { compileRequestSchema, typstLivePreviewRequestSchema } from './schemas.js';
+export function createRoutes(compileManager, cacheManager, typstLivePreviewManager, synctexManager) {
+    const router = express.Router();
     /**
      * POST /project/:projectId/compile
      * Compile a document project
@@ -17,7 +11,7 @@ function createRoutes(compileManager, cacheManager, typstLivePreviewManager, syn
         try {
             const { projectId } = req.params;
             // Validate request body
-            const body = schemas_js_1.compileRequestSchema.parse(req.body);
+            const body = compileRequestSchema.parse(req.body);
             // Execute compilation
             const result = await compileManager.compile({
                 projectId,
@@ -36,7 +30,7 @@ function createRoutes(compileManager, cacheManager, typstLivePreviewManager, syn
     router.post('/project/:projectId/typst/live/preview', async (req, res, next) => {
         try {
             const { projectId } = req.params;
-            const body = schemas_js_1.typstLivePreviewRequestSchema.parse(req.body);
+            const body = typstLivePreviewRequestSchema.parse(req.body);
             const result = await typstLivePreviewManager.preview({
                 projectId,
                 ...body,
@@ -131,7 +125,7 @@ function createRoutes(compileManager, cacheManager, typstLivePreviewManager, syn
             res.json(result);
         }
         catch (error) {
-            if (error instanceof SynctexManager_js_1.SynctexNotFoundError) {
+            if (error instanceof SynctexNotFoundError) {
                 res.status(404).send('Not Found');
                 return;
             }
@@ -158,7 +152,7 @@ function createRoutes(compileManager, cacheManager, typstLivePreviewManager, syn
             res.json(result);
         }
         catch (error) {
-            if (error instanceof SynctexManager_js_1.SynctexNotFoundError) {
+            if (error instanceof SynctexNotFoundError) {
                 res.status(404).send('Not Found');
                 return;
             }

@@ -1,22 +1,15 @@
-"use strict";
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.SynctexManager = exports.SynctexNotFoundError = void 0;
-const promises_1 = __importDefault(require("node:fs/promises"));
-const node_path_1 = __importDefault(require("node:path"));
-const errors_js_1 = require("../utils/errors.js");
-const settings_js_1 = __importDefault(require("../config/settings.js"));
-const logger_js_1 = __importDefault(require("../utils/logger.js"));
-class SynctexNotFoundError extends Error {
+import fs from 'node:fs/promises';
+import path from 'node:path';
+import { ValidationError } from '../utils/errors.js';
+import settings from '../config/settings.js';
+import logger from '../utils/logger.js';
+export class SynctexNotFoundError extends Error {
     constructor(message) {
         super(message);
         this.name = 'SynctexNotFoundError';
     }
 }
-exports.SynctexNotFoundError = SynctexNotFoundError;
-class SynctexManager {
+export class SynctexManager {
     dockerExecutor;
     cacheManager;
     constructor(dockerExecutor, cacheManager) {
@@ -26,7 +19,7 @@ class SynctexManager {
     async syncFromCode(projectId, request) {
         const file = normalizeSynctexPath(request.file);
         if (!file) {
-            throw new errors_js_1.ValidationError('Query parameter "file" is required');
+            throw new ValidationError('Query parameter "file" is required');
         }
         const line = toPositiveInteger(request.line, 'line');
         const column = toNonNegativeInteger(request.column, 'column');
@@ -50,16 +43,16 @@ class SynctexManager {
     }
     async ensureSynctexArtifacts(projectId, buildId) {
         if (!buildId || buildId.trim() === '') {
-            throw new errors_js_1.ValidationError('Query parameter "buildId" is required');
+            throw new ValidationError('Query parameter "buildId" is required');
         }
         const buildDir = this.cacheManager.getBuildPath(projectId, buildId);
-        await this.ensureFileExists(node_path_1.default.join(buildDir, 'output.pdf'), 'output.pdf');
-        await this.ensureFileExists(node_path_1.default.join(buildDir, 'output.synctex.gz'), 'output.synctex.gz');
+        await this.ensureFileExists(path.join(buildDir, 'output.pdf'), 'output.pdf');
+        await this.ensureFileExists(path.join(buildDir, 'output.synctex.gz'), 'output.synctex.gz');
         return buildDir;
     }
     async ensureFileExists(filePath, fileName) {
         try {
-            const stats = await promises_1.default.stat(filePath);
+            const stats = await fs.stat(filePath);
             if (!stats.isFile()) {
                 throw new SynctexNotFoundError(`Expected file ${fileName} is not a file`);
             }
@@ -69,23 +62,22 @@ class SynctexManager {
         }
     }
     async runSynctex(projectId, buildDir, command) {
-        logger_js_1.default.debug({ projectId, buildDir, command }, 'Running SyncTeX command');
+        logger.debug({ projectId, buildDir, command }, 'Running SyncTeX command');
         const result = await this.dockerExecutor.run({
             projectId: `${projectId}-synctex`,
             command,
             directory: buildDir,
-            image: settings_js_1.default.texliveImage,
-            timeout: Math.min(settings_js_1.default.compileTimeout, 30000),
+            image: settings.texliveImage,
+            timeout: Math.min(settings.compileTimeout, 30000),
             environment: {},
             networkDisabled: true,
         });
         if (result.exitCode !== 0) {
-            throw new errors_js_1.ValidationError(`SyncTeX command failed with exit code ${result.exitCode}: ${result.stderr || result.stdout}`);
+            throw new ValidationError(`SyncTeX command failed with exit code ${result.exitCode}: ${result.stderr || result.stdout}`);
         }
         return result.stdout;
     }
 }
-exports.SynctexManager = SynctexManager;
 function parseViewOutput(output) {
     const records = parseOutput(output);
     const parsed = [];
@@ -169,26 +161,26 @@ function getString(record, key) {
 }
 function toPositiveInteger(value, key) {
     if (!Number.isInteger(value) || value <= 0) {
-        throw new errors_js_1.ValidationError(`Query parameter "${key}" must be a positive integer`);
+        throw new ValidationError(`Query parameter "${key}" must be a positive integer`);
     }
     return value;
 }
 function toNonNegativeInteger(value, key) {
     if (!Number.isInteger(value) || value < 0) {
-        throw new errors_js_1.ValidationError(`Query parameter "${key}" must be a non-negative integer`);
+        throw new ValidationError(`Query parameter "${key}" must be a non-negative integer`);
     }
     return value;
 }
 function toFiniteNumber(value, key) {
     if (!Number.isFinite(value)) {
-        throw new errors_js_1.ValidationError(`Query parameter "${key}" must be a finite number`);
+        throw new ValidationError(`Query parameter "${key}" must be a finite number`);
     }
     return value;
 }
 function normalizeSynctexPath(input) {
     const normalizedSlashes = input.replace(/\\/g, '/');
     let normalized = normalizedSlashes;
-    if (node_path_1.default.isAbsolute(normalizedSlashes)) {
+    if (path.isAbsolute(normalizedSlashes)) {
         normalized = normalizedSlashes.replace(/^\/compile\/?/u, '');
     }
     normalized = normalized.replace(/^\.\/+/u, '');

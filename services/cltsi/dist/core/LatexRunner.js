@@ -1,12 +1,6 @@
-"use strict";
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.LatexRunner = void 0;
-const errors_js_1 = require("../utils/errors.js");
-const logger_js_1 = __importDefault(require("../utils/logger.js"));
-const settings_js_1 = __importDefault(require("../config/settings.js"));
+import { CompilationError } from '../utils/errors.js';
+import logger from '../utils/logger.js';
+import settings from '../config/settings.js';
 /**
  * LatexRunner - Builds and executes latexmk commands
  *
@@ -15,7 +9,7 @@ const settings_js_1 = __importDefault(require("../config/settings.js"));
  * - Bibliography generation (bibtex/biber)
  * - Index generation (makeindex)
  */
-class LatexRunner {
+export class LatexRunner {
     dockerExecutor;
     constructor(dockerExecutor) {
         this.dockerExecutor = dockerExecutor;
@@ -25,7 +19,7 @@ class LatexRunner {
      */
     async runLatex(projectId, options) {
         const command = this.buildCommand(options);
-        logger_js_1.default.info({
+        logger.info({
             projectId,
             compiler: options.compiler,
             mainFile: options.mainFile,
@@ -35,7 +29,7 @@ class LatexRunner {
             projectId,
             command,
             directory: options.directory,
-            image: settings_js_1.default.texliveImage,
+            image: settings.texliveImage,
             timeout: options.timeout,
             environment: {
                 // TeX environment
@@ -48,7 +42,7 @@ class LatexRunner {
         // latexmk returns 12 when LaTeX has errors but PDF was generated
         // We accept this as it allows users to see partial output
         if (result.exitCode !== 0 && result.exitCode !== 12) {
-            throw new errors_js_1.CompilationError('LaTeX compilation failed', {
+            throw new CompilationError('LaTeX compilation failed', {
                 outputFiles: [], // Will be populated by CompileManager
             });
         }
@@ -95,5 +89,4 @@ class LatexRunner {
         return mapping[compiler] || 'pdf';
     }
 }
-exports.LatexRunner = LatexRunner;
 //# sourceMappingURL=LatexRunner.js.map

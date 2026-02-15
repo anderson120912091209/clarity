@@ -1,46 +1,40 @@
-"use strict";
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.ResourceManager = void 0;
-const promises_1 = __importDefault(require("node:fs/promises"));
-const node_path_1 = __importDefault(require("node:path"));
-const errors_js_1 = require("../utils/errors.js");
-const logger_js_1 = __importDefault(require("../utils/logger.js"));
+import fs from 'node:fs/promises';
+import path from 'node:path';
+import { ValidationError } from '../utils/errors.js';
+import logger from '../utils/logger.js';
 /**
  * ResourceManager - Handles file synchronization to compile directory
  *
  * Security: Validates all paths to prevent directory traversal attacks
  */
-class ResourceManager {
+export class ResourceManager {
     /**
      * Sync resources (files, URLs) to disk
      */
     async syncResourcesToDisk(request, baseDir) {
         // Create project directory
-        await promises_1.default.mkdir(baseDir, { recursive: true });
+        await fs.mkdir(baseDir, { recursive: true });
         const resourceList = [];
         for (const resource of request.resources) {
             const safePath = this.validatePath(baseDir, resource.path);
             // Create parent directories
-            await promises_1.default.mkdir(node_path_1.default.dirname(safePath), { recursive: true });
+            await fs.mkdir(path.dirname(safePath), { recursive: true });
             // Write content (URL support can be added later)
             if (resource.content) {
                 if (resource.encoding === 'base64') {
-                    await promises_1.default.writeFile(safePath, Buffer.from(resource.content, 'base64'));
+                    await fs.writeFile(safePath, Buffer.from(resource.content, 'base64'));
                 }
                 else {
-                    await promises_1.default.writeFile(safePath, resource.content, 'utf-8');
+                    await fs.writeFile(safePath, resource.content, 'utf-8');
                 }
                 resourceList.push(resource.path);
             }
             else if (resource.url) {
                 // TODO: Implement URL downloading with caching
-                logger_js_1.default.warn({ path: resource.path, url: resource.url }, 'URL resources not yet implemented, skipping');
+                logger.warn({ path: resource.path, url: resource.url }, 'URL resources not yet implemented, skipping');
             }
         }
-        logger_js_1.default.info({ projectId: request.projectId, fileCount: resourceList.length }, 'Resources synced to disk');
+        logger.info({ projectId: request.projectId, fileCount: resourceList.length }, 'Resources synced to disk');
         return resourceList;
     }
     /**
@@ -50,14 +44,14 @@ class ResourceManager {
      */
     validatePath(baseDir, resourcePath) {
         // Normalize and join paths
-        const safePath = node_path_1.default.normalize(node_path_1.default.join(baseDir, resourcePath));
+        const safePath = path.normalize(path.join(baseDir, resourcePath));
         // Ensure result is within baseDir (prevents ../../../etc/passwd)
-        if (!safePath.startsWith(baseDir + node_path_1.default.sep)) {
-            throw new errors_js_1.ValidationError(`Invalid path - directory traversal detected: ${resourcePath}`);
+        if (!safePath.startsWith(baseDir + path.sep)) {
+            throw new ValidationError(`Invalid path - directory traversal detected: ${resourcePath}`);
         }
         // Additional checks
         if (resourcePath.includes('\0')) {
-            throw new errors_js_1.ValidationError('Invalid path - null byte detected');
+            throw new ValidationError('Invalid path - null byte detected');
         }
         return safePath;
     }
@@ -66,13 +60,12 @@ class ResourceManager {
      */
     async cleanupCompileDir(compileDir) {
         try {
-            await promises_1.default.rm(compileDir, { recursive: true, force: true });
-            logger_js_1.default.debug({ compileDir }, 'Compile directory cleaned up');
+            await fs.rm(compileDir, { recursive: true, force: true });
+            logger.debug({ compileDir }, 'Compile directory cleaned up');
         }
         catch (error) {
-            logger_js_1.default.warn({ err: error, compileDir }, 'Failed to cleanup compile directory');
+            logger.warn({ err: error, compileDir }, 'Failed to cleanup compile directory');
         }
     }
 }
-exports.ResourceManager = ResourceManager;
 //# sourceMappingURL=ResourceManager.js.map

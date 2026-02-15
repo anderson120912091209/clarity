@@ -1,11 +1,6 @@
-"use strict";
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
-Object.defineProperty(exports, "__esModule", { value: true });
-const node_path_1 = __importDefault(require("node:path"));
-const node_url_1 = require("node:url");
-const __dirname = node_path_1.default.dirname((0, node_url_1.fileURLToPath)(import.meta.url));
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const parseBoolean = (value, defaultValue) => {
     if (value === undefined)
         return defaultValue;
@@ -30,7 +25,7 @@ const settings = {
     cacheAge: parseInt(process.env.CACHE_AGE || '5400000', 10), // 90 minutes
     cacheLimit: parseInt(process.env.CACHE_LIMIT || '2', 10),
     // Security
-    seccompProfilePath: node_path_1.default.join(__dirname, 'seccomp.json'),
+    seccompProfilePath: path.join(__dirname, 'seccomp.json'),
 };
-exports.default = settings;
+export default settings;
 //# sourceMappingURL=settings.js.map

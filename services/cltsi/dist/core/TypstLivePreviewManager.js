@@ -1,23 +1,17 @@
-"use strict";
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.TypstLivePreviewManager = void 0;
-const promises_1 = __importDefault(require("node:fs/promises"));
-const node_path_1 = __importDefault(require("node:path"));
-const dockerode_1 = __importDefault(require("dockerode"));
-const errors_js_1 = require("../utils/errors.js");
-const LockManager_js_1 = require("./LockManager.js");
-const settings_js_1 = __importDefault(require("../config/settings.js"));
-const logger_js_1 = __importDefault(require("../utils/logger.js"));
+import fs from 'node:fs/promises';
+import path from 'node:path';
+import Docker from 'dockerode';
+import { CompilationError, TimeoutError } from '../utils/errors.js';
+import { LockManager } from './LockManager.js';
+import settings from '../config/settings.js';
+import logger from '../utils/logger.js';
 const DEFAULT_PREVIEW_TIMEOUT_MS = 8000;
 const MIN_PREVIEW_TIMEOUT_MS = 500;
 const MAX_LOG_CHUNKS = 300;
 const SESSION_IDLE_TTL_MS = 10 * 60 * 1000;
 const GC_INTERVAL_MS = 60 * 1000;
 const POLL_INTERVAL_MS = 120;
-class TypstLivePreviewManager {
+export class TypstLivePreviewManager {
     docker;
     lockManager;
     resourceManager;
@@ -25,13 +19,13 @@ class TypstLivePreviewManager {
     sessions = new Map();
     gcTimer;
     constructor(resourceManager, cacheManager) {
-        this.docker = new dockerode_1.default();
-        this.lockManager = new LockManager_js_1.LockManager();
+        this.docker = new Docker();
+        this.lockManager = new LockManager();
         this.resourceManager = resourceManager;
         this.cacheManager = cacheManager;
         this.gcTimer = setInterval(() => {
             this.cleanupIdleSessions().catch((error) => {
-                logger_js_1.default.warn({ err: error }, 'Failed to cleanup idle Typst live sessions');
+                logger.warn({ err: error }, 'Failed to cleanup idle Typst live sessions');
             });
         }, GC_INTERVAL_MS);
     }
@@ -59,8 +53,8 @@ class TypstLivePreviewManager {
     }
     async previewLocked(request) {
         const compileDir = this.getCompileDir(request.projectId);
-        const pdfPath = node_path_1.default.join(compileDir, 'output.pdf');
-        const outputLogPath = node_path_1.default.join(compileDir, 'output.log');
+        const pdfPath = path.join(compileDir, 'output.pdf');
+        const outputLogPath = path.join(compileDir, 'output.log');
         const previousSession = this.sessions.get(request.projectId) || null;
         const previousPdfMtime = await this.getFileMtimeMs(pdfPath);
         const previousLogSeq = previousSession?.logSeq ?? 0;
@@ -90,7 +84,7 @@ class TypstLivePreviewManager {
             const logs = this.collectLogsSince(session, startLogSeq);
             await this.writeOutputLog(outputLogPath, logs, error instanceof Error ? error.message : 'Typst live preview failed.');
             const { buildId, outputFiles } = await this.cacheManager.saveOutputFiles(request.projectId, compileDir, resourceList);
-            throw new errors_js_1.CompilationError(error instanceof Error ? error.message : 'Typst live preview failed', { buildId, outputFiles });
+            throw new CompilationError(error instanceof Error ? error.message : 'Typst live preview failed', { buildId, outputFiles });
         }
     }
     async ensureSession(projectId, rootResourcePath, allowNetwork) {
@@ -111,13 +105,13 @@ class TypstLivePreviewManager {
     async startSession(projectId, rootResourcePath, allowNetwork) {
         const compileDir = this.getCompileDir(projectId);
         const containerName = this.buildContainerName(projectId);
-        await promises_1.default.mkdir(compileDir, { recursive: true });
+        await fs.mkdir(compileDir, { recursive: true });
         await this.ensureTypstImageExists();
         const session = {};
         const seccompProfile = 'unconfined';
         const containerOptions = {
             name: containerName,
-            Image: settings_js_1.default.typstImage,
+            Image: settings.typstImage,
             Cmd: [
                 'watch',
                 '--root',
@@ -135,8 +129,8 @@ class TypstLivePreviewManager {
                 Ulimits: [
                     {
                         Name: 'cpu',
-                        Soft: Math.floor(settings_js_1.default.compileTimeout / 1000) + 5,
-                        Hard: Math.floor(settings_js_1.default.compileTimeout / 1000) + 10,
+                        Soft: Math.floor(settings.compileTimeout / 1000) + 5,
+                        Hard: Math.floor(settings.compileTimeout / 1000) + 10,
                     },
                 ],
                 LogConfig: { Type: 'none', Config: {} },
@@ -173,7 +167,7 @@ class TypstLivePreviewManager {
         };
         container.modem.demuxStream(stream, stdoutStream, stderrStream);
         await container.start();
-        logger_js_1.default.info({ projectId, containerName }, 'Started Typst live preview session');
+        logger.info({ projectId, containerName }, 'Started Typst live preview session');
         void container
             .wait()
             .then((result) => {
@@ -181,13 +175,13 @@ class TypstLivePreviewManager {
             session.exitCode = result.StatusCode;
             this.pushLogChunk(session, `\n[Typst live preview container exited with code ${result.StatusCode}]\n`);
             this.sessions.delete(projectId);
-            logger_js_1.default.warn({ projectId, exitCode: result.StatusCode }, 'Typst live preview session exited');
+            logger.warn({ projectId, exitCode: result.StatusCode }, 'Typst live preview session exited');
         })
             .catch((error) => {
             session.exited = true;
             this.pushLogChunk(session, `\n[Typst live preview container wait failed: ${error instanceof Error ? error.message : String(error)}]\n`);
             this.sessions.delete(projectId);
-            logger_js_1.default.warn({ projectId, err: error }, 'Failed waiting for Typst live preview session');
+            logger.warn({ projectId, err: error }, 'Failed waiting for Typst live preview session');
         });
         return session;
     }
@@ -195,19 +189,19 @@ class TypstLivePreviewManager {
         if (typeof requestedAllowNetwork === 'boolean') {
             return requestedAllowNetwork;
         }
-        return settings_js_1.default.typstAllowNetwork;
+        return settings.typstAllowNetwork;
     }
     async waitForPreviewUpdate(session, previousPdfMtime, startLogSeq, timeoutMs) {
         const deadline = Date.now() + timeoutMs;
-        const pdfPath = node_path_1.default.join(session.compileDir, 'output.pdf');
+        const pdfPath = path.join(session.compileDir, 'output.pdf');
         while (Date.now() < deadline) {
             if (session.exited) {
-                throw new errors_js_1.CompilationError(`Typst live preview session exited${session.exitCode !== null ? ` (code ${session.exitCode})` : ''}.`, {});
+                throw new CompilationError(`Typst live preview session exited${session.exitCode !== null ? ` (code ${session.exitCode})` : ''}.`, {});
             }
             const currentPdfMtime = await this.getFileMtimeMs(pdfPath);
             const recentLogs = this.collectLogsSince(session, startLogSeq);
             if (/\berror:\b/i.test(recentLogs)) {
-                throw new errors_js_1.CompilationError('Typst live preview failed.', {});
+                throw new CompilationError('Typst live preview failed.', {});
             }
             if (currentPdfMtime > previousPdfMtime) {
                 return;
@@ -217,7 +211,7 @@ class TypstLivePreviewManager {
             }
             await this.sleep(POLL_INTERVAL_MS);
         }
-        throw new errors_js_1.TimeoutError('Typst live preview timed out.');
+        throw new TimeoutError('Typst live preview timed out.');
     }
     collectLogsSince(session, startSeq) {
         return session.logs
@@ -247,13 +241,13 @@ class TypstLivePreviewManager {
                 await session.container.kill();
             }
             catch (error) {
-                logger_js_1.default.debug({ projectId, err: error }, 'Failed to kill Typst live preview container (it may have already exited)');
+                logger.debug({ projectId, err: error }, 'Failed to kill Typst live preview container (it may have already exited)');
             }
         }
         if (cleanupCompileDir) {
             await this.resourceManager.cleanupCompileDir(session.compileDir);
         }
-        logger_js_1.default.info({ projectId }, 'Stopped Typst live preview session');
+        logger.info({ projectId }, 'Stopped Typst live preview session');
     }
     async cleanupIdleSessions() {
         const now = Date.now();
@@ -266,14 +260,14 @@ class TypstLivePreviewManager {
     }
     async ensureTypstImageExists() {
         try {
-            await this.docker.getImage(settings_js_1.default.typstImage).inspect();
+            await this.docker.getImage(settings.typstImage).inspect();
         }
         catch {
-            throw new errors_js_1.CompilationError(`Typst image not found: ${settings_js_1.default.typstImage}. Please run: docker pull ${settings_js_1.default.typstImage}`, {});
+            throw new CompilationError(`Typst image not found: ${settings.typstImage}. Please run: docker pull ${settings.typstImage}`, {});
         }
     }
     getCompileDir(projectId) {
-        return node_path_1.default.join(settings_js_1.default.compileDir, 'typst-live', projectId);
+        return path.join(settings.compileDir, 'typst-live', projectId);
     }
     buildContainerName(projectId) {
         const safeProjectId = projectId.replace(/[^a-zA-Z0-9_.-]/g, '-').slice(0, 40);
@@ -281,11 +275,11 @@ class TypstLivePreviewManager {
     }
     normalizeTimeout(timeout) {
         const base = timeout ?? DEFAULT_PREVIEW_TIMEOUT_MS;
-        return Math.max(MIN_PREVIEW_TIMEOUT_MS, Math.min(settings_js_1.default.compileTimeout, base));
+        return Math.max(MIN_PREVIEW_TIMEOUT_MS, Math.min(settings.compileTimeout, base));
     }
     async getFileMtimeMs(filePath) {
         try {
-            const stats = await promises_1.default.stat(filePath);
+            const stats = await fs.stat(filePath);
             return stats.mtimeMs;
         }
         catch {
@@ -294,11 +288,10 @@ class TypstLivePreviewManager {
     }
     async writeOutputLog(outputLogPath, logs, fallback) {
         const content = logs.trim().length > 0 ? logs : `${fallback}\n`;
-        await promises_1.default.writeFile(outputLogPath, content, 'utf-8');
+        await fs.writeFile(outputLogPath, content, 'utf-8');
     }
     async sleep(ms) {
         await new Promise((resolve) => setTimeout(resolve, ms));
     }
 }
-exports.TypstLivePreviewManager = TypstLivePreviewManager;
 //# sourceMappingURL=TypstLivePreviewManager.js.map

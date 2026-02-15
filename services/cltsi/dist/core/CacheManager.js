@@ -1,14 +1,8 @@
-"use strict";
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.CacheManager = void 0;
-const promises_1 = __importDefault(require("node:fs/promises"));
-const node_path_1 = __importDefault(require("node:path"));
-const node_crypto_1 = __importDefault(require("node:crypto"));
-const logger_js_1 = __importDefault(require("../utils/logger.js"));
-const settings_js_1 = __importDefault(require("../config/settings.js"));
+import fs from 'node:fs/promises';
+import path from 'node:path';
+import crypto from 'node:crypto';
+import logger from '../utils/logger.js';
+import settings from '../config/settings.js';
 /**
  * CacheManager - Manages output file caching with expiry
  *
@@ -18,15 +12,15 @@ const settings_js_1 = __importDefault(require("../config/settings.js"));
  * - Count-based limits (default 2 builds per project)
  * - Async cleanup to avoid blocking
  */
-class CacheManager {
+export class CacheManager {
     /**
      * Save output files and return buildId
      */
     async saveOutputFiles(projectId, compileDir, _resourceList) {
         const buildId = this.generateBuildId();
-        const cacheDir = node_path_1.default.join(settings_js_1.default.outputDir, projectId, 'builds', buildId);
+        const cacheDir = path.join(settings.outputDir, projectId, 'builds', buildId);
         // Create cache directory
-        await promises_1.default.mkdir(cacheDir, { recursive: true });
+        await fs.mkdir(cacheDir, { recursive: true });
         // Files to cache
         const filesToCache = [
             { name: 'output.pdf', type: 'pdf' },
@@ -35,12 +29,12 @@ class CacheManager {
         ];
         const outputFiles = [];
         for (const { name, type } of filesToCache) {
-            const srcPath = node_path_1.default.join(compileDir, name);
-            const dstPath = node_path_1.default.join(cacheDir, name);
+            const srcPath = path.join(compileDir, name);
+            const dstPath = path.join(cacheDir, name);
             try {
                 // Copy file to cache
-                await promises_1.default.copyFile(srcPath, dstPath);
-                const stats = await promises_1.default.stat(dstPath);
+                await fs.copyFile(srcPath, dstPath);
+                const stats = await fs.stat(dstPath);
                 outputFiles.push({
                     path: name,
                     type,
@@ -50,13 +44,13 @@ class CacheManager {
             }
             catch (error) {
                 // File doesn't exist (normal for failed compilations)
-                logger_js_1.default.debug({ file: name, err: error }, 'Output file not found, skipping');
+                logger.debug({ file: name, err: error }, 'Output file not found, skipping');
             }
         }
-        logger_js_1.default.info({ projectId, buildId, fileCount: outputFiles.length }, 'Output files cached');
+        logger.info({ projectId, buildId, fileCount: outputFiles.length }, 'Output files cached');
         // Trigger cleanup asynchronously (don't await)
         this.cleanupOldBuilds(projectId).catch(err => {
-            logger_js_1.default.warn({ err, projectId }, 'Failed to cleanup old builds');
+            logger.warn({ err, projectId }, 'Failed to cleanup old builds');
         });
         return { buildId, outputFiles };
     }
@@ -65,16 +59,16 @@ class CacheManager {
      */
     generateBuildId() {
         const timestamp = Date.now().toString(16);
-        const random = node_crypto_1.default.randomBytes(8).toString('hex');
+        const random = crypto.randomBytes(8).toString('hex');
         return `${timestamp}-${random}`;
     }
     /**
      * Cleanup old builds based on age and count limits
      */
     async cleanupOldBuilds(projectId) {
-        const buildsDir = node_path_1.default.join(settings_js_1.default.outputDir, projectId, 'builds');
+        const buildsDir = path.join(settings.outputDir, projectId, 'builds');
         try {
-            const builds = await promises_1.default.readdir(buildsDir);
+            const builds = await fs.readdir(buildsDir);
             // Sort by buildId (timestamp embedded) - newest first
             builds.sort().reverse();
             const now = Date.now();
@@ -82,40 +76,39 @@ class CacheManager {
             for (let i = 0; i < builds.length; i++) {
                 const buildId = builds[i];
                 // Keep first N builds (cache limit)
-                if (i >= settings_js_1.default.cacheLimit) {
+                if (i >= settings.cacheLimit) {
                     toDelete.push(buildId);
                     continue;
                 }
                 // Delete builds older than cache age
                 const timestamp = parseInt(buildId.split('-')[0], 16);
                 const age = now - timestamp;
-                if (age > settings_js_1.default.cacheAge) {
+                if (age > settings.cacheAge) {
                     toDelete.push(buildId);
                 }
             }
             // Delete in parallel
             if (toDelete.length > 0) {
-                await Promise.all(toDelete.map(buildId => promises_1.default.rm(node_path_1.default.join(buildsDir, buildId), { recursive: true, force: true })));
-                logger_js_1.default.info({ projectId, deletedCount: toDelete.length }, 'Cleaned up old builds');
+                await Promise.all(toDelete.map(buildId => fs.rm(path.join(buildsDir, buildId), { recursive: true, force: true })));
+                logger.info({ projectId, deletedCount: toDelete.length }, 'Cleaned up old builds');
             }
         }
         catch (error) {
             // Builds directory might not exist yet
-            logger_js_1.default.debug({ err: error, projectId }, 'No builds to cleanup');
+            logger.debug({ err: error, projectId }, 'No builds to cleanup');
         }
     }
     /**
      * Get path to cached output file
      */
     getOutputPath(projectId, buildId, filename) {
-        return node_path_1.default.join(settings_js_1.default.outputDir, projectId, 'builds', buildId, filename);
+        return path.join(settings.outputDir, projectId, 'builds', buildId, filename);
     }
     /**
      * Get path to a cached build directory.
      */
     getBuildPath(projectId, buildId) {
-        return node_path_1.default.join(settings_js_1.default.outputDir, projectId, 'builds', buildId);
+        return path.join(settings.outputDir, projectId, 'builds', buildId);
     }
 }
-exports.CacheManager = CacheManager;
 //# sourceMappingURL=CacheManager.js.map

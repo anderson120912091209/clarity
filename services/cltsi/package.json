@@ -2,6 +2,7 @@
   "name": "@clarity/clsi",
   "version": "1.0.0",
   "description": "Common LaTeX Service Interface - Sandboxed LaTeX compilation service",
+  "type": "module",
   "main": "dist/server.js",
   "scripts": {
     "dev": "tsx watch src/server.ts",

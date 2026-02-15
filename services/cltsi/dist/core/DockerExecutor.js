@@ -1,13 +1,7 @@
-"use strict";
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.DockerExecutor = void 0;
-const dockerode_1 = __importDefault(require("dockerode"));
-const errors_js_1 = require("../utils/errors.js");
-const logger_js_1 = __importDefault(require("../utils/logger.js"));
-const settings_js_1 = __importDefault(require("../config/settings.js"));
+import Docker from 'dockerode';
+import { TimeoutError } from '../utils/errors.js';
+import logger from '../utils/logger.js';
+import settings from '../config/settings.js';
 /**
  * DockerExecutor - Manages sandboxed LaTeX compilation in Docker containers
  *
@@ -19,10 +13,10 @@ const settings_js_1 = __importDefault(require("../config/settings.js"));
  * - Non-root user execution
  * - Auto-cleanup after completion
  */
-class DockerExecutor {
+export class DockerExecutor {
     docker;
     constructor() {
-        this.docker = new dockerode_1.default();
+        this.docker = new Docker();
     }
     /**
      * Run a command in an isolated Docker container
@@ -30,7 +24,7 @@ class DockerExecutor {
     async run(options) {
         const containerName = `clarity-compile-${options.projectId}-${Date.now()}`;
         const networkDisabled = options.networkDisabled ?? true;
-        logger_js_1.default.info({ projectId: options.projectId, command: options.command, networkDisabled }, 'Starting Docker compilation');
+        logger.info({ projectId: options.projectId, command: options.command, networkDisabled }, 'Starting Docker compilation');
         // Load seccomp profile
         const seccompProfile = await this.loadSeccompProfile();
         const containerOptions = {
@@ -99,13 +93,13 @@ class DockerExecutor {
             container.modem.demuxStream(stream, stdoutStream, stderrStream);
             // Start container
             await container.start();
-            logger_js_1.default.debug({ containerName }, 'Container started');
+            logger.debug({ containerName }, 'Container started');
             // Race between completion and timeout
             const result = await Promise.race([
                 this.waitForContainer(container),
                 this.timeoutContainer(container, options.timeout),
             ]);
-            logger_js_1.default.info({ projectId: options.projectId, exitCode: result.StatusCode }, 'Container exited');
+            logger.info({ projectId: options.projectId, exitCode: result.StatusCode }, 'Container exited');
             return {
                 stdout,
                 stderr,
@@ -113,7 +107,7 @@ class DockerExecutor {
             };
         }
         catch (error) {
-            logger_js_1.default.error({ err: error, projectId: options.projectId }, 'Docker execution failed');
+            logger.error({ err: error, projectId: options.projectId }, 'Docker execution failed');
             throw error;
         }
     }
@@ -129,15 +123,15 @@ class DockerExecutor {
      */
     async timeoutContainer(container, timeout) {
         await new Promise(resolve => setTimeout(resolve, timeout));
-        logger_js_1.default.warn({ containerId: container.id }, 'Killing container due to timeout');
+        logger.warn({ containerId: container.id }, 'Killing container due to timeout');
         try {
             await container.kill();
         }
         catch (error) {
             // Container may have already exited
-            logger_js_1.default.debug({ err: error }, 'Error killing container (may have exited)');
+            logger.debug({ err: error }, 'Error killing container (may have exited)');
         }
-        throw new errors_js_1.TimeoutError('Compilation timed out');
+        throw new TimeoutError('Compilation timed out');
     }
     /**
      * Load seccomp profile for container security
@@ -146,7 +140,7 @@ class DockerExecutor {
     async loadSeccompProfile() {
         // For Docker for Mac compatibility, disable seccomp for now
         // Still secure: network disabled, no capabilities, resource limits
-        logger_js_1.default.debug('Using unconfined seccomp profile for Docker for Mac compatibility');
+        logger.debug('Using unconfined seccomp profile for Docker for Mac compatibility');
         return 'unconfined';
         // TODO: Enable seccomp by loading JSON inline for production:
         // const content = await fs.readFile(settings.seccompProfilePath, 'utf-8');
@@ -159,19 +153,19 @@ class DockerExecutor {
         try {
             // Test Docker connection
             await this.docker.ping();
-            logger_js_1.default.info('Docker connection successful');
+            logger.info('Docker connection successful');
             // Check if TeX Live image exists, pull if not
             try {
-                await this.docker.getImage(settings_js_1.default.texliveImage).inspect();
-                logger_js_1.default.info({ image: settings_js_1.default.texliveImage }, 'TeX Live image found');
+                await this.docker.getImage(settings.texliveImage).inspect();
+                logger.info({ image: settings.texliveImage }, 'TeX Live image found');
             }
             catch {
-                logger_js_1.default.info({ image: settings_js_1.default.texliveImage }, 'Pulling TeX Live image...');
-                await this.pullImage(settings_js_1.default.texliveImage);
+                logger.info({ image: settings.texliveImage }, 'Pulling TeX Live image...');
+                await this.pullImage(settings.texliveImage);
             }
         }
         catch (error) {
-            logger_js_1.default.error({ err: error }, 'Docker initialization failed');
+            logger.error({ err: error }, 'Docker initialization failed');
             throw new Error('Failed to initialize Docker. Is Docker running?');
         }
     }
@@ -186,12 +180,11 @@ class DockerExecutor {
                 this.docker.modem.followProgress(stream, (followErr) => {
                     if (followErr)
                         return reject(followErr);
-                    logger_js_1.default.info({ image: imageName }, 'Image pulled successfully');
+                    logger.info({ image: imageName }, 'Image pulled successfully');
                     resolve();
                 });
             });
         });
     }
 }
-exports.DockerExecutor = DockerExecutor;
 //# sourceMappingURL=DockerExecutor.js.map

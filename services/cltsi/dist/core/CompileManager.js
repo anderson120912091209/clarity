@@ -1,14 +1,8 @@
-"use strict";
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.CompileManager = void 0;
-const node_path_1 = __importDefault(require("node:path"));
-const promises_1 = __importDefault(require("node:fs/promises"));
-const errors_js_1 = require("../utils/errors.js");
-const logger_js_1 = __importDefault(require("../utils/logger.js"));
-const settings_js_1 = __importDefault(require("../config/settings.js"));
+import path from 'node:path';
+import fs from 'node:fs/promises';
+import { CompilationError } from '../utils/errors.js';
+import logger from '../utils/logger.js';
+import settings from '../config/settings.js';
 /**
  * CompileManager - Orchestrates the compilation workflow
  *
@@ -19,7 +13,7 @@ const settings_js_1 = __importDefault(require("../config/settings.js"));
  * 4. Save output files and generate buildId
  * 5. Release lock (even on error)
  */
-class CompileManager {
+export class CompileManager {
     lockManager;
     resourceManager;
     latexRunner;
@@ -37,8 +31,8 @@ class CompileManager {
      */
     async compile(request) {
         const { projectId } = request;
-        const compileDir = node_path_1.default.join(settings_js_1.default.compileDir, projectId);
-        logger_js_1.default.info({ projectId, compiler: request.compiler }, 'Starting compilation');
+        const compileDir = path.join(settings.compileDir, projectId);
+        logger.info({ projectId, compiler: request.compiler }, 'Starting compilation');
         // Step 1: Acquire lock to prevent concurrent compilations
         const lock = await this.lockManager.acquire(projectId);
         try {
@@ -51,7 +45,7 @@ class CompileManager {
                 await this.runCompilation(projectId, request, compileDir);
                 // Step 4: Save output files (compilation succeeded)
                 const { buildId, outputFiles } = await this.cacheManager.saveOutputFiles(projectId, compileDir, resourceList);
-                logger_js_1.default.info({ projectId, buildId }, 'Compilation successful');
+                logger.info({ projectId, buildId }, 'Compilation successful');
                 return {
                     status: 'success',
                     buildId,
@@ -61,9 +55,9 @@ class CompileManager {
             catch (error) {
                 // Compilation failed, but still save logs for debugging
                 const { buildId, outputFiles } = await this.cacheManager.saveOutputFiles(projectId, compileDir, resourceList);
-                logger_js_1.default.warn({ projectId, buildId, err: error }, 'Compilation failed');
+                logger.warn({ projectId, buildId, err: error }, 'Compilation failed');
                 // Determine error type
-                throw new errors_js_1.CompilationError(error instanceof Error ? error.message : 'Compilation failed', { buildId, outputFiles });
+                throw new CompilationError(error instanceof Error ? error.message : 'Compilation failed', { buildId, outputFiles });
             }
         }
         finally {
@@ -76,19 +70,19 @@ class CompileManager {
      */
     async stopCompile(projectId) {
         // TODO: Implement container killing logic
-        logger_js_1.default.info({ projectId }, 'Stop compilation requested');
+        logger.info({ projectId }, 'Stop compilation requested');
         // For now, timeout will handle this
     }
     /**
      * Clear all cached builds for a project
      */
     async clearCache(projectId) {
-        const projectOutputDir = node_path_1.default.join(settings_js_1.default.outputDir, projectId);
+        const projectOutputDir = path.join(settings.outputDir, projectId);
         await this.resourceManager.cleanupCompileDir(projectOutputDir);
-        logger_js_1.default.info({ projectId }, 'Cache cleared');
+        logger.info({ projectId }, 'Cache cleared');
     }
     async runCompilation(projectId, request, compileDir) {
-        const timeout = request.timeout || settings_js_1.default.compileTimeout;
+        const timeout = request.timeout || settings.compileTimeout;
         if (request.compiler === 'typst') {
             await this.typstRunner.runTypst(projectId, {
                 directory: compileDir,
@@ -118,8 +112,7 @@ class CompileManager {
             'output.bbl',
             'output.blg',
         ];
-        await Promise.all(outputFiles.map((file) => promises_1.default.rm(node_path_1.default.join(compileDir, file), { force: true })));
+        await Promise.all(outputFiles.map((file) => fs.rm(path.join(compileDir, file), { force: true })));
     }
 }
-exports.CompileManager = CompileManager;
 //# sourceMappingURL=CompileManager.js.map
