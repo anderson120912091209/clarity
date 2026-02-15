@@ -36,6 +36,10 @@
   ],
   "exclude": [
     "node_modules",
-    "references"
+    "references",
+    "services/cltsi",
+    "services/cltsi/**",
+    "railway-api",
+    "railway-api/**"
   ]
 }
