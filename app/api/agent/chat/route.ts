@@ -460,7 +460,7 @@ export async function POST(req: Request) {
 
   // Track AI chat message event
   const posthog = getPostHogClient()
-  posthog.capture({
+  posthog?.capture({
     distinctId: requestId,
     event: 'ai_chat_message_sent',
     properties: {

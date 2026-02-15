@@ -105,7 +105,7 @@ export async function POST(request: NextRequest) {
 
   // Track server-side checkout session created event
   const posthog = getPostHogClient()
-  posthog.capture({
+  posthog?.capture({
     distinctId: customerEmail ?? 'anonymous',
     event: 'checkout_session_created',
     properties: {
