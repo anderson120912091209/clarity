@@ -9,6 +9,7 @@ import { db } from '@/lib/constants'
 import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import { useSidebar } from '@/contexts/SidebarContext'
+import { useDashboardSettings } from '@/contexts/DashboardSettingsContext'
 import { useProject } from '@/contexts/ProjectContext'
 import { FileTree } from '@/components/file-tree/file-tree'
 import { tx } from '@instantdb/react'
@@ -35,6 +36,7 @@ interface EditorSidebarProps {
 export default function EditorSidebar({ syntaxTheme, onSyntaxThemeChange }: EditorSidebarProps) {
   const router = useRouter()
   const { user } = db.useAuth()
+  const { settings } = useDashboardSettings()
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
   const [settingsView, setSettingsView] = useState<'root' | 'theme' | 'preview'>('root')
@@ -63,8 +65,8 @@ export default function EditorSidebar({ syntaxTheme, onSyntaxThemeChange }: Edit
       }
     }
 
-    setLocalPdfBackgroundTheme(DEFAULT_PDF_BACKGROUND_THEME)
-  }, [project?.pdfBackgroundTheme, projectId])
+    setLocalPdfBackgroundTheme(settings.defaultPdfBackgroundTheme)
+  }, [project?.pdfBackgroundTheme, projectId, settings.defaultPdfBackgroundTheme])
 
   const handleSignOut = () => {
     db.auth.signOut()

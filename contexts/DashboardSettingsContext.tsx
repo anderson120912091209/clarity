@@ -1,10 +1,19 @@
 'use client'
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
+import type { EditorSyntaxTheme } from '@/components/editor/syntax/themes/catalog'
+import { DEFAULT_EDITOR_SYNTAX_THEME } from '@/components/editor/syntax/themes/catalog'
+import {
+  DEFAULT_PDF_BACKGROUND_THEME,
+  isPdfBackgroundThemeKey,
+  type PdfBackgroundThemeKey,
+} from '@/lib/constants/pdf-background-themes'
+import { GEMINI_ALLOWED_MODELS } from '@/lib/constants/gemini-models'
 
 export type DashboardView = 'grid' | 'list'
 export type DashboardSort = 'date' | 'name'
 export type DashboardDensity = 'comfortable' | 'compact'
+export type ChatModelPreference = 'auto' | (typeof GEMINI_ALLOWED_MODELS)[number]
 
 export interface DashboardSettings {
   defaultView: DashboardView
@@ -17,6 +26,11 @@ export interface DashboardSettings {
   showTrashCountBadge: boolean
   confirmBeforeTrash: boolean
   confirmBeforePermanentDelete: boolean
+  defaultEditorSyntaxTheme: EditorSyntaxTheme
+  defaultPdfBackgroundTheme: PdfBackgroundThemeKey
+  defaultPdfCaretNavigation: boolean
+  defaultChatIncludeCurrentDocument: boolean
+  defaultChatModel: ChatModelPreference
 }
 
 const DASHBOARD_SETTINGS_STORAGE_KEY = 'clarity.dashboard.settings.v1'
@@ -32,6 +46,11 @@ export const DEFAULT_DASHBOARD_SETTINGS: DashboardSettings = {
   showTrashCountBadge: true,
   confirmBeforeTrash: true,
   confirmBeforePermanentDelete: true,
+  defaultEditorSyntaxTheme: DEFAULT_EDITOR_SYNTAX_THEME,
+  defaultPdfBackgroundTheme: DEFAULT_PDF_BACKGROUND_THEME,
+  defaultPdfCaretNavigation: true,
+  defaultChatIncludeCurrentDocument: true,
+  defaultChatModel: 'auto',
 }
 
 interface DashboardSettingsContextValue {
@@ -46,6 +65,16 @@ interface DashboardSettingsContextValue {
 
 const DashboardSettingsContext = createContext<DashboardSettingsContextValue | null>(null)
 
+function isChatModelPreference(value: unknown): value is ChatModelPreference {
+  if (value === 'auto') return true
+  if (typeof value !== 'string') return false
+  return GEMINI_ALLOWED_MODELS.includes(value as (typeof GEMINI_ALLOWED_MODELS)[number])
+}
+
+function isEditorSyntaxTheme(value: unknown): value is EditorSyntaxTheme {
+  return value === 'default' || value === 'shiki'
+}
+
 function parseStoredSettings(raw: string | null): DashboardSettings {
   if (!raw) return DEFAULT_DASHBOARD_SETTINGS
 
@@ -59,12 +88,28 @@ function parseStoredSettings(raw: string | null): DashboardSettings {
         typeof parsed.workspaceName === 'string'
           ? parsed.workspaceName
           : DEFAULT_DASHBOARD_SETTINGS.workspaceName,
-      showProjectTypeBadge: parsed.showProjectTypeBadge ?? true,
-      showLastEditedTime: parsed.showLastEditedTime ?? true,
-      showNewProjectCard: parsed.showNewProjectCard ?? true,
-      showTrashCountBadge: parsed.showTrashCountBadge ?? true,
-      confirmBeforeTrash: parsed.confirmBeforeTrash ?? true,
-      confirmBeforePermanentDelete: parsed.confirmBeforePermanentDelete ?? true,
+      showProjectTypeBadge: parsed.showProjectTypeBadge ?? DEFAULT_DASHBOARD_SETTINGS.showProjectTypeBadge,
+      showLastEditedTime: parsed.showLastEditedTime ?? DEFAULT_DASHBOARD_SETTINGS.showLastEditedTime,
+      showNewProjectCard: parsed.showNewProjectCard ?? DEFAULT_DASHBOARD_SETTINGS.showNewProjectCard,
+      showTrashCountBadge: parsed.showTrashCountBadge ?? DEFAULT_DASHBOARD_SETTINGS.showTrashCountBadge,
+      confirmBeforeTrash: parsed.confirmBeforeTrash ?? DEFAULT_DASHBOARD_SETTINGS.confirmBeforeTrash,
+      confirmBeforePermanentDelete:
+        parsed.confirmBeforePermanentDelete ??
+        DEFAULT_DASHBOARD_SETTINGS.confirmBeforePermanentDelete,
+      defaultEditorSyntaxTheme: isEditorSyntaxTheme(parsed.defaultEditorSyntaxTheme)
+        ? parsed.defaultEditorSyntaxTheme
+        : DEFAULT_DASHBOARD_SETTINGS.defaultEditorSyntaxTheme,
+      defaultPdfBackgroundTheme: isPdfBackgroundThemeKey(parsed.defaultPdfBackgroundTheme)
+        ? parsed.defaultPdfBackgroundTheme
+        : DEFAULT_DASHBOARD_SETTINGS.defaultPdfBackgroundTheme,
+      defaultPdfCaretNavigation:
+        parsed.defaultPdfCaretNavigation ?? DEFAULT_DASHBOARD_SETTINGS.defaultPdfCaretNavigation,
+      defaultChatIncludeCurrentDocument:
+        parsed.defaultChatIncludeCurrentDocument ??
+        DEFAULT_DASHBOARD_SETTINGS.defaultChatIncludeCurrentDocument,
+      defaultChatModel: isChatModelPreference(parsed.defaultChatModel)
+        ? parsed.defaultChatModel
+        : DEFAULT_DASHBOARD_SETTINGS.defaultChatModel,
     }
   } catch {
     return DEFAULT_DASHBOARD_SETTINGS

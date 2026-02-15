@@ -20,6 +20,10 @@ import { QUICK_EDIT_GEMINI_MODEL_OPTIONS } from '@/lib/constants/gemini-models'
 import { db } from '@/lib/constants'
 import { useChatThreadsState } from '@/features/agent'
 import {
+  useDashboardSettings,
+  type ChatModelPreference,
+} from '@/contexts/DashboardSettingsContext'
+import {
   computeNextSeq,
   createRun,
   createThread,
@@ -125,6 +129,10 @@ function formatThreadDate(iso?: string): string {
   })
 }
 
+function isChatModelPreference(value: string): value is ChatModelPreference {
+  return QUICK_EDIT_GEMINI_MODEL_OPTIONS.some((option) => option.value === value)
+}
+
 export function ChatPanel({
   projectId,
   userId,
@@ -147,11 +155,16 @@ export function ChatPanel({
   onAcceptAllStaged,
   onRejectAllStaged,
 }: ChatPanelProps) {
+  const { settings } = useDashboardSettings()
   const [messageInput, setMessageInput] = useState('')
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [selectedModel, setSelectedModel] = useState<string>('auto')
-  const [showCurrentDocument, setShowCurrentDocument] = useState(true)
+  const [selectedModel, setSelectedModel] = useState<ChatModelPreference>(
+    settings.defaultChatModel
+  )
+  const [showCurrentDocument, setShowCurrentDocument] = useState(
+    settings.defaultChatIncludeCurrentDocument
+  )
   const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null)
   const [insertingMessageId, setInsertingMessageId] = useState<string | null>(null)
   const [runningStagedAction, setRunningStagedAction] = useState<string | null>(null)
@@ -284,6 +297,29 @@ export function ChatPanel({
     if (!activeFileName) return 'Current document'
     return activeFileName.length > 30 ? `${activeFileName.slice(0, 27)}...` : activeFileName
   }, [activeFileName])
+
+  useEffect(() => {
+    setSelectedModel(settings.defaultChatModel)
+  }, [settings.defaultChatModel])
+
+  useEffect(() => {
+    setShowCurrentDocument(settings.defaultChatIncludeCurrentDocument)
+  }, [settings.defaultChatIncludeCurrentDocument])
+
+  const handleModelChange = useCallback(
+    (nextModel: string) => {
+      if (!isChatModelPreference(nextModel)) return
+      setSelectedModel(nextModel)
+    },
+    []
+  )
+
+  const handleShowCurrentDocumentChange = useCallback(
+    (nextValue: boolean) => {
+      setShowCurrentDocument(nextValue)
+    },
+    []
+  )
 
   const currentDocumentContext = useMemo(() => {
     if (!showCurrentDocument || !fileContent) return ''
@@ -1032,18 +1068,28 @@ export function ChatPanel({
                     className="ml-1 text-zinc-400 hover:text-zinc-200"
                     onClick={(event) => {
                       event.stopPropagation()
-                      setShowCurrentDocument(false)
+                      handleShowCurrentDocumentChange(false)
                     }}
                     onKeyDown={(event) => {
                       if (event.key === 'Enter' || event.key === ' ') {
                         event.preventDefault()
                         event.stopPropagation()
-                        setShowCurrentDocument(false)
+                        handleShowCurrentDocumentChange(false)
                       }
                     }}
                   >
                     <X className="h-3.5 w-3.5" />
                   </span>
+                </button>
+              )}
+              {!showCurrentDocument && (
+                <button
+                  type="button"
+                  onClick={() => handleShowCurrentDocumentChange(true)}
+                  className="inline-flex h-8 items-center gap-2 rounded-xl border border-[#343542] bg-[#1b1c22] px-3 text-sm font-medium text-zinc-300 transition-colors hover:bg-[#20212a] hover:text-zinc-100"
+                >
+                  <FileText className="h-4 w-4 text-zinc-400" />
+                  <span>Attach current document</span>
                 </button>
               )}
             </div>
@@ -1073,7 +1119,7 @@ export function ChatPanel({
                     <span className="text-zinc-400">Model</span>
                     <select
                       value={selectedModel}
-                      onChange={(event) => setSelectedModel(event.target.value)}
+                      onChange={(event) => handleModelChange(event.target.value)}
                       className="h-7 max-w-[8.5rem] rounded-md border border-[#3a3b45] bg-[#1b1c22] px-2 text-sm text-zinc-200 focus:outline-none focus:ring-1 focus:ring-[#6D78E7]"
                     >
                       {QUICK_EDIT_GEMINI_MODEL_OPTIONS.map((option) => (

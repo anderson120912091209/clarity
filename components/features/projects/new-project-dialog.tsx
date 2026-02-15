@@ -98,6 +98,8 @@ export function NewProjectDialog({ children, open: controlledOpen, onOpenChange:
             document_class: 'blank',
             created_at: new Date(),
             type: docType,
+            pdfBackgroundTheme: settings.defaultPdfBackgroundTheme,
+            isPdfCaretNavigationEnabled: settings.defaultPdfCaretNavigation,
           }),
           ...fileStructure.map((node) =>
             tx.files[id()].update({
@@ -122,7 +124,7 @@ export function NewProjectDialog({ children, open: controlledOpen, onOpenChange:
         console.error("Failed to create project", e)
         setIsCreating(false)
     }
-  }, [docType, router, setOpen, title, user])
+  }, [docType, router, setOpen, settings.defaultPdfBackgroundTheme, settings.defaultPdfCaretNavigation, title, user])
 
   // Handle keyboard shortcuts
   useEffect(() => {

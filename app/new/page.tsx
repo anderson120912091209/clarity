@@ -1,7 +1,6 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
@@ -11,6 +10,7 @@ import { CheckIcon, FileText, ChevronRight } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { templateContent, typstTemplateContent } from '@/lib/constants/templates'
 import { useFrontend } from '@/contexts/FrontendContext'
+import { useDashboardSettings } from '@/contexts/DashboardSettingsContext'
 import { completeNavJourney, markNavMilestone } from '@/lib/perf/nav-trace'
 import { cn } from '@/lib/utils'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -36,10 +36,9 @@ const typstTemplates = [
   { id: 'letter', title: 'Letter', description: 'Standard letter format', image: '/letter_preview.webp' },
 ]
 
-type TemplateKey = keyof typeof templateContent | keyof typeof typstTemplateContent
-
 export default function NewDocument() {
   const { user } = useFrontend()
+  const { settings } = useDashboardSettings()
   const router = useRouter()
   const [title, setTitle] = useState('Untitled Project')
   const [docType, setDocType] = useState<DocType>('latex')
@@ -111,6 +110,8 @@ export default function NewDocument() {
         document_class: selectedTemplate,
         created_at: new Date(),
         type: docType, // Verify if 'type' field exists in schema or if we need to add it
+        pdfBackgroundTheme: settings.defaultPdfBackgroundTheme,
+        isPdfCaretNavigationEnabled: settings.defaultPdfCaretNavigation,
       }),
       ...fileStructure.map((node) =>
         tx.files[id()].update({
@@ -259,4 +260,3 @@ export default function NewDocument() {
     </div>
   )
 }
-

@@ -10,12 +10,13 @@ import CursorEditorContainer from '@/components/editor/cursor-editor-container'
 import type { EditorSelectionPayload } from '@/components/editor/editor'
 import { ChatPanel, useChangeManagerState } from '@/features/agent'
 import { useFrontend } from '@/contexts/FrontendContext'
+import { useDashboardSettings } from '@/contexts/DashboardSettingsContext'
 import { ProjectProvider } from '@/contexts/ProjectContext'
 import { useParams } from 'next/navigation'
 import { useProject } from '@/contexts/ProjectContext'
 import { EditorTabs } from '@/components/editor/editor-tabs'
 import { PDFNavContent, useLatex } from '@/components/latex-render/latex'
-import { DEFAULT_EDITOR_SYNTAX_THEME, type EditorSyntaxTheme } from '@/components/editor/types'
+import type { EditorSyntaxTheme } from '@/components/editor/types'
 import { db } from '@/lib/constants'
 import { tx } from '@instantdb/react'
 import {
@@ -228,6 +229,7 @@ function EditorLayout() {
   const [isChatVisible, setIsChatVisible] = useState(false)
   const isAiChatEnabled = AI_CHAT_ENABLED
   const { user } = useFrontend()
+  const { settings, updateSetting } = useDashboardSettings()
   const {
     currentlyOpen,
     project,
@@ -237,10 +239,10 @@ function EditorLayout() {
     isFilesLoading,
   } = useProject()
   const { files: stagedChanges, anyStreaming: anyStagedStreaming } = useChangeManagerState()
-  const isPdfNavigationEnabled = project?.isPdfCaretNavigationEnabled ?? true
+  const isPdfNavigationEnabled =
+    project?.isPdfCaretNavigationEnabled ?? settings.defaultPdfCaretNavigation
   const pdfScrollNonceRef = useRef(0)
   const editorGotoNonceRef = useRef(0)
-  const hasMountedRef = useRef(false)
   const projectDataMarkedRef = useRef(false)
   const editorReadyRef = useRef(false)
   const pdfReadyRef = useRef(false)
@@ -248,9 +250,15 @@ function EditorLayout() {
   const syncFromCodeAbortRef = useRef<AbortController | null>(null)
   const syncFromPdfAbortRef = useRef<AbortController | null>(null)
   const syncSelectionAbortRef = useRef<AbortController | null>(null)
-  const [editorSyntaxTheme, setEditorSyntaxTheme] = useState<EditorSyntaxTheme>(DEFAULT_EDITOR_SYNTAX_THEME)
+  const [editorSyntaxTheme, setEditorSyntaxTheme] = useState<EditorSyntaxTheme>(
+    settings.defaultEditorSyntaxTheme
+  )
   const [liveFileContentOverrides, setLiveFileContentOverrides] = useState<Record<string, string>>({})
   const fileContent = (currentlyOpen?.id ? liveFileContentOverrides[currentlyOpen.id] : undefined) ?? currentlyOpen?.content ?? ''
+
+  useEffect(() => {
+    setEditorSyntaxTheme(settings.defaultEditorSyntaxTheme)
+  }, [settings.defaultEditorSyntaxTheme])
 
   useEffect(() => {
     projectDataMarkedRef.current = false
@@ -347,24 +355,13 @@ function EditorLayout() {
         }
       })
   }, [liveFileContentOverrides, projectFiles])
-  useEffect(() => {
-    try {
-      const saved = window.localStorage.getItem('editor.syntaxTheme')
-      if (saved === 'shiki' || saved === 'default') {
-        setEditorSyntaxTheme(saved)
-      }
-    } catch {}
-  }, [])
-
-  useEffect(() => {
-    if (!hasMountedRef.current) {
-      hasMountedRef.current = true
-      return
-    }
-    try {
-      window.localStorage.setItem('editor.syntaxTheme', editorSyntaxTheme)
-    } catch {}
-  }, [editorSyntaxTheme])
+  const handleEditorSyntaxThemeChange = useCallback(
+    (theme: EditorSyntaxTheme) => {
+      setEditorSyntaxTheme(theme)
+      updateSetting('defaultEditorSyntaxTheme', theme)
+    },
+    [updateSetting]
+  )
 
   useEffect(() => {
     if (!Array.isArray(projectFiles) || projectFiles.length === 0) {
@@ -1101,7 +1098,12 @@ function EditorLayout() {
 
   return (
     <AppLayout
-      sidebar={<EditorSidebar syntaxTheme={editorSyntaxTheme} onSyntaxThemeChange={setEditorSyntaxTheme} />}
+      sidebar={
+        <EditorSidebar
+          syntaxTheme={editorSyntaxTheme}
+          onSyntaxThemeChange={handleEditorSyntaxThemeChange}
+        />
+      }
       header={null}
       showHeader={false}
     >

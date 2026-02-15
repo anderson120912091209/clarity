@@ -1,4 +1,5 @@
 import { SidebarProvider } from '@/contexts/SidebarContext'
+import { DashboardSettingsProvider } from '@/contexts/DashboardSettingsContext'
 
 export default function ProjectLayout({
   children,
@@ -7,7 +8,7 @@ export default function ProjectLayout({
 }>) {
   return (
     <SidebarProvider>
-      {children}
+      <DashboardSettingsProvider>{children}</DashboardSettingsProvider>
     </SidebarProvider>
   )
 }

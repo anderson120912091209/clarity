@@ -10,6 +10,7 @@ import { Label } from '@/components/ui/label'
 import { ZoomIn, ZoomOut, RotateCcw, Play, Loader2, Download, FileType, RefreshCw, ScrollText, MessageSquare } from 'lucide-react'
 import { savePdfToStorage, savePreviewToStorage } from '@/lib/utils/db-utils'
 import { useProject } from '@/contexts/ProjectContext'
+import { useDashboardSettings } from '@/contexts/DashboardSettingsContext'
 import { createPathname } from '@/lib/utils/client-utils'
 import { useFrontend } from '@/contexts/FrontendContext'
 import { fetchPdf, type SynctexContext } from '@/lib/utils/pdf-utils'
@@ -376,6 +377,7 @@ function LatexRenderer({
   onPdfReady,
 }: LatexRendererProps) {
   const { project: data, projectId } = useProject();
+  const { settings } = useDashboardSettings()
   const scale = data?.projectScale ?? 0.9;
   const [localPdfBackgroundTheme, setLocalPdfBackgroundTheme] = useState<PdfBackgroundThemeKey>(DEFAULT_PDF_BACKGROUND_THEME)
   const pdfBackgroundTheme = resolvePdfBackgroundTheme(localPdfBackgroundTheme)
@@ -402,8 +404,8 @@ function LatexRenderer({
       }
     }
 
-    setLocalPdfBackgroundTheme(DEFAULT_PDF_BACKGROUND_THEME)
-  }, [data?.pdfBackgroundTheme, projectId])
+    setLocalPdfBackgroundTheme(settings.defaultPdfBackgroundTheme)
+  }, [data?.pdfBackgroundTheme, projectId, settings.defaultPdfBackgroundTheme])
 
   useEffect(() => {
     if (typeof window === 'undefined') return
