@@ -10,6 +10,7 @@ export interface DashboardSettings {
   defaultView: DashboardView
   defaultSort: DashboardSort
   density: DashboardDensity
+  workspaceName: string
   showProjectTypeBadge: boolean
   showLastEditedTime: boolean
   showNewProjectCard: boolean
@@ -24,6 +25,7 @@ export const DEFAULT_DASHBOARD_SETTINGS: DashboardSettings = {
   defaultView: 'grid',
   defaultSort: 'date',
   density: 'comfortable',
+  workspaceName: 'Untitled Workspace',
   showProjectTypeBadge: true,
   showLastEditedTime: true,
   showNewProjectCard: true,
@@ -53,6 +55,10 @@ function parseStoredSettings(raw: string | null): DashboardSettings {
       defaultView: parsed.defaultView === 'list' ? 'list' : 'grid',
       defaultSort: parsed.defaultSort === 'name' ? 'name' : 'date',
       density: parsed.density === 'compact' ? 'compact' : 'comfortable',
+      workspaceName:
+        typeof parsed.workspaceName === 'string'
+          ? parsed.workspaceName
+          : DEFAULT_DASHBOARD_SETTINGS.workspaceName,
       showProjectTypeBadge: parsed.showProjectTypeBadge ?? true,
       showLastEditedTime: parsed.showLastEditedTime ?? true,
       showNewProjectCard: parsed.showNewProjectCard ?? true,

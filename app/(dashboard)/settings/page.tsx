@@ -1,6 +1,7 @@
 'use client'
 
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import { Switch } from '@/components/ui/switch'
 import { useDashboardSettings } from '@/contexts/DashboardSettingsContext'
 
@@ -106,6 +107,25 @@ export default function DashboardSettingsPage() {
               Compact
             </Button>
           </div>
+        </div>
+      </section>
+
+      <section className="space-y-3 rounded-md border border-white/[0.08] bg-white/[0.01] p-4">
+        <h2 className="text-[13px] font-medium text-white/90">Workspace identity</h2>
+
+        <div className="space-y-1.5 rounded-md border border-white/[0.08] bg-white/[0.02] px-3 py-3">
+          <div className="text-[12px] font-medium text-white/90">Workspace name</div>
+          <p className="text-[11px] text-zinc-500">
+            Used first in create-project dialogs. If set to Untitled, we fall back to your profile
+            name + Workspace, then email.
+          </p>
+          <Input
+            value={settings.workspaceName}
+            onChange={(event) => updateSetting('workspaceName', event.target.value)}
+            placeholder="Untitled Workspace"
+            className="h-8 bg-white/[0.03] border-white/[0.08] text-[12px] text-zinc-300 placeholder:text-zinc-600 focus-visible:ring-1 focus-visible:ring-white/20"
+            aria-label="Workspace name"
+          />
         </div>
       </section>
 

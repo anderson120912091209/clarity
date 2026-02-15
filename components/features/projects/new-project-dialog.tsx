@@ -7,11 +7,12 @@ import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { useRouter } from 'next/navigation'
 import { useFrontend } from '@/contexts/FrontendContext'
+import { useDashboardSettings } from '@/contexts/DashboardSettingsContext'
 import { db } from '@/lib/constants'
 import { tx, id } from '@instantdb/react'
 import { templateContent, typstTemplateContent } from '@/lib/constants/templates'
 import { LayoutTemplate, Command, Loader2 } from 'lucide-react'
-import { cn, getWorkspaceName } from '@/lib/utils'
+import { getWorkspaceName } from '@/lib/utils'
 
 interface NewProjectDialogProps {
   children: React.ReactNode
@@ -33,6 +34,7 @@ export function NewProjectDialog({ children, open: controlledOpen, onOpenChange:
   }, [isControlled, setControlledOpen])
 
   const { user } = useFrontend()
+  const { settings } = useDashboardSettings()
   const router = useRouter()
   const [title, setTitle] = useState('')
   const [docType, setDocType] = useState<'latex' | 'typst'>('latex')
@@ -153,14 +155,15 @@ export function NewProjectDialog({ children, open: controlledOpen, onOpenChange:
           <TooltipTrigger asChild>
             {triggerContent}
           </TooltipTrigger>
-          <TooltipContent side="bottom" className="bg-[#1E1F22] text-white border border-white/[0.08] text-[11px] px-2 py-1 flex items-center gap-1.5 align-center shadow-lg">
+          <TooltipContent side="bottom" className="bg-[#1E1F22] text-white
+           border border-white/[0.08] text-[11px] px-2 py-1 flex items-center gap-1.5 align-center shadow-lg">
             {tooltip}
           </TooltipContent>
         </Tooltip>
       ) : (
         triggerContent
       )}
-      <DialogContent className="sm:max-w-[600px] p-0 gap-0 bg-[#1C1D1F]
+      <DialogContent className="sm:max-w-[600px] sm:top-[46%] p-0 gap-0 bg-[#1C1D1F]
        border-[#2C2C2C] shadow-2xl overflow-hidden">
         <DialogTitle className="sr-only">Create new project</DialogTitle>
         
@@ -169,7 +172,7 @@ export function NewProjectDialog({ children, open: controlledOpen, onOpenChange:
             <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2 text-zinc-400 text-xs font-medium tracking-wider">
                     <span className="bg-[#2C2C2C] px-1.5 py-0.5 rounded text-zinc-300 max-w-[150px] truncate">
-                      {getWorkspaceName(user)}
+                      {getWorkspaceName(user, settings.workspaceName)}
                     </span>
                     <span>›</span>
                     <span>Create Project</span>
@@ -181,7 +184,9 @@ export function NewProjectDialog({ children, open: controlledOpen, onOpenChange:
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 placeholder="Project title..."
-                className="text-xl font-medium bg-transparent border-none p-0 h-auto placeholder:text-zinc-600 focus-visible:ring-0 text-white"
+                className="text-xl font-medium bg-transparent
+                 border-none p-0 h-auto placeholder:text-zinc-600 
+                 focus-visible:ring-0 font-semibold text-white"
                 autoComplete="off"
             />
 
