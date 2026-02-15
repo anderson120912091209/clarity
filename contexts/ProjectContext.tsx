@@ -19,7 +19,8 @@ export function ProjectProvider({ children, projectId }: { children: ReactNode; 
   const { user } = useFrontend();
   const { data: projectData, isLoading: isProjectLoading, error: projectError } = useProjectData(projectId, user.id)
   const { data: filesData, isLoading: isFilesLoading, error: filesError } = useProjectFiles(projectId, user.id)
-  const activeFileId = projectData?.projects?.[0]?.activeFileId
+  const project = projectData?.projects?.[0]
+  const activeFileId = project?.activeFileId
   const openFiles = filesData?.files?.filter((file: any) => file.isOpen === true) || []
   const currentlyOpen = filesData?.files?.find((file: any) => file.id === activeFileId)
 
@@ -33,9 +34,15 @@ export function ProjectProvider({ children, projectId }: { children: ReactNode; 
     }
   }, [isProjectLoading, projectData, isFilesLoading, filesData, router]);
 
+  useEffect(() => {
+    if (!isProjectLoading && project?.trashed_at) {
+      router.push('/trash')
+    }
+  }, [isProjectLoading, project?.trashed_at, router])
+
   const value = {
     projectId,
-    project: projectData?.projects[0],
+    project,
     files: filesData?.files,
     openFiles,
     currentlyOpen,

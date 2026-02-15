@@ -358,6 +358,7 @@ interface LatexRendererProps {
     | null
   onPdfPointSelect?: (point: { page: number; h: number; v: number }) => void
   isPdfNavigationEnabled?: boolean
+  onPdfReady?: () => void
 }
 
 
@@ -372,6 +373,7 @@ function LatexRenderer({
   highlightRequest,
   onPdfPointSelect,
   isPdfNavigationEnabled = true,
+  onPdfReady,
 }: LatexRendererProps) {
   const { project: data, projectId } = useProject();
   const scale = data?.projectScale ?? 0.9;
@@ -527,6 +529,7 @@ function LatexRenderer({
                  highlightRequest={highlightRequest}
                  onPdfPointSelect={onPdfPointSelect}
                  isPdfNavigationEnabled={isPdfNavigationEnabled}
+                 onPdfReady={onPdfReady}
              />
         </div>
       ) : (
@@ -603,7 +606,7 @@ export function PDFNavContent({
           onClick={onCompile} 
           disabled={isLoading}
           className={cn(
-             "h-7 pl-2.5 pr-1 gap-1.5 text-xs font-medium bg-[#6D78E7] hover:bg-[#5b65d6] text-white border-0 transition-all rounded-md shadow-sm group shrink-0",
+             "h-7 pl-2.5 pr-1 gap-1.5 text-xs font-medium bg-[#6D78E7] hover:bg-[#6D78E7]/90 text-white border border-white/10 transition-all rounded-md shadow-sm group shrink-0",
              isLoading ? "opacity-90 cursor-wait" : ""
           )}
         >

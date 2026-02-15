@@ -36,11 +36,11 @@ declare global {
 }
 
 let mathJaxPromise: Promise<MathJaxInstance> | null = null
-const DEFAULT_INLINE_DELIMITERS = [
+const DEFAULT_INLINE_DELIMITERS: MathJaxDelimiters = [
   ['$', '$'],
   ['\\(', '\\)'],
 ]
-const DEFAULT_DISPLAY_DELIMITERS = [
+const DEFAULT_DISPLAY_DELIMITERS: MathJaxDelimiters = [
   ['$$', '$$'],
   ['\\[', '\\]'],
 ]

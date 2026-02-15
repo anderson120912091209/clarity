@@ -53,6 +53,7 @@ interface CodeEditorProps {
   filePath?: string
   onSelectionChange?: (payload: EditorSelectionPayload | null) => void
   onActionsReady?: (actions: { triggerQuickEdit: () => void }) => void
+  onReady?: () => void
   gotoRequest?: {
     fileId: string
     lineNumber: number
@@ -77,6 +78,7 @@ export const CodeEditor = ({
   filePath,
   onSelectionChange,
   onActionsReady,
+  onReady,
   gotoRequest,
 }: CodeEditorProps) => {
   const isAiChatEnabled = process.env.NEXT_PUBLIC_ENABLE_AI_CHAT === 'true'
@@ -243,6 +245,7 @@ export const CodeEditor = ({
           })
         }
         handleEditorDidMount(editor, monaco)
+        onReady?.()
         const cleanupAIAssist = handleAIAssist(editor, monaco, setIsStreaming, onChange)
         editor.onDidDispose(() => {
           if (isAiChatEnabled) {

@@ -797,7 +797,7 @@ export function ChatPanel({
               onClick={() => {
                 void resetChat()
               }}
-              className="h-8 w-8 rounded-lg bg-[#6D78E7] hover:bg-[#5b65d6] text-white"
+              className="h-8 w-8 rounded-lg bg-[#6D78E7] hover:bg-[#6D78E7]/90 text-white border border-white/10 shadow-sm transition-all"
               title="New chat"
             >
               <SquarePen className="h-4 w-4" />

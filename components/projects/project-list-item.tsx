@@ -17,6 +17,7 @@ import { createPathname } from '@/lib/utils/client-utils'
 import { getAllProjectFiles } from '@/hooks/data'
 import { useFrontend } from '@/contexts/FrontendContext'
 import { Skeleton } from '@/components/ui/skeleton'
+import { startNavJourney } from '@/lib/perf/nav-trace'
 
 interface ProjectListItemProps {
   project: any | null
@@ -126,6 +127,12 @@ export default function ProjectListItem({ project, loading = false }: ProjectLis
     <>
       <Link 
         href={`/project/${project.id}`}
+        onClick={() =>
+          startNavJourney('project_open', {
+            source: 'projects_list_item',
+            projectId: project.id,
+          })
+        }
         className="group grid grid-cols-[auto_1fr_auto_auto] items-center gap-4 py-2 px-3 rounded-[4px] hover:bg-white/[0.03] transition-colors border-b border-white/[0.04] last:border-0 outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-zinc-500"
       >
         {/* Icon */}

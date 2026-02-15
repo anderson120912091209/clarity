@@ -354,11 +354,270 @@ const proposalContent = `\\documentclass[12pt]{article}
 
 \\end{document}`
 
+
+
+const presentationContent = `\\documentclass{beamer}
+\\usetheme{Madrid}
+\\usecolortheme{default}
+
+\\title{Presentation Title}
+\\subtitle{A Subtitle}
+\\author{Author Name}
+\\institute{Institute Name}
+\\date{\\today}
+
+\\begin{document}
+
+\\begin{frame}
+  \\titlepage
+\\end{frame}
+
+\\begin{frame}{Outline}
+  \\tableofcontents
+\\end{frame}
+
+\\section{Introduction}
+\\begin{frame}{Introduction}
+  \\begin{itemize}
+    \\item Item 1
+    \\item Item 2
+    \\item Item 3
+  \\end{itemize}
+\\end{frame}
+
+\\section{Main Body}
+\\begin{frame}{Main Body Slide}
+  \\begin{block}{Block Title}
+    Block content.
+  \\end{block}
+  
+  \\begin{alertblock}{Alert Block Title}
+    Alert block content.
+  \\end{alertblock}
+  
+  \\begin{exampleblock}{Example Block Title}
+    Example block content.
+  \\end{exampleblock}
+\\end{frame}
+
+\\section{Conclusion}
+\\begin{frame}{Conclusion}
+  \\begin{itemize}
+    \\item Summary point 1
+    \\item Summary point 2
+  \\end{itemize}
+\\end{frame}
+
+\\end{document}`
+
+const assignmentContent = `\\documentclass[11pt]{article}
+\\usepackage{amsmath, amssymb, amsthm}
+\\usepackage{geometry}
+\\geometry{a4paper, margin=1in}
+
+\\title{Assignment Title}
+\\author{Student Name}
+\\date{\\today}
+
+\\begin{document}
+
+\\maketitle
+
+\\section*{Problem 1}
+State the problem here.
+
+\\begin{proof}[Solution]
+  Write your solution here.
+\\end{proof}
+
+\\section*{Problem 2}
+State the next problem.
+
+\\begin{proof}[Solution]
+  Write your solution here.
+\\end{proof}
+
+\\end{document}`
+
+const ieeeConfContent = `\\documentclass[conference]{IEEEtran}
+\\usepackage{cite}
+\\usepackage{amsmath,amssymb,amsfonts}
+\\usepackage{algorithmic}
+\\usepackage{graphicx}
+\\usepackage{textcomp}
+\\usepackage{xcolor}
+
+\\begin{document}
+
+\\title{Conference Paper Title}
+
+\\author{\\IEEEauthorblockN{Given Name Surname}
+\\IEEEauthorblockA{\\textit{dept. name of organization (of Aff.)} \\\\
+\\textit{name of organization (of Aff.)}\\\\
+City, Country \\\\
+email address or ORCID}
+}
+
+\\maketitle
+
+\\begin{abstract}
+This document is a model and instructions for \\LaTeX.
+\\end{abstract}
+
+\\begin{IEEEkeywords}
+component, formatting, style, styling, insert
+\\end{IEEEkeywords}
+
+\\section{Introduction}
+This document is a model and instructions for \\LaTeX.
+
+\\end{IEEEauthorblockN}
+\\end{document}`
+
+// Typst Templates
+
+const typstBlankContent = `#set page(paper: "a4")
+#set text(font: "Linux Libertine", size: 11pt)
+
+= Document Title
+
+== Introduction
+
+This is a blank Typst document. You can start typing your content here.
+
+== Section
+
+Math is simple: $E=mc^2$.
+`
+
+const typstReportContent = `#set text(font: "Linux Libertine", size: 11pt)
+#set page(numbering: "1")
+
+#align(center + horizon)[
+  #text(2em, weight: "bold")[Report Title]
+  
+  #v(2em)
+  
+  Author Name
+  
+  #datetime.today().display()
+]
+
+#pagebreak()
+
+#outline()
+
+#pagebreak()
+
+= Introduction
+This is the introduction.
+
+= Methodology
+This is the methodology.
+
+= Results
+This is the results section.
+
+= Conclusion
+This is the conclusion.
+`
+
+const typstResumeContent = `#set page(
+  paper: "us-letter", 
+  margin: (x: 0.5in, y: 0.5in)
+)
+#set text(font: "Linux Libertine", size: 10pt)
+
+#show heading.where(level: 1): it => [
+  #set align(left)
+  #set text(weight: "bold", size: 1.2em)
+  #stack(
+    dir: ltr,
+    spacing: 1fr,
+    it.body,
+    line(length: 100%, stroke: 0.5pt)
+  )
+  #v(0.5em)
+]
+
+#align(center)[
+  #text(size: 1.5em, weight: "bold")[Your Name] \\
+  #text(size: 0.9em)[email@example.com | 123-456-7890 | linkedin.com/in/yourname]
+]
+
+= Experience
+
+**Job Title** #h(1fr) Date - Date \\
+*Company Name* #h(1fr) Location
+- Achievement 1
+- Achievement 2
+- Achievement 3
+
+= Education
+
+**Degree Name** #h(1fr) Date - Date \\
+*University Name* #h(1fr) Location
+
+= Skills
+
+- Skill 1
+- Skill 2
+- Skill 3
+`
+
+const typstLetterContent = `#set text(font: "Linux Libertine", size: 11pt)
+#set page(margin: (x: 1in, y: 1in))
+
+Your Name \\
+123 Your Street \\
+Your City, ST 12345 \\
+your.email@example.com
+
+#v(1em)
+
+#datetime.today().display()
+
+#v(1em)
+
+Recipient Name \\
+Recipient Title \\
+Company Name \\
+123 Company Street \\
+Company City, ST 67890
+
+#v(2em)
+
+Dear Recipient Name,
+
+#v(1em)
+
+I am writing to you today to...
+
+#v(1em)
+
+Sincerely,
+
+#v(2em)
+
+Your Name
+`
+
 export const templateContent = {
   article: blankContent,
   report: reportContent,
   resume: resumeContent,
   letter: letterContent,
   proposal: proposalContent,
+  presentation: presentationContent,
+  assignment: assignmentContent,
+  ieee_conf: ieeeConfContent,
   blank: blankContent,
 }
+
+export const typstTemplateContent = {
+  blank: typstBlankContent,
+  report: typstReportContent,
+  resume: typstResumeContent,
+  letter: typstLetterContent,
+}
+

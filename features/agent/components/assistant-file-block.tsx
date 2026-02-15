@@ -120,8 +120,8 @@ export function AssistantFileBlock({
             onClick={onAccept}
             disabled={actionDisabled || !onAccept}
             className={cn(
-              "flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-all shadow-sm",
-              "bg-[#6D78E7] text-white hover:bg-[#5b65d6] hover:shadow-md hover:shadow-[#6D78E7]/20",
+              "flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-all shadow-sm border border-white/10",
+              "bg-[#6D78E7] text-white hover:bg-[#6D78E7]/90 hover:shadow-md hover:shadow-[#6D78E7]/20",
               (actionDisabled || !onAccept) && "opacity-50 cursor-not-allowed hover:bg-[#6D78E7] hover:shadow-none"
             )}
           >

@@ -48,7 +48,7 @@ export default function SidebarToggle({ className = '' }: SidebarToggleProps) {
         <TooltipContent 
           side="bottom" 
           align="start"
-          className="bg-[#6D78E7] text-white border-0 flex items-center gap-1 px-2 py-1"
+          className="bg-[#6D78E7] text-white border border-white/10 flex items-center gap-1 px-2 py-1 shadow-md"
         >
           <span className="text-xs font-medium">Sidebar</span>
           <span className="bg-white/20 px-1.5 py-0.5 rounded text-[10px] font-medium text-white flex items-center justify-center min-w-[32px]">

@@ -34,6 +34,7 @@ const _schema = i.schema({
       created_at: i.string().optional(),
       document_class: i.string().optional(),
       last_compiled: i.string().optional(),
+      trashed_at: i.string().optional(),
       page_count: i.number().optional(),
       pdfBackgroundTheme: i.string().optional(),
       project_content: i.string().optional(),

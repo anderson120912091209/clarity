@@ -27,11 +27,13 @@ import {
 import {
   applyAssistantInsertBlock,
   parseAssistantInsertBlocks,
+  type AssistantInsertBlock,
   type InsertMode,
 } from '@/features/agent/lib/assistant-insert'
 import { chatApplyService, type FileSuggestionApplyMode } from '@/services/agent/browser/chat/chatApplyService'
 import { changeManagerService, type StagedFileChange } from '@/features/agent/services/change-manager'
 import type { AgentWorkspaceFileContext } from '@/features/agent/types/chat-context'
+import { completeNavJourney, markNavMilestone } from '@/lib/perf/nav-trace'
 
 export const maxDuration = 30
 const AI_CHAT_ENABLED = process.env.NEXT_PUBLIC_ENABLE_AI_CHAT === 'true'
@@ -226,18 +228,72 @@ function EditorLayout() {
   const [isChatVisible, setIsChatVisible] = useState(false)
   const isAiChatEnabled = AI_CHAT_ENABLED
   const { user } = useFrontend()
-  const { currentlyOpen, project, files: projectFiles, projectId } = useProject()
+  const {
+    currentlyOpen,
+    project,
+    files: projectFiles,
+    projectId,
+    isProjectLoading,
+    isFilesLoading,
+  } = useProject()
   const { files: stagedChanges, anyStreaming: anyStagedStreaming } = useChangeManagerState()
   const isPdfNavigationEnabled = project?.isPdfCaretNavigationEnabled ?? true
   const pdfScrollNonceRef = useRef(0)
   const editorGotoNonceRef = useRef(0)
   const hasMountedRef = useRef(false)
+  const projectDataMarkedRef = useRef(false)
+  const editorReadyRef = useRef(false)
+  const pdfReadyRef = useRef(false)
+  const workspaceReadyRef = useRef(false)
   const syncFromCodeAbortRef = useRef<AbortController | null>(null)
   const syncFromPdfAbortRef = useRef<AbortController | null>(null)
   const syncSelectionAbortRef = useRef<AbortController | null>(null)
   const [editorSyntaxTheme, setEditorSyntaxTheme] = useState<EditorSyntaxTheme>(DEFAULT_EDITOR_SYNTAX_THEME)
   const [liveFileContentOverrides, setLiveFileContentOverrides] = useState<Record<string, string>>({})
   const fileContent = (currentlyOpen?.id ? liveFileContentOverrides[currentlyOpen.id] : undefined) ?? currentlyOpen?.content ?? ''
+
+  useEffect(() => {
+    projectDataMarkedRef.current = false
+    editorReadyRef.current = false
+    pdfReadyRef.current = false
+    workspaceReadyRef.current = false
+
+    if (!projectId) return
+    markNavMilestone('page_visible', { route: `/project/${projectId}`, projectId })
+  }, [projectId])
+
+  useEffect(() => {
+    if (!projectId) return
+    if (projectDataMarkedRef.current) return
+    if (isProjectLoading || isFilesLoading) return
+
+    projectDataMarkedRef.current = true
+    markNavMilestone('project_data_ready', { projectId })
+  }, [isFilesLoading, isProjectLoading, projectId])
+
+  const tryMarkWorkspaceReady = useCallback(() => {
+    if (!projectId || workspaceReadyRef.current) return
+    if (!editorReadyRef.current || !pdfReadyRef.current) return
+
+    workspaceReadyRef.current = true
+    markNavMilestone('workspace_ready', { projectId })
+    completeNavJourney('project_open')
+  }, [projectId])
+
+  const handleEditorReady = useCallback(() => {
+    if (!projectId || editorReadyRef.current) return
+    editorReadyRef.current = true
+    markNavMilestone('editor_ready', { projectId })
+    tryMarkWorkspaceReady()
+  }, [projectId, tryMarkWorkspaceReady])
+
+  const handlePdfReady = useCallback(() => {
+    if (!projectId || pdfReadyRef.current) return
+    pdfReadyRef.current = true
+    markNavMilestone('pdf_ready', { projectId })
+    tryMarkWorkspaceReady()
+  }, [projectId, tryMarkWorkspaceReady])
+
   const workspaceFilesForChat = useMemo<AgentWorkspaceFileContext[]>(() => {
     if (!Array.isArray(projectFiles) || projectFiles.length === 0) return []
 
@@ -467,7 +523,7 @@ function EditorLayout() {
       if (!trimmed) return
 
       const structuredEdits = parseStructuredFileEditPayloads(trimmed)
-      const structuredBlocks = structuredEdits.map((edit) => ({
+      const structuredBlocks: AssistantInsertBlock[] = structuredEdits.map((edit) => ({
         filePath: edit.filePath,
         insertMode: edit.editType === 'search_replace' ? ('search_replace' as InsertMode) : ('replace_file' as InsertMode),
         hasExplicitInsertMode: true,
@@ -1061,6 +1117,7 @@ function EditorLayout() {
             isPdfNavigationEnabled={isPdfNavigationEnabled}
             syntaxTheme={editorSyntaxTheme}
             onFileContentChange={handleLiveFileContentChange}
+            onEditorReady={handleEditorReady}
             gotoRequest={editorGotoRequest}
           />
         </ResizablePanel>
@@ -1079,6 +1136,7 @@ function EditorLayout() {
             highlightRequest={pdfHighlightRequest}
             onPdfPointSelect={handlePdfPointSelect}
             isPdfNavigationEnabled={isPdfNavigationEnabled}
+            onPdfReady={handlePdfReady}
           />
         </ResizablePanel>
         {isAiChatEnabled && isChatVisible && (

@@ -26,6 +26,7 @@ interface CursorEditorContainerProps {
   }) => void
   syntaxTheme?: EditorSyntaxTheme
   onFileContentChange?: (fileId: string, content: string) => void
+  onEditorReady?: () => void
   gotoRequest?: {
     fileId: string
     lineNumber: number
@@ -43,6 +44,7 @@ const CursorEditorContainer: React.FC<CursorEditorContainerProps> = ({
   onCursorClick,
   syntaxTheme,
   onFileContentChange,
+  onEditorReady,
   gotoRequest,
   onFindSelectionInPdf,
   isPdfNavigationEnabled = true,
@@ -354,6 +356,7 @@ const CursorEditorContainer: React.FC<CursorEditorContainerProps> = ({
               filePath={openFilePath}
               onSelectionChange={handleSelectionChange}
               onActionsReady={handleEditorActionsReady}
+              onReady={onEditorReady}
               gotoRequest={activeGotoRequest}
               key={`${theme || systemTheme}-${openFile?.id}`}
             />

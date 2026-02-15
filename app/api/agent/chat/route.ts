@@ -387,6 +387,17 @@ function normalizeConversationMessages(
   return { conversation, uiSystemInstructions }
 }
 
+function extractTextContent(content: CoreMessage['content']): string {
+  if (typeof content === 'string') return content
+  if (Array.isArray(content)) {
+    return content
+      .filter((part) => part && typeof part === 'object' && 'type' in part && part.type === 'text')
+      .map((part) => (part as any).text)
+      .join('\n')
+  }
+  return ''
+}
+
 export async function POST(req: Request) {
   const isAiChatEnabled =
     process.env.ENABLE_AI_CHAT === 'true' ||
@@ -413,7 +424,8 @@ export async function POST(req: Request) {
   }
 
   const context = normalizeContext(payload.context)
-  const latestUserMessage = conversation[conversation.length - 1]?.content ?? ''
+  const lastMsg = conversation[conversation.length - 1]
+  const latestUserMessage = lastMsg ? extractTextContent(lastMsg.content) : ''
   const typstLibraryEnabled = shouldEnableTypstLibrary(context, latestUserMessage)
   const forceStructuredEdits = isLikelyEditIntent(latestUserMessage)
 

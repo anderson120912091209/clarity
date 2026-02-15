@@ -23,6 +23,7 @@ export default function LatexCanvas({
   highlightRequest,
   onPdfPointSelect,
   isPdfNavigationEnabled = true,
+  onPdfReady,
 }: {
   pdfUrl: string;
   onDocumentLoadSuccess: (result: { numPages: number }) => void;
@@ -46,6 +47,7 @@ export default function LatexCanvas({
     | null;
   onPdfPointSelect?: (point: { page: number; h: number; v: number }) => void;
   isPdfNavigationEnabled?: boolean;
+  onPdfReady?: () => void;
 }) {
   const [workerReady, setWorkerReady] = useState(false)
   const [documentError, setDocumentError] = useState<string | null>(null)
@@ -192,6 +194,7 @@ export default function LatexCanvas({
         onLoadSuccess={(pdf) => {
           setDocumentError(null)
           onDocumentLoadSuccess(pdf)
+          onPdfReady?.()
         }}
         onLoadError={(error) => {
           console.error('PDF load error:', error)

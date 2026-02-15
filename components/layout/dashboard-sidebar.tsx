@@ -3,8 +3,8 @@
 import React from 'react'
 import Link from 'next/link'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
-import { User, Search, Pencil, ChevronDown, Plus, SquarePen, Loader2 } from 'lucide-react'
+import { TooltipProvider } from '@/components/ui/tooltip'
+import { User, ChevronDown, SquarePen, Loader2, Settings, Trash2 } from 'lucide-react'
 import { db } from '@/lib/constants'
 import { useRouter, usePathname } from 'next/navigation'
 import { useState } from 'react'
@@ -12,6 +12,10 @@ import { useSidebar } from '@/contexts/SidebarContext'
 import { SidebarShell } from '@/components/layout/sidebar-shell'
 import Image from 'next/image'
 import { startStripeCheckout } from '@/lib/stripe/checkout'
+import { startNavJourney } from '@/lib/perf/nav-trace'
+import { NewProjectDialog } from '@/components/features/projects/new-project-dialog'
+import { getAllProjects } from '@/hooks/data'
+import { useDashboardSettings } from '@/contexts/DashboardSettingsContext'
 
 export default function DashboardSidebar() {
   const router = useRouter()
@@ -20,8 +24,14 @@ export default function DashboardSidebar() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const [isUpgrading, setIsUpgrading] = useState(false)
   const { isCollapsed } = useSidebar()
+  const { settings } = useDashboardSettings()
+  const { data: projectsData } = getAllProjects(user?.id)
+  const projects = projectsData?.projects as Array<{ trashed_at?: string | null }> | undefined
   
   const isProjectsActive = pathname?.startsWith('/projects')
+  const isTrashActive = pathname?.startsWith('/trash')
+  const isSettingsActive = pathname?.startsWith('/settings')
+  const trashedCount = projects?.filter((project) => Boolean(project.trashed_at)).length ?? 0
 
   const handleSignOut = () => {
     db.auth.signOut()
@@ -118,22 +128,24 @@ export default function DashboardSidebar() {
           {!isCollapsed && (
             <div className="flex items-center gap-1 shrink-0">
               <TooltipProvider delayDuration={0}>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Link
-                      href="/new"
-                      className="w-7 h-7 flex items-center justify-center text-white/70 hover:text-white hover:bg-[#151619] rounded-md transition-colors outline-none focus-visible:ring-2 focus-visible:ring-white/20"
-                      aria-label="New document"
-                      onClick={() => setIsMobileMenuOpen(false)}
-                    >
-                      <SquarePen className="w-4 h-4 opacity-70 group-hover:opacity-100" />
-                    </Link>
-                  </TooltipTrigger>
-                  <TooltipContent side="bottom" className="bg-[#1E1F22] text-white border border-white/[0.08] text-[11px] px-2 py-1 flex items-center gap-1.5 align-center shadow-lg">
-                    <span>Create new doc</span>
-                    <kbd className="text-[9px] font-sans text-white/40 bg-white/5 px-1 rounded-[3px] min-w-[16px] h-4 flex items-center justify-center">C</kbd>
-                  </TooltipContent>
-                </Tooltip>
+                <NewProjectDialog
+                  tooltip={
+                    <>
+                      <span>Create new doc</span>
+                      <kbd className="text-[9px] font-sans text-white/40 bg-white/5 px-1 rounded-[3px] min-w-[16px] h-4 flex items-center justify-center">C</kbd>
+                    </>
+                  }
+                >
+                  <button
+                    className="w-7 h-7 flex items-center justify-center text-white/70 hover:text-white hover:bg-[#151619] rounded-md transition-colors outline-none focus-visible:ring-2 focus-visible:ring-white/20"
+                    aria-label="New document"
+                    onClick={() => {
+                      startNavJourney('new_doc_open', { source: 'dashboard_sidebar_new_doc' })
+                    }}
+                  >
+                    <SquarePen className="w-4 h-4 opacity-70 group-hover:opacity-100" />
+                  </button>
+                </NewProjectDialog>
               </TooltipProvider>
             </div>
           )}
@@ -164,7 +176,58 @@ export default function DashboardSidebar() {
             />
             {!isCollapsed && <span>Projects</span>}
           </Link>
+
+          <Link
+            href="/trash"
+            className={`group flex items-center text-[12px] font-medium 
+            rounded-md outline-none focus-visible:ring-2 focus-visible:ring-white/20 transition-colors
+            ${isCollapsed ? 'justify-center py-1.5' : 'gap-2 px-2 py-1.5'}
+            ${isTrashActive
+              ? 'bg-[#1E1F22] text-[#E3E4E5]'
+              : 'text-[#E3E4E5] hover:bg-[#151619]'
+            }`}
+            onClick={() => setIsMobileMenuOpen(false)}
+            title={isCollapsed ? 'Trash' : undefined}
+          >
+            <Trash2
+              className={`h-4 w-4 shrink-0 transition-opacity ${
+                isTrashActive ? 'opacity-100' : 'opacity-70 group-hover:opacity-100'
+              }`}
+            />
+            {!isCollapsed && (
+              <>
+                <span>Trash</span>
+                {settings.showTrashCountBadge && trashedCount > 0 && (
+                  <span className="ml-auto rounded-full bg-white/10 px-1.5 py-0.5 text-[10px] font-medium text-white/80">
+                    {trashedCount}
+                  </span>
+                )}
+              </>
+            )}
+          </Link>
         </nav>
+
+        <div className={`border-t border-white/[0.06] py-3 ${isCollapsed ? 'px-4' : 'px-3'}`}>
+          <Link
+            href="/settings"
+            className={`group flex items-center text-[12px] font-medium 
+            rounded-md outline-none focus-visible:ring-2 focus-visible:ring-white/20 transition-colors
+            ${isCollapsed ? 'justify-center py-1.5' : 'gap-2 px-2 py-1.5'}
+            ${isSettingsActive
+              ? 'bg-[#1E1F22] text-[#E3E4E5]'
+              : 'text-[#E3E4E5] hover:bg-[#151619]'
+            }`}
+            onClick={() => setIsMobileMenuOpen(false)}
+            title={isCollapsed ? 'Settings' : undefined}
+          >
+            <Settings
+              className={`h-4 w-4 shrink-0 transition-opacity ${
+                isSettingsActive ? 'opacity-100' : 'opacity-70 group-hover:opacity-100'
+              }`}
+            />
+            {!isCollapsed && <span>Settings</span>}
+          </Link>
+        </div>
     </SidebarShell>
   )
 }

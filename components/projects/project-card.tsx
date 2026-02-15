@@ -1,9 +1,8 @@
 'use client'
 import { useEffect } from 'react'
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
-import { CopyIcon, DownloadIcon, Edit2Icon, MoreHorizontal, XIcon, MoreVertical } from 'lucide-react'
+import { CopyIcon, DownloadIcon, Edit2Icon, MoreHorizontal, Trash2 } from 'lucide-react'
 import { db } from '@/lib/constants'
 import { tx } from '@instantdb/react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
@@ -16,8 +15,11 @@ import { savePdfToStorage, savePreviewToStorage } from '@/lib/utils/db-utils'
 import { createPathname } from '@/lib/utils/client-utils'
 import { getAllProjectFiles } from '@/hooks/data'
 import { useFrontend } from '@/contexts/FrontendContext';
-import { deleteFileFromStorage } from '@/lib/utils/db-utils';
 import { Skeleton } from '@/components/ui/skeleton';
+import { startNavJourney } from '@/lib/perf/nav-trace';
+import { moveProjectToTrash } from '@/lib/utils/project-trash'
+import { formatRelativeTime } from '@/lib/utils/time'
+import { useDashboardSettings } from '@/contexts/DashboardSettingsContext'
 
 export default function ProjectCard({ project, detailed = false, loading = false }: { project?: any; detailed?: boolean; loading?: boolean }) {
   const [isDialogOpen, setIsDialogOpen] = useState(false)
@@ -27,8 +29,10 @@ export default function ProjectCard({ project, detailed = false, loading = false
   const [imageError, setImageError] = useState(false)
   const { user } = useFrontend();
   const { email, id: userId } = user || { email: '', id: '' }
+  const { settings } = useDashboardSettings()
   const [downloadURL, setDownloadURL] = useState('');
   const { data: files } = getAllProjectFiles(project?.id || '', userId)
+  const compact = settings.density === 'compact'
 
   // Determine project type
   const isTypst = files?.files?.some((f: any) => f.name.endsWith('.typ'))
@@ -60,17 +64,17 @@ export default function ProjectCard({ project, detailed = false, loading = false
     }
   }, [project?.id, project?.title, email, userId, loading])
 
-  const handleDelete = (e: React.MouseEvent) => {
+  const handleDelete = async (e: React.MouseEvent) => {
     e.preventDefault()
     e.stopPropagation();
     if (!project) return
 
-    db.transact([tx.projects[project.id].delete()]);
-    if (files && files.files) {
-      files.files.map((file) => db.transact([tx.files[file.id].delete()]))
+    if (settings.confirmBeforeTrash) {
+      const confirmed = window.confirm(`Move "${project.title}" to trash?`)
+      if (!confirmed) return
     }
-    deleteFileFromStorage(`${userId}/${project.id}/main.pdf`)
-    deleteFileFromStorage(`${userId}/${project.id}/preview.webp`)
+
+    await moveProjectToTrash(project.id)
     setIsDropdownOpen(false)
   }
 
@@ -212,6 +216,12 @@ export default function ProjectCard({ project, detailed = false, loading = false
     <>
       <Link 
         href={`/project/${project.id}`} 
+        onClick={() =>
+          startNavJourney('project_open', {
+            source: 'projects_grid_card',
+            projectId: project.id,
+          })
+        }
         className="group relative block outline-none"
       >
         {/* Card Cover */}
@@ -260,8 +270,8 @@ export default function ProjectCard({ project, detailed = false, loading = false
                   </DropdownMenuItem>
                   <div className="h-[1px] bg-white/5 my-1" />
                   <DropdownMenuItem className="focus:bg-red-500/10 focus:text-red-400 text-red-400/80 rounded-md cursor-pointer text-[12px] font-medium py-1.5 px-2" onClick={handleDelete}>
-                    <XIcon className="mr-2 h-3 w-3" />
-                    <span>Delete Project</span>
+                    <Trash2 className="mr-2 h-3 w-3" />
+                    <span>Move to Trash</span>
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
@@ -270,25 +280,25 @@ export default function ProjectCard({ project, detailed = false, loading = false
         </div>
         
         {/* Title & Info Below Card */}
-        <div className="mt-2 flex flex-col gap-0.5 px-0.5">
+        <div className={`${compact ? 'mt-1.5' : 'mt-2'} flex flex-col gap-0.5 px-0.5`}>
           <div className="flex items-center gap-2 max-w-full">
             <h3 className="truncate text-[12px] font-medium text-white/90 group-hover:text-white transition-colors leading-tight shrink">{project.title}</h3>
-            <div className="flex items-center text-[12px] shrink-0">
-               <span className="text-zinc-600 mr-1.5">•</span>
-               <span className={`font-medium ${
-                 isTypst 
-                  ? 'text-[#ABCCF5]' 
-                  : 'text-[#B5C6AE]'
-               }`}>
-                 {projectType}
-               </span>
-            </div>
+            {settings.showProjectTypeBadge && (
+              <div className="flex items-center text-[12px] shrink-0">
+                <span className="text-zinc-600 mr-1.5">•</span>
+                <span
+                  className={`font-medium ${isTypst ? 'text-[#ABCCF5]' : 'text-[#B5C6AE]'}`}
+                >
+                  {projectType}
+                </span>
+              </div>
+            )}
           </div>
-          <p className="text-[10px] text-zinc-500 font-mono tracking-tight">
-            {project.last_compiled 
-              ? getTimeAgo(new Date(project.last_compiled))
-              : "Draft"}
-          </p>
+          {settings.showLastEditedTime && (
+            <p className="text-[10px] text-zinc-500 font-mono tracking-tight">
+              {project.last_compiled ? formatRelativeTime(project.last_compiled) : 'Draft'}
+            </p>
+          )}
         </div>
       </Link>
       <Dialog open={isDialogOpen} onOpenChange={handleDialogOpenChange}>
@@ -328,28 +338,4 @@ export default function ProjectCard({ project, detailed = false, loading = false
       </Dialog>
     </>
   )
-}
-
-function getTimeAgo(date: Date): string {
-  const now = new Date();
-  const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
-
-  if (diffInSeconds < 60) {
-    return 'Just now';
-  } else if (diffInSeconds < 3600) {
-    const minutes = Math.floor(diffInSeconds / 60);
-    return `${minutes}m ago`;
-  } else if (diffInSeconds < 86400) {
-    const hours = Math.floor(diffInSeconds / 3600);
-    return `${hours}h ago`;
-  } else if (diffInSeconds < 2592000) {
-    const days = Math.floor(diffInSeconds / 86400);
-    return `${days}d ago`;
-  } else if (diffInSeconds < 31536000) {
-    const months = Math.floor(diffInSeconds / 2592000);
-    return `${months}mo ago`;
-  } else {
-    const years = Math.floor(diffInSeconds / 31536000);
-    return `${years}y ago`;
-  }
 }
