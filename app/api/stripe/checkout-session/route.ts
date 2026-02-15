@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { getPostHogClient } from '@/lib/posthog-server'
 
 export const runtime = 'nodejs'
 
@@ -101,6 +102,18 @@ export async function POST(request: NextRequest) {
       { status: 502 }
     )
   }
+
+  // Track server-side checkout session created event
+  const posthog = getPostHogClient()
+  posthog.capture({
+    distinctId: customerEmail ?? 'anonymous',
+    event: 'checkout_session_created',
+    properties: {
+      price_id: priceId,
+      customer_email: customerEmail,
+      source: 'api',
+    },
+  })
 
   return NextResponse.json({ url: checkoutUrl })
 }

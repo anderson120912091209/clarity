@@ -8,6 +8,7 @@ import {
   readTypstSkillDoc,
   searchTypstSkillDocs,
 } from '@/lib/agent/typst-skill-library'
+import { getPostHogClient } from '@/lib/posthog-server'
 
 export const runtime = 'nodejs'
 
@@ -455,6 +456,21 @@ export async function POST(req: Request) {
     workspaceFiles: context.workspaceFiles.length,
     typstLibraryEnabled,
     forceStructuredEdits,
+  })
+
+  // Track AI chat message event
+  const posthog = getPostHogClient()
+  posthog.capture({
+    distinctId: requestId,
+    event: 'ai_chat_message_sent',
+    properties: {
+      model: selectedModel,
+      workspace_files_count: context.workspaceFiles.length,
+      typst_library_enabled: typstLibraryEnabled,
+      force_structured_edits: forceStructuredEdits,
+      has_compile_error: Boolean(context.compileError),
+      message_length: latestUserMessage.length,
+    },
   })
 
   const runWithModel = (modelId: string) =>

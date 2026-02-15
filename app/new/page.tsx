@@ -14,6 +14,7 @@ import { useDashboardSettings } from '@/contexts/DashboardSettingsContext'
 import { completeNavJourney, markNavMilestone } from '@/lib/perf/nav-trace'
 import { cn } from '@/lib/utils'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import posthog from 'posthog-js'
 
 type DocType = 'latex' | 'typst'
 
@@ -129,6 +130,14 @@ export default function NewDocument() {
         })
       ),
     ])
+
+    // Track project creation event
+    posthog.capture('project_created', {
+      project_id: newProjectId,
+      doc_type: docType,
+      template: selectedTemplate,
+      source: 'template_page',
+    })
 
     router.push(`/project/${newProjectId}`)
   }

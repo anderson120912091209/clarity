@@ -3,6 +3,7 @@
 import { tx } from '@instantdb/react'
 import { db } from '@/lib/constants'
 import { deleteFileFromStorage } from '@/lib/utils/db-utils'
+import posthog from 'posthog-js'
 
 interface PermanentlyDeleteProjectOptions {
   projectId: string
@@ -11,6 +12,10 @@ interface PermanentlyDeleteProjectOptions {
 }
 
 export function moveProjectToTrash(projectId: string) {
+  posthog.capture('project_trashed', {
+    project_id: projectId,
+  })
+
   return db.transact([
     tx.projects[projectId].update({
       trashed_at: new Date().toISOString(),
@@ -19,6 +24,10 @@ export function moveProjectToTrash(projectId: string) {
 }
 
 export function restoreProjectFromTrash(projectId: string) {
+  posthog.capture('project_restored', {
+    project_id: projectId,
+  })
+
   return db.transact([
     tx.projects[projectId].update({
       trashed_at: null,
@@ -31,6 +40,11 @@ export async function permanentlyDeleteProject({
   userId,
   fileIds = [],
 }: PermanentlyDeleteProjectOptions) {
+  posthog.capture('project_deleted_permanently', {
+    project_id: projectId,
+    files_count: fileIds.length,
+  })
+
   const uniqueFileIds = Array.from(new Set(fileIds))
   const deleteOps = uniqueFileIds.map((fileId) => tx.files[fileId].delete())
 

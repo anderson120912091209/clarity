@@ -5,12 +5,21 @@ import Link from 'next/link'
 import { Check, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { startStripeCheckout } from '@/lib/stripe/checkout'
+import posthog from 'posthog-js'
 
 export function Pricing() {
   const [isUpgrading, setIsUpgrading] = useState(false)
 
   const handleUpgrade = async () => {
     setIsUpgrading(true)
+
+    // Track checkout started event
+    posthog.capture('checkout_started', {
+      plan: 'pro',
+      price: 9,
+      currency: 'USD',
+      source: 'pricing_page',
+    })
 
     try {
       await startStripeCheckout({
@@ -20,6 +29,7 @@ export function Pricing() {
     } catch (error) {
       const message =
         error instanceof Error ? error.message : 'Unable to start checkout. Please try again.'
+      posthog.captureException(error)
       window.alert(message)
       setIsUpgrading(false)
     }

@@ -13,6 +13,7 @@ import { tx, id } from '@instantdb/react'
 import { templateContent, typstTemplateContent } from '@/lib/constants/templates'
 import { LayoutTemplate, Command, Loader2 } from 'lucide-react'
 import { getWorkspaceName } from '@/lib/utils'
+import posthog from 'posthog-js'
 
 interface NewProjectDialogProps {
   children: React.ReactNode
@@ -117,7 +118,15 @@ export function NewProjectDialog({ children, open: controlledOpen, onOpenChange:
             })
           ),
         ])
-    
+
+        // Track quick project creation event
+        posthog.capture('project_created', {
+          project_id: newProjectId,
+          doc_type: docType,
+          template: 'blank',
+          source: 'quick_dialog',
+        })
+
         setOpen(false)
         router.push(`/project/${newProjectId}`)
     } catch (e) {

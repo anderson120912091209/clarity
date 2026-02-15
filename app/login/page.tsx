@@ -9,6 +9,7 @@ import { tx } from '@instantdb/react'
 import Link from 'next/link'
 import { Navbar } from '@/components/landing/navbar'
 import { buildWelcomeProjectTransactions, WELCOME_SEED_VERSION } from '@/lib/utils/init-default-projects'
+import posthog from 'posthog-js'
 
 type AuthenticatedUser = NonNullable<ReturnType<typeof db.useAuth>['user']>
 
@@ -65,6 +66,14 @@ export default function Login() {
         welcome_seeded_at: nowISO,
       }
 
+      // Identify user in PostHog
+      posthog.identify(user.id, {
+        email: user.email,
+        ...userProperties,
+      })
+
+      const isNewUser = !hasWelcomeSeeded && !hasProjects
+
       if (hasWelcomeSeeded || hasProjects) {
         await db.transact(tx.users[user.id].update(userUpdate))
         router.push('/projects')
@@ -76,6 +85,16 @@ export default function Login() {
         tx.users[user.id].update(userUpdate),
         ...transactions,
       ])
+
+      // Capture signup event for new users
+      if (isNewUser) {
+        posthog.capture('user_signed_up', {
+          user_id: user.id,
+          email: user.email,
+          signup_timestamp: nowISO,
+        })
+      }
+
       router.push('/projects')
     }
 
