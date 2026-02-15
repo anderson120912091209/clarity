@@ -1,0 +1,72 @@
+services:
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_INSTANT_APP_ID: ${NEXT_PUBLIC_INSTANT_APP_ID}
+        NEXT_PUBLIC_CLSI_URL: ${NEXT_PUBLIC_CLSI_URL}
+        NEXT_PUBLIC_ENABLE_AI_CHAT: ${NEXT_PUBLIC_ENABLE_AI_CHAT:-false}
+        NEXT_PUBLIC_RAILWAY_ENDPOINT_URL: ${NEXT_PUBLIC_RAILWAY_ENDPOINT_URL:-}
+        NEXT_PUBLIC_STRIPE_PRICE_ID: ${NEXT_PUBLIC_STRIPE_PRICE_ID:-}
+    environment:
+      NODE_ENV: production
+      ENABLE_AI_CHAT: ${ENABLE_AI_CHAT:-false}
+      GOOGLE_GENERATIVE_AI_API_KEY: ${GOOGLE_GENERATIVE_AI_API_KEY:-}
+      GOOGLE_GENERATION_AI_API_KEY: ${GOOGLE_GENERATION_AI_API_KEY:-}
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
+      STRIPE_PRICE_ID: ${STRIPE_PRICE_ID:-}
+      NEXT_PUBLIC_ENABLE_AI_CHAT: ${NEXT_PUBLIC_ENABLE_AI_CHAT:-false}
+      NEXT_PUBLIC_STRIPE_PRICE_ID: ${NEXT_PUBLIC_STRIPE_PRICE_ID:-}
+    restart: unless-stopped
+    depends_on:
+      - clsi
+    networks:
+      - appnet
+
+  clsi:
+    build:
+      context: ./services/cltsi
+      dockerfile: Dockerfile
+    environment:
+      NODE_ENV: production
+      HOST: 0.0.0.0
+      PORT: 3013
+      FRONTEND_URL: ${FRONTEND_URL}
+      COMPILE_TIMEOUT: ${COMPILE_TIMEOUT:-60000}
+      CACHE_AGE: ${CACHE_AGE:-5400000}
+      CACHE_LIMIT: ${CACHE_LIMIT:-2}
+      TYPST_ALLOW_NETWORK: ${TYPST_ALLOW_NETWORK:-false}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - clsi_compile:/tmp/clsi/compiles
+      - clsi_output:/tmp/clsi/output
+    restart: unless-stopped
+    networks:
+      - appnet
+
+  caddy:
+    image: caddy:2.8
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - web
+      - clsi
+    restart: unless-stopped
+    networks:
+      - appnet
+
+networks:
+  appnet:
+
+volumes:
+  clsi_compile:
+  clsi_output:
+  caddy_data:
+  caddy_config:

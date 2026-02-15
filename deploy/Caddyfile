@@ -1,0 +1,8 @@
+# Replace these hostnames with your real domains.
+app.example.com {
+  reverse_proxy web:3000
+}
+
+clsi.example.com {
+  reverse_proxy clsi:3013
+}
