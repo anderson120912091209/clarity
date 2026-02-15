@@ -72,6 +72,7 @@ export default function NewDocument() {
     setIsCreating(true)
 
     const newProjectId = id()
+    const mainFileId = id()
     const extension = docType === 'latex' ? 'tex' : 'typ'
     const fileName = `main.${extension}`
     
@@ -86,6 +87,7 @@ export default function NewDocument() {
     const createFileStructure = () => {
       return [
         {
+          id: mainFileId,
           name: fileName,
           type: 'file',
           parent_id: null,
@@ -111,11 +113,12 @@ export default function NewDocument() {
         document_class: selectedTemplate,
         created_at: new Date(),
         type: docType, // Verify if 'type' field exists in schema or if we need to add it
+        activeFileId: mainFileId,
         pdfBackgroundTheme: settings.defaultPdfBackgroundTheme,
         isPdfCaretNavigationEnabled: settings.defaultPdfCaretNavigation,
       }),
       ...fileStructure.map((node) =>
-        tx.files[id()].update({
+        tx.files[node.id].update({
           user_id: user?.id,
           projectId: newProjectId,
           name: node.name,

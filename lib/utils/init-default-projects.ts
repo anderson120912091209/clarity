@@ -1,21 +1,24 @@
 import { db } from '@/lib/constants'
-import { tx } from '@instantdb/react'
+import { id, tx } from '@instantdb/react'
 import { typstWelcomeContent, latexWelcomeContent } from '@/lib/constants/welcome-templates'
 
 // 1 means “starter pack v1 has been applied”.
 // Later you can introduce 2 for a new onboarding pack without adding another field.
 export const WELCOME_SEED_VERSION = 1
 
-const sanitizeIdPart = (value: string) => value.replace(/[^a-zA-Z0-9_-]/g, '_')
+export interface WelcomeProjectSeed {
+  projectId: string
+  mainFileId: string
+  mainFileName: string
+  content: string
+}
 
-function getWelcomeEntityIds(userId: string) {
-  const stableUserPart = sanitizeIdPart(userId)
-
+function getWelcomeEntityIds() {
   return {
-    typstProjectId: `welcome_${stableUserPart}_typst_v${WELCOME_SEED_VERSION}`,
-    latexProjectId: `welcome_${stableUserPart}_latex_v${WELCOME_SEED_VERSION}`,
-    typstFileId: `welcome_${stableUserPart}_typst_main_v${WELCOME_SEED_VERSION}`,
-    latexFileId: `welcome_${stableUserPart}_latex_main_v${WELCOME_SEED_VERSION}`,
+    typstProjectId: id(),
+    latexProjectId: id(),
+    typstFileId: id(),
+    latexFileId: id(),
   }
 }
 
@@ -26,7 +29,21 @@ function getWelcomeEntityIds(userId: string) {
  * Later you can introduce 2 for a new onboarding pack without adding another field.
  */
 export function buildWelcomeProjectTransactions(userId: string, timestampISO: string = new Date().toISOString()) {
-  const { typstProjectId, latexProjectId, typstFileId, latexFileId } = getWelcomeEntityIds(userId)
+  const { typstProjectId, latexProjectId, typstFileId, latexFileId } = getWelcomeEntityIds()
+  const welcomeProjects: WelcomeProjectSeed[] = [
+    {
+      projectId: typstProjectId,
+      mainFileId: typstFileId,
+      mainFileName: 'main.typ',
+      content: typstWelcomeContent,
+    },
+    {
+      projectId: latexProjectId,
+      mainFileId: latexFileId,
+      mainFileName: 'main.tex',
+      content: latexWelcomeContent,
+    },
+  ]
 
   // Create transactions for both projects
   const transactions = [
@@ -41,6 +58,8 @@ export function buildWelcomeProjectTransactions(userId: string, timestampISO: st
       page_count: 0,
       document_class: 'typst',
       created_at: timestampISO,
+      activeFileId: typstFileId,
+      isAutoFetching: true,
     }),
     tx.files[typstFileId].update({
       user_id: userId,
@@ -67,6 +86,8 @@ export function buildWelcomeProjectTransactions(userId: string, timestampISO: st
       page_count: 0,
       document_class: 'article',
       created_at: timestampISO,
+      activeFileId: latexFileId,
+      isAutoFetching: true,
     }),
     tx.files[latexFileId].update({
       user_id: userId,
@@ -90,6 +111,7 @@ export function buildWelcomeProjectTransactions(userId: string, timestampISO: st
       typstFileId,
       latexFileId,
     },
+    welcomeProjects,
     transactions,
   }
 }

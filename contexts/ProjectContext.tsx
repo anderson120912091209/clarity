@@ -4,6 +4,8 @@ import { useProjectData, useProjectFiles } from '@/hooks/data';
 import { useFrontend } from '@/contexts/FrontendContext';
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
+import { db } from '@/lib/constants'
+import { tx } from '@instantdb/react'
 
 // TODO: Add better types
 interface ProjectContextType {
@@ -22,7 +24,13 @@ export function ProjectProvider({ children, projectId }: { children: ReactNode; 
   const project = projectData?.projects?.[0]
   const activeFileId = project?.activeFileId
   const openFiles = filesData?.files?.filter((file: any) => file.isOpen === true) || []
-  const currentlyOpen = filesData?.files?.find((file: any) => file.id === activeFileId)
+  const firstMainFile =
+    filesData?.files?.find((file: any) => file?.type === 'file' && file?.main_file) ??
+    filesData?.files?.find((file: any) => file?.type === 'file')
+  const currentlyOpen =
+    filesData?.files?.find((file: any) => file.id === activeFileId) ??
+    openFiles.find((file: any) => file?.type === 'file') ??
+    firstMainFile
 
   // Fallback: If no activeFileId but files are open, default to first open file, or no file
   // If activeFileId is set but not found (deleted?), handle gracefully
@@ -39,6 +47,26 @@ export function ProjectProvider({ children, projectId }: { children: ReactNode; 
       router.push('/trash')
     }
   }, [isProjectLoading, project?.trashed_at, router])
+
+  useEffect(() => {
+    if (isProjectLoading || isFilesLoading) return
+    if (!projectId || !project || project.activeFileId || !currentlyOpen?.id) return
+
+    db.transact([
+      tx.projects[projectId].update({
+        activeFileId: currentlyOpen.id,
+      }),
+    ]).catch((error) => {
+      console.warn('Failed to initialize active file for project:', error)
+    })
+  }, [
+    isProjectLoading,
+    isFilesLoading,
+    projectId,
+    project,
+    project?.activeFileId,
+    currentlyOpen?.id,
+  ])
 
   const value = {
     projectId,

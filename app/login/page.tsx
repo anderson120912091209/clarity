@@ -4,22 +4,81 @@ import React, { useEffect, useRef, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { useRouter } from 'next/navigation'
-import { db } from '@/lib/constants'
+import { APP_ID, db } from '@/lib/constants'
 import { tx } from '@instantdb/react'
 import Link from 'next/link'
 import { Navbar } from '@/components/landing/navbar'
-import { buildWelcomeProjectTransactions, WELCOME_SEED_VERSION } from '@/lib/utils/init-default-projects'
+import {
+  buildWelcomeProjectTransactions,
+  type WelcomeProjectSeed,
+  WELCOME_SEED_VERSION,
+} from '@/lib/utils/init-default-projects'
 import posthog from 'posthog-js'
+import { fetchPdf } from '@/lib/utils/pdf-utils'
+import { savePdfToStorage, savePreviewToStorage } from '@/lib/utils/db-utils'
+import { createPathname } from '@/lib/utils/client-utils'
 
 type AuthenticatedUser = NonNullable<ReturnType<typeof db.useAuth>['user']>
 
-function toUserProperties(user: AuthenticatedUser) {
-  return Object.entries(user).reduce<Record<string, unknown>>((acc, [key, value]) => {
-    if (key !== 'id') {
-      acc[key] = value
+function getBootstrapErrorMessage(err: unknown, fallback: string) {
+  if (err instanceof Error && err.message) return err.message
+  if (typeof err === 'string' && err.trim().length > 0) return err
+
+  if (err && typeof err === 'object') {
+    const record = err as Record<string, unknown>
+    const body = record.body
+    if (body && typeof body === 'object') {
+      const bodyMessage = (body as Record<string, unknown>).message
+      if (typeof bodyMessage === 'string' && bodyMessage.trim().length > 0) return bodyMessage
     }
-    return acc
-  }, {})
+
+    const recordMessage = record.message
+    if (typeof recordMessage === 'string' && recordMessage.trim().length > 0) return recordMessage
+
+    try {
+      return JSON.stringify(err)
+    } catch {
+      return fallback
+    }
+  }
+
+  return fallback
+}
+
+function toUserUpdate(user: AuthenticatedUser) {
+  return {
+    ...(APP_ID ? { app_id: APP_ID } : {}),
+    ...(typeof user.email === 'string' ? { email: user.email } : {}),
+    refresh_token: user.refresh_token,
+  }
+}
+
+function toAnalyticsUserProperties(user: AuthenticatedUser) {
+  return {
+    ...(typeof user.email === 'string' ? { email: user.email } : {}),
+  }
+}
+
+async function warmWelcomeProjects(userId: string, projects: WelcomeProjectSeed[]) {
+  await Promise.allSettled(
+    projects.map(async (project) => {
+      const { blob } = await fetchPdf([
+        {
+          id: project.mainFileId,
+          name: project.mainFileName,
+          type: 'file',
+          parent_id: null,
+          content: project.content,
+        },
+      ])
+
+      const pathname = createPathname(userId, project.projectId)
+      await Promise.allSettled([
+        savePdfToStorage(blob, `${pathname}main.pdf`, project.projectId),
+        savePreviewToStorage(blob, `${pathname}preview.webp`, project.projectId),
+      ])
+    })
+  )
 }
 
 export default function Login() {
@@ -47,7 +106,7 @@ export default function Login() {
     if (!user || bootstrapStartedRef.current || bootstrapState.isLoading) return
 
     if (bootstrapState.error) {
-      setBootstrapError(bootstrapState.error.message)
+      setBootstrapError(getBootstrapErrorMessage(bootstrapState.error, 'Failed to initialize your account'))
       return
     }
 
@@ -59,17 +118,17 @@ export default function Login() {
       const hasProjects = (bootstrapState.data?.projects?.length ?? 0) > 0
       const hasWelcomeSeeded = (userRecord?.welcome_seed_version ?? 0) >= WELCOME_SEED_VERSION
       const nowISO = new Date().toISOString()
-      const userProperties = toUserProperties(user)
+      const userProperties = toUserUpdate(user)
       const userUpdate = {
         ...userProperties,
         welcome_seed_version: WELCOME_SEED_VERSION,
         welcome_seeded_at: nowISO,
       }
+      const analyticsProperties = toAnalyticsUserProperties(user)
 
       // Identify user in PostHog
       posthog.identify(user.id, {
-        email: user.email,
-        ...userProperties,
+        ...analyticsProperties,
       })
 
       const isNewUser = !hasWelcomeSeeded && !hasProjects
@@ -80,10 +139,19 @@ export default function Login() {
         return
       }
 
-      const { transactions } = buildWelcomeProjectTransactions(user.id, nowISO)
+      const { transactions, welcomeProjects } = buildWelcomeProjectTransactions(user.id, nowISO)
       await db.transact([
         tx.users[user.id].update(userUpdate),
         ...transactions,
+      ])
+
+      // Best effort: pre-warm welcome project thumbnails and cached PDFs without blocking login for too long.
+      const warmupTask = warmWelcomeProjects(user.id, welcomeProjects).catch((error) => {
+        console.warn('Failed to pre-warm welcome projects:', error)
+      })
+      await Promise.race([
+        warmupTask,
+        new Promise<void>((resolve) => setTimeout(resolve, 6000)),
       ])
 
       // Capture signup event for new users
@@ -101,7 +169,7 @@ export default function Login() {
     bootstrapUser().catch((err: unknown) => {
       bootstrapStartedRef.current = false
       setIsBootstrapping(false)
-      setBootstrapError(err instanceof Error ? err.message : 'Failed to initialize your account')
+      setBootstrapError(getBootstrapErrorMessage(err, 'Failed to initialize your account'))
       console.error('Failed to bootstrap user account:', err)
     })
   }, [user, bootstrapState.isLoading, bootstrapState.error, bootstrapState.data, router])

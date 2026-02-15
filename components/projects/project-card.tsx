@@ -1,5 +1,5 @@
 'use client'
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { Button } from '@/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { CopyIcon, DownloadIcon, Edit2Icon, MoreHorizontal, Trash2 } from 'lucide-react'
@@ -20,6 +20,7 @@ import { startNavJourney } from '@/lib/perf/nav-trace';
 import { moveProjectToTrash } from '@/lib/utils/project-trash'
 import { formatRelativeTime } from '@/lib/utils/time'
 import { useDashboardSettings } from '@/contexts/DashboardSettingsContext'
+import { fetchPdf } from '@/lib/utils/pdf-utils'
 
 export default function ProjectCard({ project, detailed = false, loading = false }: { project?: any; detailed?: boolean; loading?: boolean }) {
   const [isDialogOpen, setIsDialogOpen] = useState(false)
@@ -28,21 +29,31 @@ export default function ProjectCard({ project, detailed = false, loading = false
   const [imageURL, setImageURL] = useState('')
   const [imageError, setImageError] = useState(false)
   const { user } = useFrontend();
-  const { email, id: userId } = user || { email: '', id: '' }
+  const { id: userId } = user || { id: '' }
   const { settings } = useDashboardSettings()
   const [downloadURL, setDownloadURL] = useState('');
   const { data: files } = getAllProjectFiles(project?.id || '', userId)
   const compact = settings.density === 'compact'
+  const previewWarmupStartedRef = useRef(false)
 
   // Determine project type
   const isTypst = files?.files?.some((f: any) => f.name.endsWith('.typ'))
   const projectType = isTypst ? 'Typst' : 'TeX'
 
   useEffect(() => {
-    if (loading || !project || !email || !userId) return
-    
+    if (loading || !project || !userId) return
+
+    const now = Date.now()
+    const hasCachedPdf = typeof project.cachedPdfUrl === 'string' && project.cachedPdfUrl.length > 0
+    const hasCachedPreview = typeof project.cachedPreviewUrl === 'string' && project.cachedPreviewUrl.length > 0
+    const isCacheExpired =
+      typeof project.cachedPdfExpiresAt !== 'number' ||
+      typeof project.cachedPreviewExpiresAt !== 'number' ||
+      project.cachedPdfExpiresAt < now ||
+      project.cachedPreviewExpiresAt < now
+
     const pathname = createPathname(userId, project.id)
-    if (project.cachedPdfExpiresAt < Date.now() || project.cachedPreviewExpiresAt < Date.now()) {
+    if (hasCachedPdf && hasCachedPreview && isCacheExpired) {
       const expiresAt = Date.now() + 30 * 60 * 1000;
       db.storage.getDownloadUrl(pathname + 'main.pdf').then((url) => {
         db.transact(tx.projects[project.id].update({ cachedPdfUrl: url, cachedPdfExpiresAt: expiresAt })).then(() => {
@@ -58,11 +69,55 @@ export default function ProjectCard({ project, detailed = false, loading = false
           })
         })
       })
-    } else {
+      return
+    }
+
+    if (hasCachedPdf && hasCachedPreview && !isCacheExpired) {
       setImageURL(project.cachedPreviewUrl)
       setDownloadURL(project.cachedPdfUrl)
+      return
     }
-  }, [project?.id, project?.title, email, userId, loading])
+
+    if (previewWarmupStartedRef.current) return
+    if (!files?.files?.length) return
+
+    const isWelcomeProject =
+      typeof project?.title === 'string' && project.title.startsWith('Welcome to Clarity -')
+    if (!isWelcomeProject) return
+
+    const canCompile = files.files.some((file: any) => file?.type === 'file' && (file?.name === 'main.tex' || file?.name === 'main.typ'))
+    if (!canCompile) return
+
+    previewWarmupStartedRef.current = true
+    void (async () => {
+      try {
+        const { blob } = await fetchPdf(files.files)
+        await Promise.allSettled([
+          savePdfToStorage(blob, `${pathname}main.pdf`, project.id),
+          savePreviewToStorage(blob, `${pathname}preview.webp`, project.id),
+        ])
+        const [freshPdfUrl, freshPreviewUrl] = await Promise.all([
+          db.storage.getDownloadUrl(`${pathname}main.pdf`),
+          db.storage.getDownloadUrl(`${pathname}preview.webp`),
+        ])
+        setDownloadURL(freshPdfUrl)
+        setImageError(false)
+        setImageURL(freshPreviewUrl)
+      } catch (error) {
+        previewWarmupStartedRef.current = false
+        console.warn('Failed to warm project preview from card:', error)
+      }
+    })()
+  }, [
+    project?.id,
+    project?.cachedPdfUrl,
+    project?.cachedPreviewUrl,
+    project?.cachedPdfExpiresAt,
+    project?.cachedPreviewExpiresAt,
+    userId,
+    loading,
+    files?.files,
+  ])
 
   const handleDelete = async (e: React.MouseEvent) => {
     e.preventDefault()
@@ -95,12 +150,17 @@ export default function ProjectCard({ project, detailed = false, loading = false
     }
 
     const newProjectId = id();
-
     // Create a mapping of old file IDs to new file IDs
     const fileIdMapping = new Map();
     files.files.forEach((file) => {
       fileIdMapping.set(file.id, id());
     });
+
+    const mappedActiveFileId =
+      typeof project.activeFileId === 'string' ? fileIdMapping.get(project.activeFileId) : undefined
+    const mainSourceFileId = files.files.find((file) => file.main_file)?.id
+    const mappedMainFileId = mainSourceFileId ? fileIdMapping.get(mainSourceFileId) : undefined
+    const duplicatedActiveFileId = mappedActiveFileId ?? mappedMainFileId
 
     const fileContents = files.files.map((file) => {
       return {
@@ -142,6 +202,7 @@ export default function ProjectCard({ project, detailed = false, loading = false
         last_compiled: new Date(),
         word_count: 0,
         page_count: 0,
+        ...(duplicatedActiveFileId ? { activeFileId: duplicatedActiveFileId } : {}),
         cachedPdfUrl: project.cachedPdfUrl,
         cachedPreviewUrl: project.cachedPreviewUrl,
         cachedPdfExpiresAt: project.cachedPdfExpiresAt,

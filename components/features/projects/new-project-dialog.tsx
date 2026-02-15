@@ -61,6 +61,7 @@ export function NewProjectDialog({ children, open: controlledOpen, onOpenChange:
 
     try {
         const newProjectId = id()
+        const mainFileId = id()
         const extension = docType === 'latex' ? 'tex' : 'typ'
         const fileName = `main.${extension}`
         
@@ -74,6 +75,7 @@ export function NewProjectDialog({ children, open: controlledOpen, onOpenChange:
         const createFileStructure = () => {
           return [
             {
+              id: mainFileId,
               name: fileName,
               type: 'file',
               parent_id: null,
@@ -99,11 +101,12 @@ export function NewProjectDialog({ children, open: controlledOpen, onOpenChange:
             document_class: 'blank',
             created_at: new Date(),
             type: docType,
+            activeFileId: mainFileId,
             pdfBackgroundTheme: settings.defaultPdfBackgroundTheme,
             isPdfCaretNavigationEnabled: settings.defaultPdfCaretNavigation,
           }),
           ...fileStructure.map((node) =>
-            tx.files[id()].update({
+            tx.files[node.id].update({
               user_id: user.id,
               projectId: newProjectId,
               name: node.name,
