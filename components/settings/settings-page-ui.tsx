@@ -9,6 +9,20 @@ interface SettingsPageHeaderProps {
   children?: ReactNode
 }
 
+interface SettingsSectionCardProps {
+  title: string
+  description?: string
+  children?: ReactNode
+  className?: string
+}
+
+interface SettingsRowProps {
+  label: string
+  description?: string
+  children?: ReactNode
+  className?: string
+}
+
 export function SettingsPageHeader({ title, description, children }: SettingsPageHeaderProps) {
   return (
     <header className="mb-6 flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
