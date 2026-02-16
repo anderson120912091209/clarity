@@ -91,7 +91,7 @@ export function Pricing() {
             
             <div className="relative z-10">
               <div className="mb-4 md:mb-6">
-                <p className="text-[#9ea7ff] text-[10px] md:text-sm uppercase tracking-wide font-medium">Pro</p>
+                <p className="text-[#9ea7ff] text-[10px] md:text-sm uppercase tracking-wide font-medium">Supporter</p>
                 <div className="flex items-baseline gap-1 mt-1 md:mt-2">
                   <h3 className="text-2xl md:text-4xl font-semibold text-white">$9</h3>
                   <span className="text-[10px] md:text-lg text-zinc-300 font-normal">/ mo</span>
