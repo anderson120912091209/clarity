@@ -26,5 +26,7 @@ export declare class LatexRunner {
      * Get compiler-specific flag for latexmk
      */
     private getCompilerFlag;
+    private firstNonEmptyLine;
+    private persistFallbackLog;
 }
 //# sourceMappingURL=LatexRunner.d.ts.map

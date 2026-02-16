@@ -1,3 +1,5 @@
+import fs from 'node:fs/promises';
+import path from 'node:path';
 import { CompilationError } from '../utils/errors.js';
 import logger from '../utils/logger.js';
 import settings from '../config/settings.js';
@@ -42,7 +44,14 @@ export class LatexRunner {
         // Treat any non-zero exit as a compile failure.
         // We no longer force through errors because it often produces confusing states.
         if (result.exitCode !== 0) {
-            throw new CompilationError('LaTeX compilation failed', {
+            await this.persistFallbackLog(options.directory, result);
+            const stderrPreview = this.firstNonEmptyLine(result.stderr);
+            const stdoutPreview = this.firstNonEmptyLine(result.stdout);
+            const detail = stderrPreview || stdoutPreview;
+            const message = detail
+                ? `LaTeX compilation failed: ${detail}`
+                : 'LaTeX compilation failed';
+            throw new CompilationError(message, {
                 outputFiles: [], // Will be populated by CompileManager
             });
         }
@@ -84,6 +93,29 @@ export class LatexRunner {
             lualatex: 'lualatex',
         };
         return mapping[compiler] || 'pdf';
+    }
+    firstNonEmptyLine(text) {
+        return (text
+            .split('\n')
+            .map((line) => line.trim())
+            .find((line) => line.length > 0) ?? null);
+    }
+    async persistFallbackLog(compileDir, result) {
+        const outputLogPath = path.join(compileDir, 'output.log');
+        const fallbackLog = [result.stderr?.trim(), result.stdout?.trim()]
+            .filter(Boolean)
+            .join('\n\n');
+        if (!fallbackLog)
+            return;
+        try {
+            await fs.access(outputLogPath);
+            // Real compiler log already exists.
+            return;
+        }
+        catch {
+            // No output.log created by compiler, write fallback diagnostics.
+            await fs.writeFile(outputLogPath, fallbackLog, 'utf-8');
+        }
     }
 }
 //# sourceMappingURL=LatexRunner.js.map

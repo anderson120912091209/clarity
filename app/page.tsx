@@ -1,12 +1,14 @@
 import { Navbar } from '@/components/landing/navbar'
 import { Hero } from '@/components/landing/hero'
 import { Pricing } from '@/components/landing/pricing'
+import { MobileNotice } from '@/components/landing/mobile-notice'
 import { Button } from '@/components/ui/button'
 import Link from 'next/link'
 
 export default function Home() {
   return (
     <div className="flex flex-col min-h-screen bg-[#0c0c0e] text-zinc-300 selection:bg-[#94a3b8]/20 selection:text-zinc-100 antialiased overflow-x-hidden">
+      <MobileNotice />
       
       {/* Background Ambience removed for cleaner look */}
 

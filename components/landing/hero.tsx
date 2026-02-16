@@ -6,7 +6,7 @@ import Link from 'next/link'
 
 export function Hero() {
   return (
-    <section className="relative pt-32 pb-20 md:pt-40 md:pb-24 px-6 overflow-hidden">
+    <section className="relative pt-24 pb-16 md:pt-40 md:pb-24 px-6 overflow-hidden">
       <div className="max-w-5xl mx-auto flex flex-col items-start text-left">
         
         {/* Headline */}
@@ -21,9 +21,9 @@ export function Hero() {
         </p>
 
         {/* CTA */}
-        <div className="flex flex-col sm:flex-row items-center gap-4 mb-20">
+        <div className="flex flex-col sm:flex-row items-center gap-4 mb-16 md:mb-20">
           <Button asChild className="h-10 px-6 bg-white text-black
-           hover:bg-zinc-200 font-medium text-sm shadow-md rounded-md transition-colors">
+           hover:bg-zinc-200 font-medium text-sm shadow-md rounded-md transition-colors w-full sm:w-auto">
             <Link href="/login">
               Start your 7-day trial
             </Link>
@@ -33,13 +33,13 @@ export function Hero() {
         {/* Media Layout - Heptabase Replication */}
         <div className="relative w-full">
             {/* Background Container (The "image in the back") */}
-            <div className="relative overflow-hidden rounded-md pt-12 md:pt-20 px-4 md:px-12">
+            <div className="relative overflow-hidden rounded-md pt-8 md:pt-20 px-4 md:px-12">
                  {/* Background Image */}
                  <div className="absolute inset-0 pointer-events-none">
                     <img 
                         src="/landing/heroscene-art.jpg" 
                         alt="Hero background" 
-                        className="w-full h-full object-cover"
+                        className="w-full h-full object-cover opacity-50 md:opacity-100"
                     />
                  </div>
                  

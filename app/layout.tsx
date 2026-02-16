@@ -16,6 +16,8 @@ export const metadata: Metadata = {
   },
 }
 
+// ... imports
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -27,10 +29,8 @@ export default function RootLayout({
         <ThemeProvider attribute="class" defaultTheme="system" disableTransitionOnChange>
           <TooltipProvider>
             <FrontendProvider>
-              <div className="hidden md:block">
-                {children}
-                <Analytics />
-              </div>
+              {children}
+              <Analytics />
             </FrontendProvider>
           </TooltipProvider>
         </ThemeProvider>

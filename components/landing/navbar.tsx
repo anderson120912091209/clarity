@@ -5,13 +5,13 @@ import { AuthButton } from '@/components/landing/components/auth-button'
 
 export function Navbar({ minimal = false }: { minimal?: boolean }) {
   return (
-    <header className="fixed top-0 w-full z-50 px-6 py-4 bg-[#0c0c0e]">
+    <header className="fixed top-0 w-full z-50 px-4 md:px-6 py-4 bg-[#0c0c0e]/80 backdrop-blur-md border-b border-white/5">
       <div className="max-w-5xl mx-auto flex items-center justify-between">
         <Link href="/" className="flex items-center gap-2.5">
            <img 
               src="/landing/claritylogopurple.png" 
               alt="Clarity" 
-              className="h-8 w-auto"
+              className="h-7 md:h-8 w-auto"
            />
         </Link>
         
