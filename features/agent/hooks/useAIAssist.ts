@@ -13,7 +13,6 @@ import type { NormalizedSelection } from '../../../services/agent/browser/quickE
 import type { ComputedDiff } from '../../../services/agent/browser/quick-edit/types'
 import {
   chatService,
-  ctrlKStream_systemMessage,
   ctrlKStream_userMessage,
   extractPrefixAndSuffix,
   extractCodeFromFIM,
@@ -202,7 +201,6 @@ export function useAIAssist(onChange?: (value: string) => void): UseAIAssistRetu
           })
           
           // Build FIM messages
-          const systemMessage = ctrlKStream_systemMessage(DEFAULT_FIM_TAGS)
           const userMessage = ctrlKStream_userMessage({
             selection: selection.text,
             prefix,
@@ -213,11 +211,8 @@ export function useAIAssist(onChange?: (value: string) => void): UseAIAssistRetu
           })
           
           // Start streaming
-          const { output, requestId } = await chatService.generate({
-            messages: [
-              { role: 'system', content: systemMessage },
-              { role: 'user', content: userMessage },
-            ],
+          const { output } = await chatService.generate({
+            messages: [{ role: 'user', content: userMessage }],
             stream: true,
             abortSignal: abortController.signal,
             model: modelId,

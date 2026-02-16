@@ -1,6 +1,9 @@
 import { createGoogleGenerativeAI } from '@ai-sdk/google'
 import { streamText, type CoreMessage } from 'ai'
 import { GEMINI_DEFAULT_MODEL, resolveGeminiModel } from '@/lib/constants/gemini-models'
+import { authorizeAgentRequest } from '@/lib/server/agent-auth'
+import { evaluatePromptSecurity } from '@/lib/server/prompt-security'
+import { buildQuickEditSystemPrompt } from '@/lib/server/quick-edit-system-prompt'
 import {
   checkFixedQuota,
   getFixedQuotaSnapshot,
@@ -12,7 +15,7 @@ export const runtime = 'nodejs'
 
 interface QuickEditRequestBody {
   messages: Array<{
-    role: 'system' | 'user' | 'assistant'
+    role: string
     content: string
   }>
   model?: string
@@ -23,13 +26,21 @@ function sanitizeText(value: unknown): string {
   return value.trim()
 }
 
-function normalizeConversationMessages(messages: QuickEditRequestBody['messages']): CoreMessage[] {
+function normalizeConversationMessages(
+  messages: QuickEditRequestBody['messages']
+): { conversation: CoreMessage[]; rejectedSystemMessages: number } {
   const conversation: CoreMessage[] = []
+  let rejectedSystemMessages = 0
 
   for (const message of messages) {
     const content = sanitizeText(message.content)
     if (!content) continue
-    if (message.role !== 'system' && message.role !== 'user' && message.role !== 'assistant') {
+    if (message.role === 'system') {
+      rejectedSystemMessages += 1
+      continue
+    }
+
+    if (message.role !== 'user' && message.role !== 'assistant') {
       continue
     }
 
@@ -39,7 +50,22 @@ function normalizeConversationMessages(messages: QuickEditRequestBody['messages'
     })
   }
 
-  return conversation
+  return { conversation, rejectedSystemMessages }
+}
+
+function extractTextContent(content: CoreMessage['content']): string {
+  if (typeof content === 'string') return content
+  if (!Array.isArray(content)) return ''
+
+  type TextPart = { type: 'text'; text: string }
+  return content
+    .filter((part): part is TextPart => {
+      if (!part || typeof part !== 'object') return false
+      const candidate = part as { type?: unknown; text?: unknown }
+      return candidate.type === 'text' && typeof candidate.text === 'string'
+    })
+    .map((part) => part.text)
+    .join('\n')
 }
 
 function shouldRetryWithDefaultModel(error: unknown): boolean {
@@ -80,6 +106,9 @@ export async function GET(req: Request) {
 }
 
 export async function POST(req: Request) {
+  const authError = authorizeAgentRequest(req)
+  if (authError) return authError
+
   const requestId =
     typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
       ? crypto.randomUUID()
@@ -108,10 +137,34 @@ export async function POST(req: Request) {
     return createQuotaResponse('Invalid quick edit messages payload', { status: 400 }, quota)
   }
 
-  const conversation = normalizeConversationMessages(payload.messages)
+  const { conversation, rejectedSystemMessages } = normalizeConversationMessages(payload.messages)
+  if (rejectedSystemMessages > 0) {
+    return createQuotaResponse(
+      'Client-provided system messages are not allowed.',
+      { status: 400 },
+      quota
+    )
+  }
+
   if (conversation.length === 0 || conversation[conversation.length - 1].role !== 'user') {
     return createQuotaResponse(
       'A user message is required to start quick edit generation',
+      { status: 400 },
+      quota
+    )
+  }
+
+  const latestMessage = conversation[conversation.length - 1]
+  const latestUserMessage = latestMessage ? extractTextContent(latestMessage.content) : ''
+  const promptSecurity = evaluatePromptSecurity(latestUserMessage)
+  if (promptSecurity.blocked) {
+    console.warn(`[Agent QuickEdit ${requestId}] blocked prompt`, {
+      code: promptSecurity.code,
+      pattern: promptSecurity.pattern,
+      messageLength: latestUserMessage.length,
+    })
+    return createQuotaResponse(
+      'Request blocked by prompt-security policy.',
       { status: 400 },
       quota
     )
@@ -129,6 +182,7 @@ export async function POST(req: Request) {
   const runWithModel = (modelId: string) =>
     streamText({
       model: google(modelId),
+      system: buildQuickEditSystemPrompt(),
       messages: conversation,
       temperature: 0,
       maxTokens: 2048,

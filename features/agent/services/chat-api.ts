@@ -1,6 +1,6 @@
 import type { ChatMessage } from '@/features/agent/types/chat.types'
 
-type AgentRole = 'system' | 'user' | 'assistant'
+type AgentRole = 'user' | 'assistant'
 
 function resolveApiUrl(pathname: string): string {
   if (typeof window !== 'undefined') {
@@ -27,8 +27,7 @@ function resolveApiUrl(pathname: string): string {
 function normalizeMessages(messages: ChatMessage[]): Array<{ role: AgentRole; content: string }> {
   return messages
     .filter((message) => {
-      const isValidRole =
-        message.role === 'system' || message.role === 'user' || message.role === 'assistant'
+      const isValidRole = message.role === 'user' || message.role === 'assistant'
       return isValidRole && typeof message.content === 'string' && message.content.trim().length > 0
     })
     .map((message) => ({
@@ -86,8 +85,8 @@ export async function chat(messages: ChatMessage[], context: string): Promise<st
 
   if (trimmedContext.length > 0) {
     normalizedMessages.unshift({
-      role: 'system',
-      content: trimmedContext,
+      role: 'user',
+      content: `Context:\n${trimmedContext}`,
     })
   }
 

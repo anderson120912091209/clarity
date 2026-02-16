@@ -15,33 +15,6 @@ const MAX_PREFIX_SUFFIX_CHARS = 2000  // Limit context to avoid token limits
 const TRIPLE_TICK = ['```', '```'] as const
 
 // ============================================================================
-// System Message
-// ============================================================================
-
-/**
- * Generate system message for quick edit (Ctrl+K) operations
- * Instructs the model to use FIM format for code replacement
- */
-export function ctrlKStream_systemMessage(
-  fimTags: FIMTags = DEFAULT_FIM_TAGS
-): string {
-  const { preTag, midTag, sufTag } = fimTags
-  
-  return `\
-You are a FIM (fill-in-the-middle) coding assistant. Your task is to fill in the middle SELECTION marked by <${midTag}> tags.
-
-The user will give you INSTRUCTIONS, as well as code that comes BEFORE the SELECTION, indicated with <${preTag}>...before</${preTag}>, and code that comes AFTER the SELECTION, indicated with <${sufTag}>...after</${sufTag}>.
-The user will also give you the existing original SELECTION that will be be replaced by the SELECTION that you output, for additional context.
-
-Instructions:
-1. Your OUTPUT should be a SINGLE PIECE OF CODE of the form <${midTag}>...new_code</${midTag}>. Do NOT output any text or explanations before or after this.
-2. You may ONLY CHANGE the original SELECTION, and NOT the content in the <${preTag}>...</${preTag}> or <${sufTag}>...</${sufTag}> tags.
-3. Make sure all brackets in the new selection are balanced the same as in the original selection.
-4. Be careful not to duplicate or remove variables, comments, or other syntax by mistake.
-`
-}
-
-// ============================================================================
 // User Message
 // ============================================================================
 

@@ -9,12 +9,17 @@ import {
   searchTypstSkillDocs,
 } from '@/lib/agent/typst-skill-library'
 import { getPostHogClient } from '@/lib/posthog-server'
+import { authorizeAgentRequest } from '@/lib/server/agent-auth'
+import { buildChatQuotaKey, CHAT_CLIENT_QUOTA } from '@/lib/server/chat-quota'
+import { getChatBaseSystemPrompt } from '@/lib/server/chat-system-prompt'
+import { evaluatePromptSecurity } from '@/lib/server/prompt-security'
+import { checkFixedQuota } from '@/lib/server/rate-limit'
 
 export const runtime = 'nodejs'
 
 interface ChatRequestBody {
   messages: Array<{
-    role: 'system' | 'user' | 'assistant'
+    role: string
     content: string
   }>
   model?: string
@@ -287,49 +292,7 @@ function buildSystemPrompt(
   extraInstructions: string[],
   options: { typstLibraryEnabled: boolean; forceStructuredEdits: boolean }
 ): string {
-  const base = [
-    'You are LaTeX Architect, an expert coding assistant dedicated to helping users create, debug, and optimize LaTeX and Typst documents.',
-    '',
-    '## Core Responsibilities',
-    '',
-    '### Syntax Identification',
-    '- Analyze before responding: identify LaTeX (\\documentclass, \\usepackage, \\begin) vs Typst (#, set, show, let).',
-    '- If ambiguous, ask for clarification or default to LaTeX.',
-    '',
-    '### Code Generation',
-    '- Create complete documents based on user descriptions.',
-    '- Generate specific snippets for complex elements (tables, figures, equations).',
-    '- Always use modern packages/functions and best practices.',
-    '',
-    '### Debugging & Optimization',
-    '- Analyze user code to find errors, deprecated packages, or formatting issues.',
-    '- Provide corrected code alongside a clear explanation.',
-    '- When a compile error is reported, ALWAYS call get_compile_logs first before suggesting fixes.',
-    '',
-    '## File Editing (CRITICAL)',
-    '',
-    'When the user asks you to edit, fix, or create code in their files:',
-    '- **ALWAYS use the `apply_file_edit` tool** if you propose file changes.',
-    '- **NEVER output raw @file: or @insert: metadata in your text response.**',
-    '- **NEVER output raw SEARCH:/REPLACE: blocks in your text response.**',
-    '- For partial edits, use editType: "search_replace" with the exact text to find and replace.',
-    '- For full file rewrites, use editType: "replace_file" with the complete new content.',
-    '- You may call apply_file_edit multiple times for multiple files or multiple edits.',
-    '- After calling the tool, provide a brief explanation of what you changed in your text response.',
-    '',
-    '## Guidelines',
-    '',
-    '- Structure: Full documents need preamble + \\begin{document}...\\end{document}.',
-    '- Math: Use amsmath. Prefer \\begin{align}/\\begin{equation} over $$.',
-    '- Tables: Use booktabs. Avoid vertical lines (|).',
-    '- Be concise: code first, then explanation.',
-    '',
-    '## MathJax Rendering',
-    '- You have a MathJax render environment for chat display.',
-    '- Use $(tex_formula)$ inline delimiters (single dollar sign only).',
-    '- Never output $$ (double dollar sign) in your chat text.',
-    '- Example: $x^2 + 3x$ renders as "x² + 3x".',
-  ].join('\n')
+  const base = getChatBaseSystemPrompt()
 
   const sections = [base, buildWorkspaceSummary(context)]
   if (options.typstLibraryEnabled) {
@@ -367,17 +330,17 @@ function normalizeConversationMessages(
   messages: ChatRequestBody['messages']
 ): {
   conversation: CoreMessage[]
-  uiSystemInstructions: string[]
+  rejectedSystemMessages: number
 } {
   const conversation: CoreMessage[] = []
-  const uiSystemInstructions: string[] = []
+  let rejectedSystemMessages = 0
 
   for (const message of messages) {
     const content = sanitizeText(message.content)
     if (!content) continue
 
     if (message.role === 'system') {
-      uiSystemInstructions.push(content)
+      rejectedSystemMessages += 1
       continue
     }
 
@@ -388,21 +351,41 @@ function normalizeConversationMessages(
     })
   }
 
-  return { conversation, uiSystemInstructions }
+  return { conversation, rejectedSystemMessages }
 }
 
 function extractTextContent(content: CoreMessage['content']): string {
   if (typeof content === 'string') return content
   if (Array.isArray(content)) {
+    type TextPart = { type: 'text'; text: string }
+
     return content
-      .filter((part) => part && typeof part === 'object' && 'type' in part && part.type === 'text')
-      .map((part) => (part as any).text)
+      .filter((part): part is TextPart => {
+        if (!part || typeof part !== 'object') return false
+        const candidate = part as { type?: unknown; text?: unknown }
+        return candidate.type === 'text' && typeof candidate.text === 'string'
+      })
+      .map((part) => part.text)
       .join('\n')
   }
   return ''
 }
 
 export async function POST(req: Request) {
+  const authError = authorizeAgentRequest(req)
+  if (authError) return authError
+
+  const quota = await checkFixedQuota({
+    key: buildChatQuotaKey(req),
+    limit: CHAT_CLIENT_QUOTA,
+  })
+  if (!quota.allowed) {
+    return new Response(
+      `AI chat quota reached for this client (${CHAT_CLIENT_QUOTA} total requests).`,
+      { status: 429 }
+    )
+  }
+
   const isAiChatEnabled =
     process.env.ENABLE_AI_CHAT === 'true' ||
     process.env.NEXT_PUBLIC_ENABLE_AI_CHAT === 'true'
@@ -422,7 +405,11 @@ export async function POST(req: Request) {
     return new Response('Invalid chat messages payload', { status: 400 })
   }
 
-  const { conversation, uiSystemInstructions } = normalizeConversationMessages(messages)
+  const { conversation, rejectedSystemMessages } = normalizeConversationMessages(messages)
+  if (rejectedSystemMessages > 0) {
+    return new Response('Client-provided system messages are not allowed', { status: 400 })
+  }
+
   if (conversation.length === 0 || conversation[conversation.length - 1].role !== 'user') {
     return new Response('A user message is required to start chat generation', { status: 400 })
   }
@@ -430,19 +417,31 @@ export async function POST(req: Request) {
   const context = normalizeContext(payload.context)
   const lastMsg = conversation[conversation.length - 1]
   const latestUserMessage = lastMsg ? extractTextContent(lastMsg.content) : ''
+  const promptSecurity = evaluatePromptSecurity(latestUserMessage)
+  if (promptSecurity.blocked) {
+    console.warn(`[Agent Chat ${requestId}] blocked prompt`, {
+      code: promptSecurity.code,
+      pattern: promptSecurity.pattern,
+      messageLength: latestUserMessage.length,
+    })
+    return new Response('Request blocked by prompt-security policy.', { status: 400 })
+  }
+
   const typstLibraryEnabled = shouldEnableTypstLibrary(context, latestUserMessage)
   const forceStructuredEdits = isLikelyEditIntent(latestUserMessage)
 
+  const extraInstructions: string[] = []
+
   // Auto-inject compile error awareness
   if (context.compileError) {
-    uiSystemInstructions.push(
+    extraInstructions.push(
       '⚠️ There is an active compile error. Call get_compile_logs to investigate before suggesting fixes.'
     )
   }
 
   const systemPrompt = buildSystemPrompt(
     context,
-    uiSystemInstructions,
+    extraInstructions,
     { typstLibraryEnabled, forceStructuredEdits }
   )
 
@@ -510,7 +509,8 @@ export async function POST(req: Request) {
             }))
 
             console.info(`[Agent Chat ${requestId}] tool=list_workspace_files`, {
-              query: query ?? '',
+              hasQuery: Boolean(query?.trim()),
+              queryLength: query?.trim().length ?? 0,
               returned: files.length,
             })
 
@@ -543,8 +543,7 @@ export async function POST(req: Request) {
             const selected = lines.slice(start - 1, end).join('\n')
 
             console.info(`[Agent Chat ${requestId}] tool=read_workspace_file`, {
-              requestedPath: path,
-              resolvedPath: file.path,
+              pathProvided: Boolean(path?.trim()),
               start,
               end,
             })
@@ -584,7 +583,7 @@ export async function POST(req: Request) {
               .slice(0, maxResults)
 
             console.info(`[Agent Chat ${requestId}] tool=search_workspace`, {
-              query,
+              queryLength: query.length,
               results: results.length,
             })
 
@@ -642,7 +641,7 @@ export async function POST(req: Request) {
             const results = await searchTypstSkillDocs(query, limit)
 
             console.info(`[Agent Chat ${requestId}] tool=search_typst_skill_docs`, {
-              query,
+              queryLength: query.length,
               totalMatches: results.totalMatches,
               returned: results.results.length,
             })
@@ -673,7 +672,6 @@ export async function POST(req: Request) {
             const result = await readTypstSkillDoc(path, startLine, endLine)
 
             console.info(`[Agent Chat ${requestId}] tool=read_typst_skill_doc`, {
-              requestedPath: path,
               found: result.found,
               startLine,
               endLine,
@@ -762,9 +760,7 @@ export async function POST(req: Request) {
         }),
         execute: async ({ filePath, editType, searchContent, replaceContent, description }) => {
           console.info(`[Agent Chat ${requestId}] tool=apply_file_edit`, {
-            filePath,
             editType,
-            description,
             searchContentLength: searchContent?.length ?? 0,
             replaceContentLength: replaceContent.length,
           })

@@ -8,7 +8,6 @@ export * from './types'
 
 // Prompts
 export {
-  ctrlKStream_systemMessage,
   ctrlKStream_userMessage,
   extractPrefixAndSuffix,
   extractCodeFromFIM,

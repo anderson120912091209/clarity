@@ -499,8 +499,8 @@ export function ChatPanel({
         ...(memorySystemMessage
           ? [
               {
-                role: 'system',
-                content: memorySystemMessage,
+                role: 'user',
+                content: `Context from prior interactions:\n${memorySystemMessage}`,
               } as ChatMessage,
             ]
           : []),
