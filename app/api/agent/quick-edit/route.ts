@@ -68,6 +68,20 @@ function extractTextContent(content: CoreMessage['content']): string {
     .join('\n')
 }
 
+function extractQuickEditInstructionForSecurity(message: string): string {
+  const startToken = 'INSTRUCTIONS\n'
+  const endToken = '\n\nPRIMARY SURROUNDING CONTEXT'
+
+  const startIndex = message.indexOf(startToken)
+  if (startIndex < 0) return message
+
+  const instructionStart = startIndex + startToken.length
+  const endIndex = message.indexOf(endToken, instructionStart)
+  if (endIndex < 0) return message.slice(instructionStart).trim()
+
+  return message.slice(instructionStart, endIndex).trim()
+}
+
 function shouldRetryWithDefaultModel(error: unknown): boolean {
   const message = error instanceof Error ? error.message : String(error)
   return /not found|not supported/i.test(message)
@@ -156,12 +170,13 @@ export async function POST(req: Request) {
 
   const latestMessage = conversation[conversation.length - 1]
   const latestUserMessage = latestMessage ? extractTextContent(latestMessage.content) : ''
-  const promptSecurity = evaluatePromptSecurity(latestUserMessage)
+  const securityInput = extractQuickEditInstructionForSecurity(latestUserMessage)
+  const promptSecurity = evaluatePromptSecurity(securityInput)
   if (promptSecurity.blocked) {
     console.warn(`[Agent QuickEdit ${requestId}] blocked prompt`, {
       code: promptSecurity.code,
       pattern: promptSecurity.pattern,
-      messageLength: latestUserMessage.length,
+      messageLength: securityInput.length,
     })
     return createQuotaResponse(
       'Request blocked by prompt-security policy.',
@@ -185,7 +200,7 @@ export async function POST(req: Request) {
       system: buildQuickEditSystemPrompt(),
       messages: conversation,
       temperature: 0,
-      maxTokens: 2048,
+      maxTokens: 4096,
     })
 
   try {

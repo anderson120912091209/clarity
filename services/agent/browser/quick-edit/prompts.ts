@@ -11,7 +11,12 @@ import { FIMTags, DEFAULT_FIM_TAGS } from './types'
 // Constants
 // ============================================================================
 
-const MAX_PREFIX_SUFFIX_CHARS = 2000  // Limit context to avoid token limits
+const MAX_PREFIX_SUFFIX_CHARS = 6000
+const MAX_SECONDARY_CONTEXT_CHARS = 4800
+const MAX_SECONDARY_HEAD_CHARS = 1800
+const MAX_SECONDARY_TAIL_CHARS = 1400
+const MAX_OUTLINE_ITEMS = 24
+const MAX_OUTLINE_LINE_CHARS = 160
 const TRIPLE_TICK = ['```', '```'] as const
 
 // ============================================================================
@@ -25,17 +30,23 @@ export function ctrlKStream_userMessage(opts: {
   selection: string
   prefix: string
   suffix: string
+  secondaryContext: string
   instructions: string
   fimTags?: FIMTags
   language: string
 }): string {
-  const { selection, prefix, suffix, instructions, language } = opts
+  const { selection, prefix, suffix, secondaryContext, instructions, language } = opts
   const fimTags = opts.fimTags ?? DEFAULT_FIM_TAGS
   const { preTag, sufTag, midTag } = fimTags
   
   return `\
 
-CURRENT SELECTION
+QUICK EDIT TASK
+- Primary focus is the selection plus immediate surrounding context.
+- Secondary context gives high-level file intent and structure. Use it to avoid inconsistent edits.
+- Never modify text outside the selection.
+
+PRIMARY SELECTION (EDIT THIS ONLY)
 ${TRIPLE_TICK[0]}${language}
 <${midTag}>${selection}</${midTag}>
 ${TRIPLE_TICK[1]}
@@ -43,12 +54,17 @@ ${TRIPLE_TICK[1]}
 INSTRUCTIONS
 ${instructions}
 
+PRIMARY SURROUNDING CONTEXT (READ-ONLY)
 <${preTag}>${prefix}</${preTag}>
 <${sufTag}>${suffix}</${sufTag}>
 
-Return only the completion block of code (of the form ${TRIPLE_TICK[0]}${language}
-<${midTag}>...new code</${midTag}>
-${TRIPLE_TICK[1]}).`
+SECONDARY FILE CONTEXT (READ-ONLY)
+${secondaryContext}
+
+Output contract (strict):
+- Return only: <${midTag}>...new code...</${midTag}>
+- No markdown fences.
+- No explanation text.`
 }
 
 // ============================================================================
@@ -63,8 +79,9 @@ export function extractPrefixAndSuffix(opts: {
   fullFileStr: string
   startLine: number  // 1-indexed
   endLine: number    // 1-indexed
-}): { prefix: string; suffix: string } {
-  const { fullFileStr, startLine, endLine } = opts
+  language?: string
+}): { prefix: string; suffix: string; secondaryContext: string } {
+  const { fullFileStr, startLine, endLine, language = 'plaintext' } = opts
   const fullFileLines = fullFileStr.split('\n')
   
   // Extract prefix (lines before selection)
@@ -93,7 +110,115 @@ export function extractPrefixAndSuffix(opts: {
     }
   }
   
-  return { prefix, suffix }
+  const secondaryContext = buildSecondaryContext({
+    fullFileLines,
+    startLine,
+    endLine,
+    language,
+  })
+
+  return { prefix, suffix, secondaryContext }
+}
+
+function buildSecondaryContext(opts: {
+  fullFileLines: string[]
+  startLine: number
+  endLine: number
+  language: string
+}): string {
+  const { fullFileLines, startLine, endLine, language } = opts
+  const totalLines = fullFileLines.length
+  const selectionLineCount = Math.max(1, endLine - startLine + 1)
+  const selectionPercent = Math.round((Math.max(1, startLine) / Math.max(1, totalLines)) * 100)
+
+  const outline = extractFileOutline(fullFileLines).slice(0, MAX_OUTLINE_ITEMS)
+  const headSnapshot = takeHeadSnapshot(fullFileLines, MAX_SECONDARY_HEAD_CHARS)
+  const tailSnapshot = takeTailSnapshot(fullFileLines, MAX_SECONDARY_TAIL_CHARS)
+
+  const parts = [
+    [
+      `Language: ${language}`,
+      `Total lines: ${totalLines}`,
+      `Selection lines: ${startLine}-${endLine} (${selectionLineCount} lines)`,
+      `Selection starts around: ${selectionPercent}% of file`,
+    ].join('\n'),
+  ]
+
+  if (outline.length > 0) {
+    parts.push(`File outline (line: snippet):\n${outline.join('\n')}`)
+  }
+
+  if (headSnapshot.trim()) {
+    parts.push(
+      [
+        `File start snapshot (${language}):`,
+        TRIPLE_TICK[0] + language,
+        headSnapshot,
+        TRIPLE_TICK[1],
+      ].join('\n')
+    )
+  }
+
+  if (tailSnapshot.trim()) {
+    parts.push(
+      [
+        `File end snapshot (${language}):`,
+        TRIPLE_TICK[0] + language,
+        tailSnapshot,
+        TRIPLE_TICK[1],
+      ].join('\n')
+    )
+  }
+
+  const combined = parts.join('\n\n')
+  if (combined.length <= MAX_SECONDARY_CONTEXT_CHARS) return combined
+  return `${combined.slice(0, MAX_SECONDARY_CONTEXT_CHARS)}\n\n[Secondary context truncated]`
+}
+
+function takeHeadSnapshot(lines: string[], maxChars: number): string {
+  let out = ''
+  for (const line of lines) {
+    if ((out.length + line.length + 1) > maxChars) break
+    out += (out ? '\n' : '') + line
+  }
+  return out
+}
+
+function takeTailSnapshot(lines: string[], maxChars: number): string {
+  let out = ''
+  for (let idx = lines.length - 1; idx >= 0; idx -= 1) {
+    const line = lines[idx]
+    const candidate = out ? `${line}\n${out}` : line
+    if (candidate.length > maxChars) break
+    out = candidate
+  }
+  return out
+}
+
+function extractFileOutline(lines: string[]): string[] {
+  const outlinePatterns = [
+    /^\\(documentclass|usepackage|begin\{[^}]+\}|section\{[^}]+\}|subsection\{[^}]+\}|chapter\{[^}]+\}|input\{[^}]+\}|include\{[^}]+\}|newcommand\b)/,
+    /^#(import|set|show|let)\b/,
+    /^={1,6}\s+\S/,
+    /^\s*(export\s+)?(async\s+)?function\s+\w+/,
+    /^\s*(export\s+)?class\s+\w+/,
+    /^\s*(const|let|var)\s+\w+\s*=\s*\(/,
+    /^\s*(interface|type|enum|struct)\s+\w+/,
+    /^\s*def\s+\w+/,
+    /^\s*fn\s+\w+/,
+  ]
+
+  const matches: string[] = []
+  for (let index = 0; index < lines.length; index += 1) {
+    const line = lines[index]
+    const trimmed = line.trim()
+    if (!trimmed) continue
+    if (!outlinePatterns.some((pattern) => pattern.test(trimmed))) continue
+    matches.push(`${index + 1}: ${trimmed.slice(0, MAX_OUTLINE_LINE_CHARS)}`)
+    if (matches.length >= MAX_OUTLINE_ITEMS) break
+  }
+
+  return matches
 }
 
 // ============================================================================

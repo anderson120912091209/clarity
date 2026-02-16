@@ -194,10 +194,11 @@ export function useAIAssist(onChange?: (value: string) => void): UseAIAssistRetu
           const language = getLanguageFromFile(model.uri.path) || 'latex'
           
           // Get prefix and suffix for FIM
-          const { prefix, suffix } = extractPrefixAndSuffix({
+          const { prefix, suffix, secondaryContext } = extractPrefixAndSuffix({
             fullFileStr: fullFileText,
             startLine: selection.lineNumbers.start,
             endLine: selection.lineNumbers.end,
+            language,
           })
           
           // Build FIM messages
@@ -205,6 +206,7 @@ export function useAIAssist(onChange?: (value: string) => void): UseAIAssistRetu
             selection: selection.text,
             prefix,
             suffix,
+            secondaryContext,
             instructions,
             fimTags: DEFAULT_FIM_TAGS,
             language,
