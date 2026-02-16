@@ -25,7 +25,7 @@ export function Hero() {
           <Button asChild className="h-10 px-6 bg-white text-black
            hover:bg-zinc-200 font-medium text-sm shadow-md rounded-md transition-colors w-full sm:w-auto">
             <Link href="/login">
-              Start your 7-day trial
+              Get started
             </Link>
           </Button>
         </div>

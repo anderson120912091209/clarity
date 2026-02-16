@@ -2,6 +2,7 @@ import DashboardSidebar from '@/components/layout/dashboard-sidebar'
 import { SidebarProvider } from '@/contexts/SidebarContext'
 import SidebarToggle from '@/components/layout/sidebar-toggle'
 import { DashboardSettingsProvider } from '@/contexts/DashboardSettingsContext'
+import { MobileProductNotice } from '@/components/mobile-product-notice'
 
 export default function DashboardLayout({
   children,
@@ -11,6 +12,7 @@ export default function DashboardLayout({
   return (
     <SidebarProvider>
       <DashboardSettingsProvider>
+        <MobileProductNotice />
         <div className="h-screen bg-[#090909] text-white flex font-sans selection:bg-white/20">
           {/* Dashboard Sidebar */}
           <DashboardSidebar />
