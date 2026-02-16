@@ -9,19 +9,21 @@ export function MobileNotice() {
   if (!isVisible) return null
 
   return (
-    <div className="relative z-50 flex items-center justify-between gap-3 bg-[#6D78E7]/10 px-4 py-3 text-sm text-[#6D78E7] md:hidden border-b border-[#6D78E7]/20">
-      <div className="flex items-center gap-3">
-        <Laptop className="h-4 w-4 shrink-0" />
-        <span className="font-medium">
-          For the best experience, please use Clarity on a computer.
-        </span>
+    <div className="fixed top-20 left-4 right-4 z-[60] md:hidden">
+      <div className="flex items-center justify-between gap-2 bg-[#6D78E7]/10 backdrop-blur-sm px-3 py-2 text-xs text-[#6D78E7] border border-[#6D78E7]/20 rounded-full shadow-lg max-w-md mx-auto">
+        <div className="flex items-center gap-2">
+          <Laptop className="h-3 w-3 shrink-0" />
+          <span className="font-medium">
+            Best on desktop
+          </span>
+        </div>
+        <button 
+          onClick={() => setIsVisible(false)}
+          className="shrink-0 p-0.5 hover:bg-[#6D78E7]/10 rounded-full transition-colors"
+        >
+          <X className="h-3 w-3" />
+        </button>
       </div>
-      <button 
-        onClick={() => setIsVisible(false)}
-        className="shrink-0 p-1 hover:bg-[#6D78E7]/10 rounded-full transition-colors"
-      >
-        <X className="h-4 w-4" />
-      </button>
     </div>
   )
 }

@@ -15,7 +15,7 @@ export function Hero() {
         </h1>
 
         {/* Subtext */}
-        <p className="max-w-xl text-base md:text-lg text-zinc-400 mb-8 leading-relaxed font-normal">
+        <p className="max-w-xl text-sm md:text-lg text-zinc-400 mb-8 leading-relaxed font-normal">
           Clarity helps researchers, professors and students to compose and collaborate on their research papers faster. 
           (Supports LaTeX & Typst) 
         </p>
