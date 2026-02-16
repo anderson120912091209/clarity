@@ -15,6 +15,7 @@ interface AiQuotaDisplayProps {
   loading?: boolean
   error?: string | null
   onRefresh?: () => void
+  onUpgrade?: () => void
   className?: string
   showLabel?: boolean
   compact?: boolean
@@ -26,6 +27,7 @@ export function AiQuotaDisplay({
   loading = false,
   error,
   onRefresh,
+  onUpgrade,
   className,
   showLabel = true,
   compact = false,
@@ -121,6 +123,15 @@ export function AiQuotaDisplay({
           <Info className="h-3 w-3" />
           {error}
         </p>
+      )}
+      
+      {onUpgrade && isExceeded && (
+        <button
+          onClick={onUpgrade}
+          className="mt-2 w-full text-[11px] font-medium text-[#6D78E7] hover:text-[#858FE9] transition-colors text-center"
+        >
+          Upgrade for more quota
+        </button>
       )}
     </div>
   )

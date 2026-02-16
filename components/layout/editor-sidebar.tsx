@@ -29,6 +29,7 @@ import {
 } from '@/lib/constants/pdf-background-themes'
 import { useQuickEditQuota } from '@/hooks/useQuickEditQuota'
 import { AiQuotaDisplay } from '@/components/ai-quota-display'
+import { UpgradeModal } from '@/components/upgrade-modal'
 
 interface EditorSidebarProps {
   syntaxTheme: EditorSyntaxTheme
@@ -42,6 +43,7 @@ export default function EditorSidebar({ syntaxTheme, onSyntaxThemeChange }: Edit
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
   const [settingsView, setSettingsView] = useState<'root' | 'theme' | 'preview'>('root')
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false)
   const [localPdfBackgroundTheme, setLocalPdfBackgroundTheme] = useState<PdfBackgroundThemeKey>(DEFAULT_PDF_BACKGROUND_THEME)
   const {
     quota: quickEditQuota,
@@ -111,7 +113,8 @@ export default function EditorSidebar({ syntaxTheme, onSyntaxThemeChange }: Edit
   }
 
   return (
-    <SidebarShell
+    <>
+      <SidebarShell
       logoHref="/projects"
       isCollapsed={isCollapsed}
       isMobileMenuOpen={isMobileMenuOpen}
@@ -158,6 +161,7 @@ export default function EditorSidebar({ syntaxTheme, onSyntaxThemeChange }: Edit
                       loading={isQuickEditQuotaLoading}
                       error={quickEditQuotaError ? 'Failed to load quota status.' : null}
                       onRefresh={refreshQuickEditQuota}
+                      onUpgrade={() => setShowUpgradeModal(true)}
                       showLabel={true}
                       compact={false}
                     />
@@ -385,5 +389,8 @@ export default function EditorSidebar({ syntaxTheme, onSyntaxThemeChange }: Edit
           </div>
         )}
     </SidebarShell>
+    
+    <UpgradeModal open={showUpgradeModal} onOpenChange={setShowUpgradeModal} />
+    </>
   )
 }

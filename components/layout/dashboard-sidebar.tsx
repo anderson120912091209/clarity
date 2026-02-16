@@ -18,13 +18,14 @@ import { getAllProjects } from '@/hooks/data'
 import { useDashboardSettings } from '@/contexts/DashboardSettingsContext'
 import { useQuickEditQuota } from '@/hooks/useQuickEditQuota'
 import { AiQuotaDisplay } from '@/components/ai-quota-display'
+import { UpgradeModal } from '@/components/upgrade-modal'
 
 export default function DashboardSidebar() {
   const router = useRouter()
   const pathname = usePathname()
   const { user } = db.useAuth()
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
-  const [isUpgrading, setIsUpgrading] = useState(false)
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false)
   const { isCollapsed } = useSidebar()
   const { settings } = useDashboardSettings()
   const {
@@ -48,25 +49,9 @@ export default function DashboardSidebar() {
     router.push('/')
   }
 
-  const handleUpgrade = async () => {
-    setIsUpgrading(true)
-
-    try {
-      await startStripeCheckout({
-        customerEmail: user?.email ?? null,
-        successPath: '/projects?checkout=success',
-        cancelPath: '/projects?checkout=cancel',
-      })
-    } catch (error) {
-      const message =
-        error instanceof Error ? error.message : 'Unable to start checkout. Please try again.'
-      window.alert(message)
-      setIsUpgrading(false)
-    }
-  }
-
   return (
-    <SidebarShell
+    <>
+      <SidebarShell
       logoHref="/"
       isCollapsed={isCollapsed}
       isMobileMenuOpen={isMobileMenuOpen}
@@ -113,6 +98,7 @@ export default function DashboardSidebar() {
                       loading={isQuickEditQuotaLoading}
                       error={quickEditQuotaError ? 'Failed to load quota status.' : null}
                       onRefresh={refreshQuickEditQuota}
+                      onUpgrade={() => setShowUpgradeModal(true)}
                       showLabel={true}
                       compact={false}
                     />
@@ -125,16 +111,15 @@ export default function DashboardSidebar() {
                   >
                     <span className="text-[12px] text-white/80 group-hover:text-white">AI quota settings</span>
                   </Link>
-                  <button
-                    onClick={handleUpgrade}
-                    disabled={isUpgrading}
-                    className="flex items-center justify-between px-2 py-1.5 hover:bg-[#151619] rounded-md text-left w-full transition-colors group mx-0.5 outline-none focus:bg-white/[0.06] disabled:opacity-60 disabled:cursor-not-allowed"
-                  >
-                    <span className="text-[12px] text-white/80 group-hover:text-white">
-                      {isUpgrading ? 'Opening checkout...' : 'Upgrade plan'}
-                    </span>
-                    {isUpgrading && <Loader2 className="h-3.5 w-3.5 text-white/60 animate-spin" />}
-                  </button>
+                  <UpgradeModal
+                    trigger={
+                      <button className="flex items-center justify-between px-2 py-1.5 hover:bg-[#151619] rounded-md text-left w-full transition-colors group mx-0.5 outline-none focus:bg-white/[0.06]">
+                        <span className="text-[12px] text-white/80 group-hover:text-white">
+                          Upgrade plan
+                        </span>
+                      </button>
+                    }
+                  />
                   <button
                     onClick={handleSignOut}
                     className="flex items-center justify-between px-2 py-1.5 hover:bg-[#151619] rounded-md text-left w-full transition-colors group mx-0.5 outline-none focus:bg-white/[0.06]"
@@ -256,5 +241,8 @@ export default function DashboardSidebar() {
           </Link>
         </div>
     </SidebarShell>
+    
+    <UpgradeModal open={showUpgradeModal} onOpenChange={setShowUpgradeModal} />
+    </>
   )
 }

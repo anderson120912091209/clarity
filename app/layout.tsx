@@ -10,9 +10,20 @@ import { Analytics } from "@vercel/analytics/react"
 const manrope = Manrope({ subsets: ['latin'] })
 export const metadata: Metadata = {
   title: '{clarity}',
-  description: 'AI LaTeX Editor',
+  description: 'AI Powered Overleaf Alternative, Supports LaTeX, Typst...',
   icons: {
     icon: '/favicon.ico',
+  },
+  openGraph: {
+    title: '{clarity}',
+    description: 'AI Powered Overleaf Alternative, Supports LaTeX, Typst...',
+    images: ['/meta.png'],
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: '{clarity}',
+    description: 'AI Powered Overleaf Alternative, Supports LaTeX, Typst...',
+    images: ['/meta.png'],
   },
 }
 
