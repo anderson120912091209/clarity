@@ -6,6 +6,7 @@ export declare const compileRequestSchema: z.ZodObject<{
     draft: z.ZodOptional<z.ZodBoolean>;
     stopOnFirstError: z.ZodDefault<z.ZodBoolean>;
     allowNetwork: z.ZodOptional<z.ZodBoolean>;
+    compileMode: z.ZodOptional<z.ZodEnum<["manual", "auto"]>>;
     resources: z.ZodArray<z.ZodEffects<z.ZodObject<{
         path: z.ZodString;
         content: z.ZodOptional<z.ZodString>;
@@ -51,6 +52,7 @@ export declare const compileRequestSchema: z.ZodObject<{
     timeout?: number | undefined;
     allowNetwork?: boolean | undefined;
     draft?: boolean | undefined;
+    compileMode?: "auto" | "manual" | undefined;
 }, {
     rootResourcePath: string;
     resources: {
@@ -65,11 +67,13 @@ export declare const compileRequestSchema: z.ZodObject<{
     allowNetwork?: boolean | undefined;
     draft?: boolean | undefined;
     stopOnFirstError?: boolean | undefined;
+    compileMode?: "auto" | "manual" | undefined;
 }>;
 export declare const typstLivePreviewRequestSchema: z.ZodObject<{
     rootResourcePath: z.ZodString;
     timeout: z.ZodOptional<z.ZodNumber>;
     allowNetwork: z.ZodOptional<z.ZodBoolean>;
+    compileMode: z.ZodOptional<z.ZodEnum<["manual", "auto"]>>;
     resources: z.ZodArray<z.ZodEffects<z.ZodObject<{
         path: z.ZodString;
         content: z.ZodOptional<z.ZodString>;
@@ -112,6 +116,7 @@ export declare const typstLivePreviewRequestSchema: z.ZodObject<{
     }[];
     timeout?: number | undefined;
     allowNetwork?: boolean | undefined;
+    compileMode?: "auto" | "manual" | undefined;
 }, {
     rootResourcePath: string;
     resources: {
@@ -123,6 +128,7 @@ export declare const typstLivePreviewRequestSchema: z.ZodObject<{
     }[];
     timeout?: number | undefined;
     allowNetwork?: boolean | undefined;
+    compileMode?: "auto" | "manual" | undefined;
 }>;
 export type CompileRequestBody = z.infer<typeof compileRequestSchema>;
 export type TypstLivePreviewRequestBody = z.infer<typeof typstLivePreviewRequestSchema>;

@@ -32,6 +32,7 @@ interface NormalizedWorkspaceFile {
 }
 
 interface NormalizedChatContext {
+  userId: string | null
   activeFileId: string | null
   activeFileName: string | null
   activeFilePath: string | null
@@ -84,6 +85,7 @@ function sanitizeText(value: unknown): string {
 }
 
 function normalizeContext(input: AgentChatContext | undefined): NormalizedChatContext {
+  const userIdRaw = sanitizeText(input?.userId)
   const activeFilePathRaw = sanitizeText(input?.activeFilePath)
   const activeFileNameRaw = sanitizeText(input?.activeFileName)
   const activeFileContentRaw = sanitizeText(input?.activeFileContent)
@@ -139,6 +141,7 @@ function normalizeContext(input: AgentChatContext | undefined): NormalizedChatCo
   }
 
   return {
+    userId: userIdRaw || null,
     activeFileId: input?.activeFileId ?? null,
     activeFileName: activeFileNameRaw || null,
     activeFilePath,
@@ -461,9 +464,10 @@ export async function POST(req: Request) {
   // Track AI chat message event
   const posthog = getPostHogClient()
   posthog?.capture({
-    distinctId: requestId,
+    distinctId: context.userId ?? requestId,
     event: 'ai_chat_message_sent',
     properties: {
+      user_id: context.userId,
       model: selectedModel,
       workspace_files_count: context.workspaceFiles.length,
       typst_library_enabled: typstLibraryEnabled,

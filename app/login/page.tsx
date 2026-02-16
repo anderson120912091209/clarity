@@ -53,16 +53,10 @@ function toUserUpdate(user: AuthenticatedUser) {
   }
 }
 
-function toAnalyticsUserProperties(user: AuthenticatedUser) {
-  return {
-    ...(typeof user.email === 'string' ? { email: user.email } : {}),
-  }
-}
-
 async function warmWelcomeProjects(userId: string, projects: WelcomeProjectSeed[]) {
   await Promise.allSettled(
     projects.map(async (project) => {
-      const { blob } = await fetchPdf([
+      const { blob } = await fetchPdf(project.projectId, [
         {
           id: project.mainFileId,
           name: project.mainFileName,
@@ -70,7 +64,10 @@ async function warmWelcomeProjects(userId: string, projects: WelcomeProjectSeed[
           parent_id: null,
           content: project.content,
         },
-      ])
+      ], {
+        mode: 'manual',
+        clientUserId: userId,
+      })
 
       const pathname = createPathname(userId, project.projectId)
       await Promise.allSettled([
@@ -124,12 +121,6 @@ export default function Login() {
         welcome_seed_version: WELCOME_SEED_VERSION,
         welcome_seeded_at: nowISO,
       }
-      const analyticsProperties = toAnalyticsUserProperties(user)
-
-      // Identify user in PostHog
-      posthog.identify(user.id, {
-        ...analyticsProperties,
-      })
 
       const isNewUser = !hasWelcomeSeeded && !hasProjects
 

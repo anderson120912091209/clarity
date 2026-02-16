@@ -7,6 +7,12 @@ const parseBoolean = (value, defaultValue) => {
     const normalized = value.trim().toLowerCase();
     return normalized === '1' || normalized === 'true' || normalized === 'yes' || normalized === 'on';
 };
+const parsePositiveInt = (value, defaultValue) => {
+    if (!value)
+        return defaultValue;
+    const parsed = parseInt(value, 10);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : defaultValue;
+};
 const settings = {
     // Server configuration
     host: process.env.HOST || '0.0.0.0',
@@ -26,6 +32,19 @@ const settings = {
     cacheLimit: parseInt(process.env.CACHE_LIMIT || '2', 10),
     // Security
     seccompProfilePath: path.join(__dirname, 'seccomp.json'),
+    // Compile rate limiting
+    compileRateLimit: {
+        enabled: parseBoolean(process.env.COMPILE_RATE_LIMIT_ENABLED, true),
+        clientUserIdHeader: process.env.COMPILE_RATE_LIMIT_USER_HEADER || 'x-clarity-user-id',
+        cooldownLimit: parsePositiveInt(process.env.COMPILE_RATE_LIMIT_COOLDOWN_LIMIT, 1),
+        cooldownWindowSec: parsePositiveInt(process.env.COMPILE_RATE_LIMIT_COOLDOWN_WINDOW_SEC, 2),
+        burstLimit: parsePositiveInt(process.env.COMPILE_RATE_LIMIT_BURST_LIMIT, 60),
+        burstWindowSec: parsePositiveInt(process.env.COMPILE_RATE_LIMIT_BURST_WINDOW_SEC, 600),
+        autoLimit: parsePositiveInt(process.env.COMPILE_RATE_LIMIT_AUTO_LIMIT, 20),
+        autoWindowSec: parsePositiveInt(process.env.COMPILE_RATE_LIMIT_AUTO_WINDOW_SEC, 60),
+        dailyLimit: parsePositiveInt(process.env.COMPILE_RATE_LIMIT_DAILY_LIMIT, 200),
+        dailyWindowSec: parsePositiveInt(process.env.COMPILE_RATE_LIMIT_DAILY_WINDOW_SEC, 86400),
+    },
 };
 export default settings;
 //# sourceMappingURL=settings.js.map

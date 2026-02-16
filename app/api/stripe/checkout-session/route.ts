@@ -6,6 +6,7 @@ export const runtime = 'nodejs'
 interface CheckoutSessionRequestBody {
   priceId?: string
   customerEmail?: string
+  distinctId?: string
   successPath?: string
   cancelPath?: string
 }
@@ -29,6 +30,13 @@ function normalizeEmail(email: string | undefined): string | null {
   if (!email) return null
   const trimmed = email.trim()
   if (!trimmed || trimmed.length > 254) return null
+  return trimmed
+}
+
+function normalizeDistinctId(distinctId: string | undefined): string | null {
+  if (!distinctId) return null
+  const trimmed = distinctId.trim()
+  if (!trimmed || trimmed.length > 200) return null
   return trimmed
 }
 
@@ -59,6 +67,7 @@ export async function POST(request: NextRequest) {
   const successPath = normalizePath(body.successPath, '/projects?checkout=success')
   const cancelPath = normalizePath(body.cancelPath, '/projects?checkout=cancel')
   const customerEmail = normalizeEmail(body.customerEmail)
+  const distinctId = normalizeDistinctId(body.distinctId)
 
   const params = new URLSearchParams()
   params.set('mode', 'subscription')
@@ -106,9 +115,10 @@ export async function POST(request: NextRequest) {
   // Track server-side checkout session created event
   const posthog = getPostHogClient()
   posthog?.capture({
-    distinctId: customerEmail ?? 'anonymous',
+    distinctId: distinctId ?? customerEmail ?? 'anonymous',
     event: 'checkout_session_created',
     properties: {
+      distinct_id_source: distinctId ? 'client' : customerEmail ? 'email' : 'fallback',
       price_id: priceId,
       customer_email: customerEmail,
       source: 'api',

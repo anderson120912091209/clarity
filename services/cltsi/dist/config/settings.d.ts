@@ -11,6 +11,18 @@ interface CLSISettings {
     cacheAge: number;
     cacheLimit: number;
     seccompProfilePath: string;
+    compileRateLimit: {
+        enabled: boolean;
+        clientUserIdHeader: string;
+        cooldownLimit: number;
+        cooldownWindowSec: number;
+        burstLimit: number;
+        burstWindowSec: number;
+        autoLimit: number;
+        autoWindowSec: number;
+        dailyLimit: number;
+        dailyWindowSec: number;
+    };
 }
 declare const settings: CLSISettings;
 export default settings;

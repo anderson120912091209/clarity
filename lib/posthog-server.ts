@@ -3,7 +3,8 @@ import { PostHog } from 'posthog-node'
 let posthogClient: PostHog | null = null
 
 export function getPostHogClient(): PostHog | null {
-  const apiKey = process.env.NEXT_PUBLIC_POSTHOG_KEY
+  const apiKey = process.env.POSTHOG_API_KEY ?? process.env.NEXT_PUBLIC_POSTHOG_KEY
+  const host = process.env.POSTHOG_HOST ?? process.env.NEXT_PUBLIC_POSTHOG_HOST
   if (!apiKey) {
     return null
   }
@@ -12,7 +13,7 @@ export function getPostHogClient(): PostHog | null {
     posthogClient = new PostHog(
       apiKey,
       {
-        host: process.env.NEXT_PUBLIC_POSTHOG_HOST,
+        host,
         flushAt: 1,
         flushInterval: 0,
       }

@@ -1,5 +1,6 @@
 import express from 'express';
 import { SynctexNotFoundError } from '../core/SynctexManager.js';
+import { buildCompileRateLimitHeaders, checkCompileRateLimit, getCompileMode, } from '../core/CompileRateLimiter.js';
 import { compileRequestSchema, typstLivePreviewRequestSchema } from './schemas.js';
 export function createRoutes(compileManager, cacheManager, typstLivePreviewManager, synctexManager) {
     const router = express.Router();
@@ -10,12 +11,39 @@ export function createRoutes(compileManager, cacheManager, typstLivePreviewManag
     router.post('/project/:projectId/compile', async (req, res, next) => {
         try {
             const { projectId } = req.params;
+            const compileMode = getCompileMode(req);
+            const rateLimitResult = await checkCompileRateLimit(req, projectId, compileMode);
+            res.set(buildCompileRateLimitHeaders(rateLimitResult));
+            if (!rateLimitResult.allowed) {
+                res.set('Retry-After', String(rateLimitResult.quota.retryAfterSec));
+                res.status(429).json({
+                    status: 'rate-limited',
+                    reason: rateLimitResult.reason,
+                    message: rateLimitResult.reason === 'daily'
+                        ? 'Daily compile quota reached for this client.'
+                        : 'Compile rate limit reached. Please retry shortly.',
+                    limit: rateLimitResult.quota.limit,
+                    used: rateLimitResult.quota.used,
+                    remaining: rateLimitResult.quota.remaining,
+                    retryAfterSec: rateLimitResult.quota.retryAfterSec,
+                });
+                return;
+            }
             // Validate request body
             const body = compileRequestSchema.parse(req.body);
+            const compileRequestBody = {
+                compiler: body.compiler,
+                rootResourcePath: body.rootResourcePath,
+                timeout: body.timeout,
+                draft: body.draft,
+                stopOnFirstError: body.stopOnFirstError,
+                allowNetwork: body.allowNetwork,
+                resources: body.resources,
+            };
             // Execute compilation
             const result = await compileManager.compile({
                 projectId,
-                ...body,
+                ...compileRequestBody,
             });
             res.json(result);
         }
@@ -30,10 +58,34 @@ export function createRoutes(compileManager, cacheManager, typstLivePreviewManag
     router.post('/project/:projectId/typst/live/preview', async (req, res, next) => {
         try {
             const { projectId } = req.params;
+            const compileMode = getCompileMode(req);
+            const rateLimitResult = await checkCompileRateLimit(req, projectId, compileMode);
+            res.set(buildCompileRateLimitHeaders(rateLimitResult));
+            if (!rateLimitResult.allowed) {
+                res.set('Retry-After', String(rateLimitResult.quota.retryAfterSec));
+                res.status(429).json({
+                    status: 'rate-limited',
+                    reason: rateLimitResult.reason,
+                    message: rateLimitResult.reason === 'daily'
+                        ? 'Daily compile quota reached for this client.'
+                        : 'Compile rate limit reached. Please retry shortly.',
+                    limit: rateLimitResult.quota.limit,
+                    used: rateLimitResult.quota.used,
+                    remaining: rateLimitResult.quota.remaining,
+                    retryAfterSec: rateLimitResult.quota.retryAfterSec,
+                });
+                return;
+            }
             const body = typstLivePreviewRequestSchema.parse(req.body);
+            const typstPreviewRequestBody = {
+                rootResourcePath: body.rootResourcePath,
+                timeout: body.timeout,
+                allowNetwork: body.allowNetwork,
+                resources: body.resources,
+            };
             const result = await typstLivePreviewManager.preview({
                 projectId,
-                ...body,
+                ...typstPreviewRequestBody,
             });
             res.json(result);
         }

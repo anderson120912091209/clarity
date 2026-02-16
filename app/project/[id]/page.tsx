@@ -35,6 +35,7 @@ import { chatApplyService, type FileSuggestionApplyMode } from '@/services/agent
 import { changeManagerService, type StagedFileChange } from '@/features/agent/services/change-manager'
 import type { AgentWorkspaceFileContext } from '@/features/agent/types/chat-context'
 import { completeNavJourney, markNavMilestone } from '@/lib/perf/nav-trace'
+import { warmupShikiMonaco } from '@/components/editor/utils/shiki-monaco'
 
 export const maxDuration = 30
 const AI_CHAT_ENABLED = process.env.NEXT_PUBLIC_ENABLE_AI_CHAT === 'true'
@@ -259,6 +260,14 @@ function EditorLayout() {
   useEffect(() => {
     setEditorSyntaxTheme(settings.defaultEditorSyntaxTheme)
   }, [settings.defaultEditorSyntaxTheme])
+
+  useEffect(() => {
+    if (editorSyntaxTheme !== 'shiki') return
+
+    void warmupShikiMonaco().catch((error) => {
+      console.warn('[Shiki] Project-level warmup failed:', error)
+    })
+  }, [editorSyntaxTheme])
 
   useEffect(() => {
     projectDataMarkedRef.current = false

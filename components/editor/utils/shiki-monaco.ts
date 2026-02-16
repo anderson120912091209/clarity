@@ -32,13 +32,16 @@ type MonacoEditorWithShikiAlias = typeof monaco.editor & {
   __shikiThemeAliasBase?: typeof monaco.editor.setTheme
 }
 
-let setupPromise: Promise<{
+type ShikiSetupResult = {
   highlighter: ShikiHighlighter
   shikiToMonaco: (
     highlighter: ShikiHighlighter,
     monacoInstance: typeof monaco
   ) => void
-}> | null = null
+}
+
+let setupPromise: Promise<ShikiSetupResult> | null = null
+let shikiMonacoReady = false
 
 function importFromUrl(url: string): Promise<unknown> {
   // Use native `import()` at runtime without asking the bundler to resolve http(s) specifiers.
@@ -46,7 +49,7 @@ function importFromUrl(url: string): Promise<unknown> {
   return (0, eval)(`import(${JSON.stringify(url)})`)
 }
 
-export async function setupShikiMonaco(monacoInstance: typeof monaco): Promise<void> {
+function getSetupPromise(): Promise<ShikiSetupResult> {
   if (!setupPromise) {
     setupPromise = (async () => {
       const [shikiModule, shikiMonacoModule] = (await Promise.all([
@@ -68,17 +71,31 @@ export async function setupShikiMonaco(monacoInstance: typeof monaco): Promise<v
     })().catch((err) => {
       // If the CDN import fails (offline/CSP), let the editor fall back to Monaco's built-in highlighting.
       setupPromise = null
+      shikiMonacoReady = false
       throw err
     })
   }
 
-  const { highlighter, shikiToMonaco } = await setupPromise
+  return setupPromise
+}
+
+export function isShikiMonacoReady(): boolean {
+  return shikiMonacoReady
+}
+
+export function warmupShikiMonaco(): Promise<void> {
+  return getSetupPromise().then(() => undefined)
+}
+
+export async function setupShikiMonaco(monacoInstance: typeof monaco): Promise<void> {
+  const { highlighter, shikiToMonaco } = await getSetupPromise()
 
   ensureMonacoLanguageRegistered(monacoInstance, 'latex')
   ensureMonacoLanguageRegistered(monacoInstance, 'typst')
 
   // Re-apply tokenization on every call to keep switching stable.
   shikiToMonaco(highlighter, monacoInstance)
+  shikiMonacoReady = true
 
   // Map common Monaco theme names to Shiki themes so theme switches don't throw.
   // Re-wrap when the underlying setTheme implementation changes (for example after restoring default mode).

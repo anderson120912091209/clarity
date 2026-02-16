@@ -16,6 +16,7 @@ export interface AgentChatSettingsContext {
 }
 
 export interface AgentChatContext {
+  userId?: string | null
   activeFileId?: string | null
   activeFileName?: string | null
   activeFilePath?: string | null

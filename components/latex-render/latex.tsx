@@ -7,7 +7,16 @@ import { Button } from '@/components/ui/button'
 import { Switch } from '@/components/ui/switch'
 import LatexError from './latex-error'
 import { Label } from '@/components/ui/label'
-import { ZoomIn, ZoomOut, RotateCcw, Play, Loader2, Download, FileType, RefreshCw, ScrollText, MessageSquare } from 'lucide-react'
+import { Loader2 } from 'lucide-react'
+import {
+  ChatRound,
+  ClipboardText,
+  DocumentText,
+  Download,
+  MagnifierZoomIn,
+  MagnifierZoomOut,
+  Refresh,
+} from '@solar-icons/react'
 import { savePdfToStorage, savePreviewToStorage } from '@/lib/utils/db-utils'
 import { useProject } from '@/contexts/ProjectContext'
 import { useDashboardSettings } from '@/contexts/DashboardSettingsContext'
@@ -33,6 +42,7 @@ if (typeof window !== 'undefined') {
 }
 
 const AUTO_PERSIST_IDLE_MS = 1200
+const SOLAR_ICON_WEIGHT = 'Linear' as const
 
 // Hook for managing LaTeX compilation state
 export function useLatex(liveFileContentOverrides: Record<string, string> = {}) {
@@ -200,8 +210,10 @@ export function useLatex(liveFileContentOverrides: Record<string, string> = {}) 
     setLogs(null)
     
     try {
-      const { blob, logs, synctex } = await fetchPdf(effectiveFiles, {
+      const { blob, logs, synctex } = await fetchPdf(projectId, effectiveFiles, {
         signal: abortController.signal,
+        mode,
+        clientUserId: user.id,
       })
       if (runId !== compileRunRef.current) return
 
@@ -328,7 +340,7 @@ function LogsPanel({ logs, error }: { logs: string | null, error: string | null 
     <div className="flex flex-col h-full w-full bg-[#090909] text-zinc-300 font-mono text-xs overflow-hidden">
       <div className="flex items-center justify-between px-4 py-2 border-b border-white/5 bg-white/[0.02]">
         <div className="flex items-center gap-2">
-          <ScrollText className="w-3.5 h-3.5 text-zinc-400" />
+          <ClipboardText className="w-3.5 h-3.5 text-zinc-400" weight={SOLAR_ICON_WEIGHT} />
           <span className="font-medium">Compilation Logs</span>
         </div>
       </div>
@@ -560,7 +572,7 @@ function LatexRenderer({
       ) : (
         <div className="flex-1 flex flex-col items-center justify-center text-zinc-500 gap-3">
            <div className="w-16 h-16 rounded-2xl bg-zinc-900 border border-white/5 flex items-center justify-center shadow-xl">
-               <FileType className="w-8 h-8 opacity-50" />
+               <DocumentText className="w-8 h-8 opacity-50" weight={SOLAR_ICON_WEIGHT} />
            </div>
            <p className="text-sm">Ready to compile</p>
         </div>
@@ -638,7 +650,7 @@ export function PDFNavContent({
           {isLoading ? (
             <Loader2 className="w-3.5 h-3.5 animate-spin text-white/70" />
           ) : (
-            <RefreshCw className="w-3.5 h-3.5" />
+            <Refresh className="w-3.5 h-3.5" weight={SOLAR_ICON_WEIGHT} />
           )}
           <span>Compile</span>
           
@@ -660,7 +672,7 @@ export function PDFNavContent({
             )}
             title={isChatVisible ? 'Hide AI Chat' : 'Show AI Chat'}
           >
-            <MessageSquare className="w-3.5 h-3.5" />
+            <ChatRound className="w-3.5 h-3.5" weight={SOLAR_ICON_WEIGHT} />
             <span>AI Chat</span>
           </Button>
         ) : null}
@@ -675,7 +687,7 @@ export function PDFNavContent({
              showLogs ? "bg-white/10 text-white" : "text-zinc-400 hover:text-white hover:bg-white/5"
            )}
          >
-           <ScrollText className="w-3.5 h-3.5" />
+           <ClipboardText className="w-3.5 h-3.5" weight={SOLAR_ICON_WEIGHT} />
          </Button>
 
         {/* View Controls */}
@@ -686,7 +698,7 @@ export function PDFNavContent({
              onClick={onZoomOut} 
              className="h-7 w-7 rounded-md text-zinc-400 hover:text-[#6D78E7] hover:bg-[#6D78E7]/10 transition-colors"
           >
-            <ZoomOut className="h-3.5 w-3.5" />
+            <MagnifierZoomOut className="h-3.5 w-3.5" weight={SOLAR_ICON_WEIGHT} />
           </Button>
           
           <span 
@@ -702,7 +714,7 @@ export function PDFNavContent({
              onClick={onZoomIn} 
              className="h-7 w-7 rounded-md text-zinc-400 hover:text-[#6D78E7] hover:bg-[#6D78E7]/10 transition-colors"
           >
-            <ZoomIn className="h-3.5 w-3.5" />
+            <MagnifierZoomIn className="h-3.5 w-3.5" weight={SOLAR_ICON_WEIGHT} />
           </Button>
           
           <div className="w-px h-3.5 bg-white/10 mx-1.5" />
@@ -713,7 +725,7 @@ export function PDFNavContent({
             onClick={onDownload} 
             className="h-7 w-7 rounded-md text-zinc-400 hover:text-[#6D78E7] hover:bg-[#6D78E7]/10 transition-colors"
           >
-            <Download className="h-3.5 w-3.5" />
+            <Download className="h-3.5 w-3.5" weight={SOLAR_ICON_WEIGHT} />
           </Button>
         </div>
       </div>

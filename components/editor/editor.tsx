@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Editor from '@monaco-editor/react'
 import { useEditorSetup } from './hooks/useEditorSetup'
 import { useAIAssist } from '@/features/agent'
@@ -7,7 +7,11 @@ import { editorDefaultOptions } from './constants/editorDefaults'
 import { Loader2 } from 'lucide-react'
 import { historyService } from '@/services/agent/browser/history/historyService'
 import { chatApplyService } from '@/services/agent/browser/chat/chatApplyService'
-import { setupShikiMonaco } from './utils/shiki-monaco'
+import {
+  isShikiMonacoReady,
+  setupShikiMonaco,
+  warmupShikiMonaco,
+} from './utils/shiki-monaco'
 import { useTheme } from 'next-themes'
 import type { editor as MonacoEditorNamespace, IDisposable } from 'monaco-editor'
 import {
@@ -109,6 +113,9 @@ export const CodeEditor = ({
     typeof navigator !== 'undefined' && navigator.userAgent.includes('Macintosh')
   const isDark =
     theme === 'dark' || (theme === 'system' && systemTheme === 'dark')
+  const [isShikiReady, setIsShikiReady] = useState<boolean>(() =>
+    isShikiMonacoReady()
+  )
 
   const applyDefaultSyntaxTheme = useCallback(
     (monacoInstance: MonacoInstance, model: MonacoModel) => {
@@ -154,6 +161,7 @@ export const CodeEditor = ({
         defaultTokensDisposableRef.current = null
         await setupShikiMonaco(monacoInstance)
         if (applySeqRef.current !== seq) return
+        setIsShikiReady(true)
         applyShikiSyntaxTheme(monacoInstance, model)
       } catch (err) {
         console.warn('[Shiki] Theme setup failed; falling back to default:', err)
@@ -169,6 +177,15 @@ export const CodeEditor = ({
   useEffect(() => {
     applySyntaxThemeRef.current = applySyntaxTheme
   }, [applySyntaxTheme])
+
+  useEffect(() => {
+    if (syntaxTheme !== 'shiki') return
+
+    void warmupShikiMonaco()
+      .catch((error) => {
+        console.warn('[Shiki] Warmup failed; using Monaco fallback:', error)
+      })
+  }, [syntaxTheme])
 
   useEffect(() => {
     applySyntaxTheme()
@@ -222,7 +239,12 @@ export const CodeEditor = ({
     editor.focus()
   }, [gotoRequest, editorRef])
 
-  const editorTheme = resolveMonacoThemeForSyntaxTheme(syntaxTheme, isDark)
+  const editorTheme =
+    syntaxTheme === 'shiki' && !isShikiReady
+      ? isDark
+        ? 'vs-dark'
+        : 'vs'
+      : resolveMonacoThemeForSyntaxTheme(syntaxTheme, isDark)
 
   return (
     <Editor

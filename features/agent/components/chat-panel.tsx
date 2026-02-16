@@ -354,6 +354,7 @@ export function ChatPanel({
     }
 
     return {
+      userId,
       activeFileId: activeFileId ?? null,
       activeFileName: activeFileName ?? null,
       activeFilePath: activeFilePath ?? null,
@@ -381,6 +382,7 @@ export function ChatPanel({
     currentDocumentContext,
     libraryEnabled,
     showCurrentDocument,
+    userId,
     workspaceFiles,
   ])
 

@@ -2,9 +2,15 @@ import posthog from 'posthog-js'
 
 const ingestHost = process.env.NEXT_PUBLIC_POSTHOG_HOST
 const uiHostFromIngest = ingestHost?.replace('.i.posthog.com', '.posthog.com')
+const forceReplay = process.env.NEXT_PUBLIC_POSTHOG_FORCE_REPLAY === 'true'
+const isDevelopment = process.env.NODE_ENV === 'development'
+const useProxy =
+  process.env.NEXT_PUBLIC_POSTHOG_USE_PROXY === 'true' ||
+  (process.env.NEXT_PUBLIC_POSTHOG_USE_PROXY !== 'false' && !isDevelopment)
+const apiHost = useProxy ? '/ingest' : ingestHost
 
 posthog.init(process.env.NEXT_PUBLIC_POSTHOG_KEY!, {
-  api_host: '/ingest',
+  api_host: apiHost,
   // ui_host should be the PostHog app host, not the ingestion host.
   ui_host: process.env.NEXT_PUBLIC_POSTHOG_UI_HOST ?? uiHostFromIngest,
   defaults: '2025-11-30',
@@ -13,11 +19,14 @@ posthog.init(process.env.NEXT_PUBLIC_POSTHOG_KEY!, {
   // Keep explicit so replay doesn't depend on implicit defaults.
   disable_session_recording: false,
   // Turn on debug in development mode
-  debug: process.env.NODE_ENV === 'development',
+  debug: isDevelopment,
   loaded: (ph) => {
-    // In local debugging, start recorder explicitly for easier replay troubleshooting.
-    if (process.env.NODE_ENV === 'development') {
-      ph.startSessionRecording()
+    if (typeof window !== 'undefined') {
+      ;(window as typeof window & { posthog?: typeof ph }).posthog = ph
+    }
+    // Helpful for validating replay in local/dev without changing project-wide sampling.
+    if (isDevelopment || forceReplay) {
+      ph.startSessionRecording(true)
     }
   },
 })

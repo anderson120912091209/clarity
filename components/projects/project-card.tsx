@@ -91,7 +91,10 @@ export default function ProjectCard({ project, detailed = false, loading = false
     previewWarmupStartedRef.current = true
     void (async () => {
       try {
-        const { blob } = await fetchPdf(files.files)
+        const { blob } = await fetchPdf(project.id, files.files, {
+          mode: 'manual',
+          clientUserId: userId,
+        })
         await Promise.allSettled([
           savePdfToStorage(blob, `${pathname}main.pdf`, project.id),
           savePreviewToStorage(blob, `${pathname}preview.webp`, project.id),

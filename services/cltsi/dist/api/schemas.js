@@ -16,12 +16,14 @@ export const compileRequestSchema = z.object({
     draft: z.boolean().optional(),
     stopOnFirstError: z.boolean().default(true),
     allowNetwork: z.boolean().optional(),
+    compileMode: z.enum(['manual', 'auto']).optional(),
     resources: z.array(resourceSchema).min(1),
 });
 export const typstLivePreviewRequestSchema = z.object({
     rootResourcePath: z.string().min(1),
     timeout: z.number().min(500).max(300000).optional(),
     allowNetwork: z.boolean().optional(),
+    compileMode: z.enum(['manual', 'auto']).optional(),
     resources: z.array(resourceSchema).min(1),
 });
 //# sourceMappingURL=schemas.js.map
