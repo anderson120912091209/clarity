@@ -58,6 +58,53 @@ interface FetchPdfResult {
   synctex: SynctexContext | null
 }
 
+interface CompileDiagnostics {
+  summary?: string
+  file?: string
+  line?: number
+}
+
+interface CompileResultPayload {
+  status?: string
+  buildId?: string
+  outputFiles?: Array<{ path: string; url?: string }>
+  diagnostics?: CompileDiagnostics
+  message?: string
+}
+
+function getUserFacingCompileMessage(
+  compileResult: CompileResultPayload,
+  compileLabel: string
+): string {
+  const summary = compileResult.diagnostics?.summary?.trim()
+  if (summary) {
+    return summary
+  }
+
+  const message = compileResult.message?.trim()
+  if (message) {
+    return message
+  }
+
+  return `${compileLabel} compilation failed.`
+}
+
+function createCompileError(
+  compileResult: CompileResultPayload,
+  compileLabel: string,
+  logs: string | null
+): Error & { logs?: string | null; diagnostics?: CompileDiagnostics; rawMessage?: string } {
+  const error = new Error(getUserFacingCompileMessage(compileResult, compileLabel)) as Error & {
+    logs?: string | null
+    diagnostics?: CompileDiagnostics
+    rawMessage?: string
+  }
+  error.logs = logs
+  error.diagnostics = compileResult.diagnostics
+  error.rawMessage = compileResult.message
+  return error
+}
+
 function buildClsiCandidates(configuredUrl: string): string[] {
   const cleanedConfiguredUrl = configuredUrl.replace(/\/+$/, '')
   const candidates = [cleanedConfiguredUrl]
@@ -262,6 +309,7 @@ export async function fetchPdf(
             payload: {
               compiler: compileTarget.compiler,
               rootResourcePath: compileTarget.rootResourcePath,
+              stopOnFirstError: true,
               resources,
             },
           },
@@ -325,7 +373,7 @@ export async function fetchPdf(
     throw new Error(errorMessage)
   }
 
-  const compileResult = await compileResponse.json()
+  const compileResult = (await compileResponse.json()) as CompileResultPayload
   
   console.log('[CLSI] Compile result:', compileResult)
 
@@ -348,17 +396,17 @@ export async function fetchPdf(
 
   // Handle compilation errors
   if (compileResult.status !== 'success') {
-    let errorMessage = compileResult.message || `${compileTarget.label} compilation failed`
-    const error = new Error(errorMessage) as any
-    error.logs = logs
-    throw error
+    throw createCompileError(compileResult, compileTarget.label, logs)
   }
 
   // Extract PDF URL from successful compilation
   const pdfFile = compileResult.outputFiles?.find((f: any) => f.path === 'output.pdf')
   if (!pdfFile || !pdfFile.url) {
-    const error = new Error('CLSI compilation succeeded but no PDF was generated') as any
+    const error = new Error(
+      compileResult.diagnostics?.summary || 'Compilation completed, but no PDF was generated.'
+    ) as any
     error.logs = logs
+    error.diagnostics = compileResult.diagnostics
     throw error
   }
 

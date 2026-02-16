@@ -317,6 +317,13 @@ export function useLatex(liveFileContentOverrides: Record<string, string> = {}) 
 }
 
 function LogsPanel({ logs, error }: { logs: string | null, error: string | null }) {
+  const summary =
+    error
+      ?.split('\n')
+      .map((line) => line.trim())
+      .find((line) => line.length > 0) ?? null
+  const fullLogs = logs?.trim() ? logs : null
+
   return (
     <div className="flex flex-col h-full w-full bg-[#090909] text-zinc-300 font-mono text-xs overflow-hidden">
       <div className="flex items-center justify-between px-4 py-2 border-b border-white/5 bg-white/[0.02]">
@@ -326,11 +333,27 @@ function LogsPanel({ logs, error }: { logs: string | null, error: string | null 
         </div>
       </div>
       
-      <div className="flex-1 overflow-auto p-4 space-y-6">
-        {/* Actual Logs */}
-        <div className="whitespace-pre-wrap leading-relaxed opacity-80">
-          {logs || error || "No logs available."}
-        </div>
+      <div className="flex-1 overflow-auto p-4 space-y-4">
+        <section className="rounded-lg border border-amber-300/20 bg-amber-200/[0.04] p-3">
+          <p className="mb-2 text-[11px] uppercase tracking-wide text-amber-200/75">Summary</p>
+          <p className="whitespace-pre-wrap break-words font-sans text-sm text-zinc-100">
+            {summary || 'No compilation errors in the latest run.'}
+          </p>
+        </section>
+
+        <section className="rounded-lg border border-white/10 bg-black/20 p-3">
+          <p className="mb-2 text-[11px] uppercase tracking-wide text-zinc-400">Full output.log</p>
+          <pre className="whitespace-pre-wrap leading-relaxed opacity-85">
+            {fullLogs || 'No compiler log file was generated for this run.'}
+          </pre>
+        </section>
+
+        {!fullLogs && error ? (
+          <section className="rounded-lg border border-white/10 bg-black/20 p-3">
+            <p className="mb-2 text-[11px] uppercase tracking-wide text-zinc-400">Fallback Error Payload</p>
+            <pre className="whitespace-pre-wrap leading-relaxed opacity-85">{error}</pre>
+          </section>
+        ) : null}
       </div>
     </div>
   )

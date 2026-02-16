@@ -24,6 +24,7 @@ export function errorHandler(err, req, res, _next) {
             status: 'error',
             buildId: err.details.buildId,
             outputFiles: err.details.outputFiles,
+            diagnostics: err.details.diagnostics,
             message: err.message,
         });
     }

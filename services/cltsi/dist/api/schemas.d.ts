@@ -4,7 +4,7 @@ export declare const compileRequestSchema: z.ZodObject<{
     rootResourcePath: z.ZodString;
     timeout: z.ZodOptional<z.ZodNumber>;
     draft: z.ZodOptional<z.ZodBoolean>;
-    stopOnFirstError: z.ZodOptional<z.ZodBoolean>;
+    stopOnFirstError: z.ZodDefault<z.ZodBoolean>;
     allowNetwork: z.ZodOptional<z.ZodBoolean>;
     resources: z.ZodArray<z.ZodEffects<z.ZodObject<{
         path: z.ZodString;
@@ -40,6 +40,7 @@ export declare const compileRequestSchema: z.ZodObject<{
 }, "strip", z.ZodTypeAny, {
     compiler: "pdflatex" | "xelatex" | "lualatex" | "typst";
     rootResourcePath: string;
+    stopOnFirstError: boolean;
     resources: {
         path: string;
         url?: string | undefined;
@@ -50,7 +51,6 @@ export declare const compileRequestSchema: z.ZodObject<{
     timeout?: number | undefined;
     allowNetwork?: boolean | undefined;
     draft?: boolean | undefined;
-    stopOnFirstError?: boolean | undefined;
 }, {
     rootResourcePath: string;
     resources: {

@@ -7,6 +7,7 @@ import { ResourceManager } from './ResourceManager.js';
 import { LatexRunner } from './LatexRunner.js';
 import { TypstRunner } from './TypstRunner.js';
 import { CacheManager } from './CacheManager.js';
+import { buildCompileDiagnostics } from '../utils/compile-diagnostics.js';
 import logger from '../utils/logger.js';
 import settings from '../config/settings.js';
 
@@ -74,6 +75,20 @@ export class CompileManager {
           resourceList
         );
 
+        const hasPdf = outputFiles.some((file) => file.path === 'output.pdf');
+        if (!hasPdf) {
+          const diagnostics = await buildCompileDiagnostics({
+            compileDir,
+            compiler: request.compiler,
+            fallbackMessage: `${request.compiler.toUpperCase()} compilation did not generate output.pdf.`,
+          });
+          throw new CompilationError(diagnostics.summary, {
+            buildId,
+            outputFiles,
+            diagnostics,
+          });
+        }
+
         logger.info({ projectId, buildId }, 'Compilation successful');
 
         return {
@@ -90,12 +105,20 @@ export class CompileManager {
           resourceList
         );
 
+        const fallbackMessage =
+          error instanceof Error ? error.message : 'Compilation failed';
+        const diagnostics = await buildCompileDiagnostics({
+          compileDir,
+          compiler: request.compiler,
+          fallbackMessage,
+        });
+
         logger.warn({ projectId, buildId, err: error }, 'Compilation failed');
 
         // Determine error type
         throw new CompilationError(
-          error instanceof Error ? error.message : 'Compilation failed',
-          { buildId, outputFiles }
+          diagnostics.summary,
+          { buildId, outputFiles, diagnostics }
         );
       }
 
@@ -145,7 +168,7 @@ export class CompileManager {
       mainFile: request.rootResourcePath,
       compiler: request.compiler,
       timeout,
-      stopOnFirstError: request.stopOnFirstError,
+      stopOnFirstError: request.stopOnFirstError !== false,
     });
   }
 

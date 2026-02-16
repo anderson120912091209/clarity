@@ -20,7 +20,7 @@ export const compileRequestSchema = z.object({
   rootResourcePath: z.string().min(1),
   timeout: z.number().min(1000).max(300000).optional(), // 1s to 5min
   draft: z.boolean().optional(),
-  stopOnFirstError: z.boolean().optional(),
+  stopOnFirstError: z.boolean().default(true),
   allowNetwork: z.boolean().optional(),
   resources: z.array(resourceSchema).min(1),
 });

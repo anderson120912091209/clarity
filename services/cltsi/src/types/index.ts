@@ -25,6 +25,7 @@ export interface CompileResult {
   status: 'success' | 'error' | 'timeout' | 'terminated';
   buildId: string;
   outputFiles: OutputFile[];
+  diagnostics?: CompileDiagnostics;
   message?: string;
 }
 
@@ -33,6 +34,12 @@ export interface OutputFile {
   type: 'pdf' | 'log' | 'synctex' | 'aux';
   url: string;
   size: number;
+}
+
+export interface CompileDiagnostics {
+  summary: string;
+  file?: string;
+  line?: number;
 }
 
 export interface LatexOptions {
@@ -73,7 +80,11 @@ export interface Lock {
 export class CompilationError extends Error {
   constructor(
     message: string,
-    public details: { buildId?: string; outputFiles?: OutputFile[] }
+    public details: {
+      buildId?: string;
+      outputFiles?: OutputFile[];
+      diagnostics?: CompileDiagnostics;
+    }
   ) {
     super(message);
     this.name = 'CompilationError';

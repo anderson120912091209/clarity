@@ -39,9 +39,9 @@ export class LatexRunner {
                 openout_any: 'p', // Paranoid mode - only current directory
             },
         });
-        // latexmk returns 12 when LaTeX has errors but PDF was generated
-        // We accept this as it allows users to see partial output
-        if (result.exitCode !== 0 && result.exitCode !== 12) {
+        // Treat any non-zero exit as a compile failure.
+        // We no longer force through errors because it often produces confusing states.
+        if (result.exitCode !== 0) {
             throw new CompilationError('LaTeX compilation failed', {
                 outputFiles: [], // Will be populated by CompileManager
             });
@@ -67,11 +67,8 @@ export class LatexRunner {
             '-file-line-error', // Better error messages
         ];
         // Optional flags
-        if (options.stopOnFirstError) {
+        if (options.stopOnFirstError ?? true) {
             command.push('-halt-on-error');
-        }
-        else {
-            command.push('-f'); // Force through errors
         }
         // Main TeX file
         command.push(options.mainFile);

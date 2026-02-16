@@ -22,6 +22,7 @@ export interface CompileResult {
     status: 'success' | 'error' | 'timeout' | 'terminated';
     buildId: string;
     outputFiles: OutputFile[];
+    diagnostics?: CompileDiagnostics;
     message?: string;
 }
 export interface OutputFile {
@@ -29,6 +30,11 @@ export interface OutputFile {
     type: 'pdf' | 'log' | 'synctex' | 'aux';
     url: string;
     size: number;
+}
+export interface CompileDiagnostics {
+    summary: string;
+    file?: string;
+    line?: number;
 }
 export interface LatexOptions {
     directory: string;
@@ -64,10 +70,12 @@ export declare class CompilationError extends Error {
     details: {
         buildId?: string;
         outputFiles?: OutputFile[];
+        diagnostics?: CompileDiagnostics;
     };
     constructor(message: string, details: {
         buildId?: string;
         outputFiles?: OutputFile[];
+        diagnostics?: CompileDiagnostics;
     });
 }
 export declare class TimeoutError extends Error {

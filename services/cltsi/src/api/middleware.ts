@@ -34,6 +34,7 @@ export function errorHandler(
       status: 'error',
       buildId: err.details.buildId,
       outputFiles: err.details.outputFiles,
+      diagnostics: err.details.diagnostics,
       message: err.message,
     });
   }

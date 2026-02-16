@@ -1,6 +1,7 @@
 import path from 'node:path';
 import fs from 'node:fs/promises';
 import { CompilationError } from '../utils/errors.js';
+import { buildCompileDiagnostics } from '../utils/compile-diagnostics.js';
 import logger from '../utils/logger.js';
 import settings from '../config/settings.js';
 /**
@@ -45,6 +46,19 @@ export class CompileManager {
                 await this.runCompilation(projectId, request, compileDir);
                 // Step 4: Save output files (compilation succeeded)
                 const { buildId, outputFiles } = await this.cacheManager.saveOutputFiles(projectId, compileDir, resourceList);
+                const hasPdf = outputFiles.some((file) => file.path === 'output.pdf');
+                if (!hasPdf) {
+                    const diagnostics = await buildCompileDiagnostics({
+                        compileDir,
+                        compiler: request.compiler,
+                        fallbackMessage: `${request.compiler.toUpperCase()} compilation did not generate output.pdf.`,
+                    });
+                    throw new CompilationError(diagnostics.summary, {
+                        buildId,
+                        outputFiles,
+                        diagnostics,
+                    });
+                }
                 logger.info({ projectId, buildId }, 'Compilation successful');
                 return {
                     status: 'success',
@@ -55,9 +69,15 @@ export class CompileManager {
             catch (error) {
                 // Compilation failed, but still save logs for debugging
                 const { buildId, outputFiles } = await this.cacheManager.saveOutputFiles(projectId, compileDir, resourceList);
+                const fallbackMessage = error instanceof Error ? error.message : 'Compilation failed';
+                const diagnostics = await buildCompileDiagnostics({
+                    compileDir,
+                    compiler: request.compiler,
+                    fallbackMessage,
+                });
                 logger.warn({ projectId, buildId, err: error }, 'Compilation failed');
                 // Determine error type
-                throw new CompilationError(error instanceof Error ? error.message : 'Compilation failed', { buildId, outputFiles });
+                throw new CompilationError(diagnostics.summary, { buildId, outputFiles, diagnostics });
             }
         }
         finally {
@@ -97,7 +117,7 @@ export class CompileManager {
             mainFile: request.rootResourcePath,
             compiler: request.compiler,
             timeout,
-            stopOnFirstError: request.stopOnFirstError,
+            stopOnFirstError: request.stopOnFirstError !== false,
         });
     }
     async clearPreviousOutputs(compileDir) {
