@@ -1,8 +1,10 @@
 import { createGoogleGenerativeAI } from '@ai-sdk/google'
 import { streamText, type CoreMessage } from 'ai'
 import { GEMINI_DEFAULT_MODEL, resolveGeminiModel } from '@/lib/constants/gemini-models'
+import { checkFixedQuota, type FixedQuotaResult } from '@/lib/server/rate-limit'
 
 export const runtime = 'nodejs'
+const QUICK_EDIT_CLIENT_QUOTA = 20
 
 interface QuickEditRequestBody {
   messages: Array<{
@@ -41,32 +43,80 @@ function shouldRetryWithDefaultModel(error: unknown): boolean {
   return /not found|not supported/i.test(message)
 }
 
+function getClientIdentifier(req: Request): string {
+  const forwardedFor = req.headers.get('x-forwarded-for')
+  const realIp = req.headers.get('x-real-ip')
+  const cfConnectingIp = req.headers.get('cf-connecting-ip')
+  const userAgent = req.headers.get('user-agent') ?? 'unknown'
+
+  const ip =
+    cfConnectingIp?.split(',')[0]?.trim() ||
+    realIp?.split(',')[0]?.trim() ||
+    forwardedFor?.split(',')[0]?.trim() ||
+    'unknown-ip'
+
+  return `${ip}:${userAgent}`
+}
+
+function attachQuotaHeaders(headers: Headers, quota: FixedQuotaResult) {
+  headers.set('X-QuickEdit-Quota-Limit', String(quota.limit))
+  headers.set('X-QuickEdit-Quota-Used', String(quota.used))
+  headers.set('X-QuickEdit-Quota-Remaining', String(quota.remaining))
+}
+
+function createQuotaResponse(
+  body: BodyInit | null,
+  init: ResponseInit,
+  quota: FixedQuotaResult
+): Response {
+  const headers = new Headers(init.headers)
+  attachQuotaHeaders(headers, quota)
+  return new Response(body, { ...init, headers })
+}
+
 export async function POST(req: Request) {
   const requestId =
     typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
       ? crypto.randomUUID()
       : `qe-${Date.now()}`
+  const clientIdentifier = getClientIdentifier(req)
+  const quota = checkFixedQuota({
+    key: `quick-edit:${clientIdentifier}`,
+    limit: QUICK_EDIT_CLIENT_QUOTA,
+  })
+
+  if (!quota.allowed) {
+    return createQuotaResponse(
+      'Quick edit quota reached for this client (20 total requests).',
+      { status: 429 },
+      quota
+    )
+  }
 
   let payload: QuickEditRequestBody
   try {
     payload = (await req.json()) as QuickEditRequestBody
   } catch {
-    return new Response('Invalid request payload', { status: 400 })
+    return createQuotaResponse('Invalid request payload', { status: 400 }, quota)
   }
 
   if (!Array.isArray(payload.messages) || payload.messages.length === 0) {
-    return new Response('Invalid quick edit messages payload', { status: 400 })
+    return createQuotaResponse('Invalid quick edit messages payload', { status: 400 }, quota)
   }
 
   const conversation = normalizeConversationMessages(payload.messages)
   if (conversation.length === 0 || conversation[conversation.length - 1].role !== 'user') {
-    return new Response('A user message is required to start quick edit generation', { status: 400 })
+    return createQuotaResponse(
+      'A user message is required to start quick edit generation',
+      { status: 400 },
+      quota
+    )
   }
 
   const apiKey =
     process.env.GOOGLE_GENERATIVE_AI_API_KEY || process.env.GOOGLE_GENERATION_AI_API_KEY
   if (!apiKey) {
-    return new Response('Missing Google API Key', { status: 401 })
+    return createQuotaResponse('Missing Google API Key', { status: 401 }, quota)
   }
 
   const google = createGoogleGenerativeAI({ apiKey })
@@ -95,9 +145,18 @@ export async function POST(req: Request) {
       result = await runWithModel(GEMINI_DEFAULT_MODEL)
     }
 
-    return result.toTextStreamResponse()
+    const streamResponse = result.toTextStreamResponse()
+    return createQuotaResponse(
+      streamResponse.body,
+      {
+        status: streamResponse.status,
+        statusText: streamResponse.statusText,
+        headers: streamResponse.headers,
+      },
+      quota
+    )
   } catch (error) {
     console.error(`[Agent QuickEdit ${requestId}] Error:`, error)
-    return new Response('Internal Server Error', { status: 500 })
+    return createQuotaResponse('Internal Server Error', { status: 500 }, quota)
   }
 }
