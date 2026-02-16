@@ -16,6 +16,8 @@ import { startNavJourney } from '@/lib/perf/nav-trace'
 import { NewProjectDialog } from '@/components/features/projects/new-project-dialog'
 import { getAllProjects } from '@/hooks/data'
 import { useDashboardSettings } from '@/contexts/DashboardSettingsContext'
+import { useQuickEditQuota } from '@/hooks/useQuickEditQuota'
+import { AiQuotaDisplay } from '@/components/ai-quota-display'
 
 export default function DashboardSidebar() {
   const router = useRouter()
@@ -25,6 +27,12 @@ export default function DashboardSidebar() {
   const [isUpgrading, setIsUpgrading] = useState(false)
   const { isCollapsed } = useSidebar()
   const { settings } = useDashboardSettings()
+  const {
+    quota: quickEditQuota,
+    isLoading: isQuickEditQuotaLoading,
+    error: quickEditQuotaError,
+    refresh: refreshQuickEditQuota,
+  } = useQuickEditQuota({ autoRefreshMs: 30_000 })
   const { data: projectsData } = getAllProjects(user?.id)
   const projects = projectsData?.projects as Array<{ trashed_at?: string | null }> | undefined
   
@@ -32,6 +40,8 @@ export default function DashboardSidebar() {
   const isTrashActive = pathname?.startsWith('/trash')
   const isSettingsActive = pathname?.startsWith('/settings')
   const trashedCount = projects?.filter((project) => Boolean(project.trashed_at)).length ?? 0
+  const quickEditQuotaUsagePercent =
+    quickEditQuota.limit > 0 ? Math.min((quickEditQuota.used / quickEditQuota.limit) * 100, 100) : 0
 
   const handleSignOut = () => {
     db.auth.signOut()
@@ -96,8 +106,25 @@ export default function DashboardSidebar() {
                 <div className="px-3 py-2 border-b border-white/[0.06]">
                   <div className="text-[12px] font-medium text-white truncate">{user?.email || 'User'}</div>
                   <div className="text-[10px] text-white/50">Free Plan</div>
+                  <div className="mt-2">
+                    <AiQuotaDisplay
+                      used={quickEditQuota.used}
+                      limit={quickEditQuota.limit}
+                      loading={isQuickEditQuotaLoading}
+                      error={quickEditQuotaError ? 'Failed to load quota status.' : null}
+                      onRefresh={refreshQuickEditQuota}
+                      showLabel={true}
+                      compact={false}
+                    />
+                  </div>
                 </div>
                 <div className="p-1">
+                  <Link
+                    href="/settings/assistant"
+                    className="flex items-center justify-between px-2 py-1.5 hover:bg-[#151619] rounded-md text-left w-full transition-colors group mx-0.5 outline-none focus:bg-white/[0.06]"
+                  >
+                    <span className="text-[12px] text-white/80 group-hover:text-white">AI quota settings</span>
+                  </Link>
                   <button
                     onClick={handleUpgrade}
                     disabled={isUpgrading}

@@ -1,10 +1,14 @@
 import { createGoogleGenerativeAI } from '@ai-sdk/google'
 import { streamText, type CoreMessage } from 'ai'
 import { GEMINI_DEFAULT_MODEL, resolveGeminiModel } from '@/lib/constants/gemini-models'
-import { checkFixedQuota, type FixedQuotaResult } from '@/lib/server/rate-limit'
+import {
+  checkFixedQuota,
+  getFixedQuotaSnapshot,
+  type FixedQuotaResult,
+} from '@/lib/server/rate-limit'
+import { buildQuickEditQuotaKey, QUICK_EDIT_CLIENT_QUOTA } from '@/lib/server/quick-edit-quota'
 
 export const runtime = 'nodejs'
-const QUICK_EDIT_CLIENT_QUOTA = 20
 
 interface QuickEditRequestBody {
   messages: Array<{
@@ -43,25 +47,11 @@ function shouldRetryWithDefaultModel(error: unknown): boolean {
   return /not found|not supported/i.test(message)
 }
 
-function getClientIdentifier(req: Request): string {
-  const forwardedFor = req.headers.get('x-forwarded-for')
-  const realIp = req.headers.get('x-real-ip')
-  const cfConnectingIp = req.headers.get('cf-connecting-ip')
-  const userAgent = req.headers.get('user-agent') ?? 'unknown'
-
-  const ip =
-    cfConnectingIp?.split(',')[0]?.trim() ||
-    realIp?.split(',')[0]?.trim() ||
-    forwardedFor?.split(',')[0]?.trim() ||
-    'unknown-ip'
-
-  return `${ip}:${userAgent}`
-}
-
 function attachQuotaHeaders(headers: Headers, quota: FixedQuotaResult) {
   headers.set('X-QuickEdit-Quota-Limit', String(quota.limit))
   headers.set('X-QuickEdit-Quota-Used', String(quota.used))
   headers.set('X-QuickEdit-Quota-Remaining', String(quota.remaining))
+  headers.set('X-QuickEdit-Quota-Store', quota.store)
 }
 
 function createQuotaResponse(
@@ -74,14 +64,28 @@ function createQuotaResponse(
   return new Response(body, { ...init, headers })
 }
 
+export async function GET(req: Request) {
+  const quota = await getFixedQuotaSnapshot({
+    key: buildQuickEditQuotaKey(req),
+    limit: QUICK_EDIT_CLIENT_QUOTA,
+  })
+
+  return Response.json({
+    limit: quota.limit,
+    used: quota.used,
+    remaining: quota.remaining,
+    allowed: quota.allowed,
+    store: quota.store,
+  })
+}
+
 export async function POST(req: Request) {
   const requestId =
     typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
       ? crypto.randomUUID()
       : `qe-${Date.now()}`
-  const clientIdentifier = getClientIdentifier(req)
-  const quota = checkFixedQuota({
-    key: `quick-edit:${clientIdentifier}`,
+  const quota = await checkFixedQuota({
+    key: buildQuickEditQuotaKey(req),
     limit: QUICK_EDIT_CLIENT_QUOTA,
   })
 

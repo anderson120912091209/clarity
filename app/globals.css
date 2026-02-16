@@ -280,3 +280,9 @@ code, kbd, samp, pre {
 .dark .monaco-editor .diff-gutter-deleted {
   background-color: #ef4444 !important;
 }
+
+@keyframes shimmer {
+  100% {
+    transform: translateX(100%);
+  }
+}

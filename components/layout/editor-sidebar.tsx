@@ -27,6 +27,8 @@ import {
   resolvePdfBackgroundTheme,
   type PdfBackgroundThemeKey,
 } from '@/lib/constants/pdf-background-themes'
+import { useQuickEditQuota } from '@/hooks/useQuickEditQuota'
+import { AiQuotaDisplay } from '@/components/ai-quota-display'
 
 interface EditorSidebarProps {
   syntaxTheme: EditorSyntaxTheme
@@ -41,11 +43,19 @@ export default function EditorSidebar({ syntaxTheme, onSyntaxThemeChange }: Edit
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
   const [settingsView, setSettingsView] = useState<'root' | 'theme' | 'preview'>('root')
   const [localPdfBackgroundTheme, setLocalPdfBackgroundTheme] = useState<PdfBackgroundThemeKey>(DEFAULT_PDF_BACKGROUND_THEME)
+  const {
+    quota: quickEditQuota,
+    isLoading: isQuickEditQuotaLoading,
+    error: quickEditQuotaError,
+    refresh: refreshQuickEditQuota,
+  } = useQuickEditQuota({ autoRefreshMs: 30_000 })
   const { isCollapsed } = useSidebar()
   const { projectId, project, files, currentlyOpen } = useProject()
   const isPdfCaretNavigationEnabled = project?.isPdfCaretNavigationEnabled ?? true
   const pdfBackgroundTheme = localPdfBackgroundTheme
   const selectedPdfBackgroundTheme = resolvePdfBackgroundTheme(pdfBackgroundTheme)
+  const quickEditQuotaUsagePercent =
+    quickEditQuota.limit > 0 ? Math.min((quickEditQuota.used / quickEditQuota.limit) * 100, 100) : 0
 
   useEffect(() => {
     const projectTheme = project?.pdfBackgroundTheme
@@ -141,8 +151,25 @@ export default function EditorSidebar({ syntaxTheme, onSyntaxThemeChange }: Edit
                 <div className="px-3 py-2 border-b border-white/[0.06]">
                   <div className="text-[12px] font-medium text-white truncate">{user?.email || 'User'}</div>
                   <div className="text-[10px] text-white/50">Free Plan</div>
+                  <div className="mt-2">
+                    <AiQuotaDisplay
+                      used={quickEditQuota.used}
+                      limit={quickEditQuota.limit}
+                      loading={isQuickEditQuotaLoading}
+                      error={quickEditQuotaError ? 'Failed to load quota status.' : null}
+                      onRefresh={refreshQuickEditQuota}
+                      showLabel={true}
+                      compact={false}
+                    />
+                  </div>
                 </div>
                 <div className="p-1">
+                  <Link
+                    href="/settings/assistant"
+                    className="flex items-center justify-between px-2 py-1.5 hover:bg-[#151619] rounded-md text-left w-full transition-colors group outline-none focus:bg-white/[0.06]"
+                  >
+                    <span className="text-[12px] text-white/80 group-hover:text-white">AI quota settings</span>
+                  </Link>
                   <button
                     onClick={handleSignOut}
                     className="flex items-center justify-between px-2 py-1.5 hover:bg-[#151619] rounded-md text-left w-full transition-colors group outline-none focus:bg-white/[0.06]"
