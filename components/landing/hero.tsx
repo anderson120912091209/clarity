@@ -5,6 +5,8 @@ import { ArrowRight, Sparkles, Terminal, Share2, FileCode2 } from 'lucide-react'
 import Link from 'next/link'
 
 export function Hero() {
+  const ctaSizeClass = 'h-[54px] w-full max-w-[250px]'
+
   return (
     <section className="relative pt-24 pb-16 md:pt-40 md:pb-24 px-6 overflow-hidden">
       <div className="max-w-5xl mx-auto flex flex-col items-start text-left">
@@ -21,13 +23,32 @@ export function Hero() {
         </p>
 
         {/* CTA */}
-        <div className="flex flex-col sm:flex-row items-center gap-4 mb-16 md:mb-20">
-          <Button asChild className="h-10 px-6 bg-white text-black
-           hover:bg-zinc-200 font-medium text-sm shadow-md rounded-md transition-colors w-full sm:w-auto">
-            <Link href="/login">
-              Get started
+        <div className="w-full flex flex-col sm:flex-row items-center gap-4 mb-16 md:mb-20">
+          <Button
+            asChild
+            className={`${ctaSizeClass} px-8 bg-white text-black hover:bg-zinc-200
+             text-sm font-semibold shadow-md rounded-md transition-colors cursor-crosshair`}
+          >
+            <Link href="/login" className="flex h-full w-full items-center justify-center cursor-crosshair">
+              Get Started Now
             </Link>
           </Button>
+          <a
+            href="https://www.producthunt.com/products/clarity-21/launches/clarity-5e700cce-895a-4d47-82ba-fa0b32065d14?embed=true&utm_source=badge-featured&utm_medium=badge&utm_campaign=badge-clarity-5e700cce-895a-4d47-82ba-fa0b32065d14"
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="Clarity on Product Hunt"
+            className={`${ctaSizeClass} cursor-crosshair hidden sm:block`}
+          >
+            <img
+              src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=1046258&theme=light&t=1771405187279"
+              alt="{clarity} - notebook for science & math, type your math notes fast! | Product Hunt"
+              className="block h-full w-full"
+              width="250"
+              height="54"
+              loading="lazy"
+            />
+          </a>
         </div>
 
         {/* Media Layout - Heptabase Replication */}
@@ -54,6 +75,24 @@ export function Hero() {
                  </div>
             </div>
         </div>
+
+        {/* Product Hunt - Mobile Only */}
+        <a
+          href="https://www.producthunt.com/products/clarity-21/launches/clarity-5e700cce-895a-4d47-82ba-fa0b32065d14?embed=true&utm_source=badge-featured&utm_medium=badge&utm_campaign=badge-clarity-5e700cce-895a-4d47-82ba-fa0b32065d14"
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label="Clarity on Product Hunt"
+          className={`${ctaSizeClass} cursor-crosshair mx-auto mt-8 block sm:hidden`}
+        >
+          <img
+            src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=1046258&theme=light&t=1771405187279"
+            alt="{clarity} - notebook for science & math, type your math notes fast! | Product Hunt"
+            className="block h-full w-full"
+            width="250"
+            height="54"
+            loading="lazy"
+          />
+        </a>
 
       </div>
     </section>

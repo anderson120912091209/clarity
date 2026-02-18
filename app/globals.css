@@ -78,6 +78,9 @@
   * {
     @apply border-border;
   }
+  html {
+    scroll-behavior: smooth;
+  }
   body {
     @apply bg-background text-foreground antialiased;
     font-feature-settings: "ss01", "ss02", "cv01", "cv02", "cv03"; 
@@ -95,6 +98,19 @@
   ::-webkit-scrollbar-thumb {
     @apply bg-muted-foreground/20 hover:bg-muted-foreground/30 transition-colors rounded-full border-4 border-solid border-transparent bg-clip-content;
   }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+}
+
+.landing-page,
+.landing-page a,
+.landing-page button,
+.landing-page [role='button'] {
+  cursor: crosshair !important;
 }
 
 /* Disable blue selection highlight in chat UI */
