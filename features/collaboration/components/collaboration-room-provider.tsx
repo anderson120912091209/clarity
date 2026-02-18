@@ -12,7 +12,7 @@ import type {
 
 interface CollaborationRoomProviderProps {
   projectId: string
-  fileId: string
+  fileId: string | null
   filePath: string | null
   role: CollaborationRole
   userId: string
@@ -29,7 +29,7 @@ function CollaborationRoomLifecycle({
   userInfo,
 }: {
   roomId: string
-  fileId: string
+  fileId: string | null
   filePath: string | null
   userId: string
   userInfo: CollaborationUserInfo
@@ -42,13 +42,6 @@ function CollaborationRoomLifecycle({
 
   useEffect(() => {
     const now = Date.now()
-    updateMyPresence({
-      fileId,
-      filePath,
-      idle: false,
-      lastActiveAt: now,
-    })
-
     broadcastEvent({
       type: 'join',
       userId,
@@ -66,7 +59,16 @@ function CollaborationRoomLifecycle({
         at: Date.now(),
       })
     }
-  }, [broadcastEvent, fileId, filePath, roomId, updateMyPresence, userId, userName])
+  }, [broadcastEvent, roomId, userId, userName])
+
+  useEffect(() => {
+    updateMyPresence({
+      fileId,
+      filePath,
+      idle: false,
+      lastActiveAt: Date.now(),
+    })
+  }, [fileId, filePath, updateMyPresence])
 
   useEffect(() => {
     const previousStatus = previousStatusRef.current
@@ -96,12 +98,12 @@ export function CollaborationRoomProvider({
   shareToken,
   children,
 }: CollaborationRoomProviderProps) {
-  const roomId = useMemo(() => buildCollaborationRoomId(projectId, fileId), [projectId, fileId])
+  const roomId = useMemo(() => buildCollaborationRoomId(projectId), [projectId])
   const authContext = useMemo(
     () => ({
       roomId,
       projectId,
-      fileId,
+      fileId: fileId || undefined,
       role,
       userId,
       userInfo,

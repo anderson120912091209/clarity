@@ -4,8 +4,9 @@
 
 - **Realtime transport and consistency:** Liveblocks + Yjs (`@liveblocks/yjs` + `y-monaco`) are used for low-latency, conflict-free concurrent editing in Monaco.
 - **Durable data:** InstantDB remains source-of-truth persistence for files/projects; editor writes are debounced (longer in collaboration mode) to avoid per-keystroke transactions.
-- **Room topology:** one room per project file with deterministic ID:
-  - `project:{projectId}:file:{fileId}`
+- **Room topology:** one room per project with deterministic ID:
+  - `project:{projectId}`
+  - active file context is tracked in presence (`fileId`, `filePath`) instead of room identity
 - **Presence model:** user cursor, selection, file location, idle state, and active timestamp are carried in Liveblocks presence.
 - **Session access model:** server-authenticated Liveblocks access token is minted by `/api/liveblocks-auth`, with role-based permissions (`viewer`, `commenter`, `editor`).
 - **Sharing model:** `/api/collab/share-link` issues signed, expiring share tokens (HMAC) scoped to a project/file and role.
@@ -44,4 +45,3 @@
   - `COLLAB_SHARE_SECRET`
   - `NEXT_PUBLIC_APP_URL` (optional, used for absolute share URL generation)
 - Optional telemetry events include join/leave/reconnect, share link creation, comment thread/comment actions, and resolve/unresolve.
-

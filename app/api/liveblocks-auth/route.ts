@@ -56,17 +56,23 @@ export async function POST(req: Request) {
   const projectId = asNonEmptyString(rawBody.projectId)
   const fileId = asNonEmptyString(rawBody.fileId)
   const userId = asNonEmptyString(rawBody.userId)
-  if (!room || !projectId || !fileId || !userId) {
+  if (!room || !projectId || !userId) {
     return NextResponse.json(
-      { error: 'Missing required fields: room, projectId, fileId, userId.' },
+      { error: 'Missing required fields: room, projectId, userId.' },
       { status: 400 }
     )
   }
 
   const parsedRoom = parseCollaborationRoomId(room)
-  if (!parsedRoom || parsedRoom.projectId !== projectId || parsedRoom.fileId !== fileId) {
-    return NextResponse.json({ error: 'Room does not match project/file.' }, { status: 403 })
+  if (!parsedRoom || parsedRoom.projectId !== projectId) {
+    return NextResponse.json({ error: 'Room does not match project.' }, { status: 403 })
   }
+
+  if (parsedRoom.fileId && fileId && parsedRoom.fileId !== fileId) {
+    return NextResponse.json({ error: 'Room file does not match request file.' }, { status: 403 })
+  }
+
+  const requestedFileId = fileId || parsedRoom.fileId || null
 
   let effectiveRole = normalizeCollaborationRole(rawBody.role, 'editor')
   const shareToken = asNonEmptyString(rawBody.shareToken)
@@ -96,10 +102,15 @@ export async function POST(req: Request) {
     // Backward compatibility:
     // older links were file-scoped, but collaboration is now project-scoped.
     // Keep accepting them so users can switch files in one shared session.
-    if (claims.fileId !== '*' && claims.fileId !== fileId && process.env.NODE_ENV !== 'production') {
+    if (
+      claims.fileId !== '*' &&
+      requestedFileId &&
+      claims.fileId !== requestedFileId &&
+      process.env.NODE_ENV !== 'production'
+    ) {
       console.warn('[collab-debug] accepting legacy file-scoped share token', {
         tokenFileId: claims.fileId,
-        requestedFileId: fileId,
+        requestedFileId,
         projectId,
       })
     }

@@ -41,9 +41,9 @@ export async function POST(req: Request) {
   const projectId = asNonEmptyString(body.projectId)
   const fileId = asNonEmptyString(body.fileId)
   const userId = asNonEmptyString(body.userId)
-  if (!projectId || !fileId || !userId) {
+  if (!projectId || !userId) {
     return NextResponse.json(
-      { error: 'Missing required fields: projectId, fileId, userId.' },
+      { error: 'Missing required fields: projectId, userId.' },
       { status: 400 }
     )
   }
@@ -71,13 +71,15 @@ export async function POST(req: Request) {
   const baseUrl = appUrl || requestUrl.origin
   const shareUrl = new URL(`/project/${projectId}`, baseUrl)
   shareUrl.searchParams.set('share', token)
-  shareUrl.searchParams.set('file', fileId)
+  if (fileId) {
+    shareUrl.searchParams.set('file', fileId)
+  }
 
   return NextResponse.json({
     shareUrl: shareUrl.toString(),
     token,
     role,
     expiresAt,
-    roomId: buildCollaborationRoomId(projectId, fileId),
+    roomId: buildCollaborationRoomId(projectId),
   })
 }

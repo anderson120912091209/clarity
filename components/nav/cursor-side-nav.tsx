@@ -10,11 +10,9 @@ import LoadingSideNav from '@/components/nav/loading-side-nav'
 import { useProject } from '@/contexts/ProjectContext'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
-import { db } from '@/lib/constants'
-import { tx } from '@instantdb/react'
 
 export default function CursorSideNav() {
-  const { project, isProjectLoading, projectId, files, currentlyOpen } = useProject()
+  const { project, isProjectLoading, projectId, files, currentlyOpen, setActiveFile } = useProject()
   const [query, setQuery] = useState('')
   const [isSearchFocused, setIsSearchFocused] = useState(false)
 
@@ -85,10 +83,7 @@ export default function CursorSideNav() {
           projectId={projectId}
           userId={files?.[0]?.user_id || ''}
           onOpenFile={(file: { id: string }) => {
-            db.transact([
-              tx.files[file.id].update({ isOpen: true }),
-              tx.projects[projectId].update({ activeFileId: file.id }),
-            ])
+            setActiveFile(file.id)
           }}
           currentlyOpenId={currentlyOpen?.id}
         />

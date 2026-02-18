@@ -259,6 +259,7 @@ function EditorLayout() {
     projectId,
     isProjectLoading,
     isFilesLoading,
+    setActiveFile,
   } = useProject()
   const { files: stagedChanges, anyStreaming: anyStagedStreaming } = useChangeManagerState()
   const isPdfNavigationEnabled =
@@ -515,13 +516,8 @@ function EditorLayout() {
     const target = projectFiles.find((file) => file?.id === shareFileId && file?.type === 'file')
     if (!target?.id) return
 
-    db.transact([
-      tx.files[target.id].update({ isOpen: true }),
-      tx.projects[projectId].update({ activeFileId: target.id }),
-    ]).catch((error) => {
-      console.warn('Failed to open shared file on join:', error)
-    })
-  }, [activeShareToken, currentlyOpen?.id, projectFiles, projectId, shareFileId])
+    setActiveFile(target.id)
+  }, [activeShareToken, currentlyOpen?.id, projectFiles, projectId, setActiveFile, shareFileId])
 
   useEffect(() => {
     return () => {
@@ -948,14 +944,7 @@ function EditorLayout() {
       const file = fileIdMap.current.get(fileId)
       if (!entry || !file) return
 
-      try {
-        await db.transact([
-          tx.files[fileId].update({ isOpen: true }),
-          tx.projects[projectId].update({ activeFileId: fileId }),
-        ])
-      } catch (error) {
-        console.warn('Failed to open staged file:', error)
-      }
+      setActiveFile(fileId)
 
       changeManagerService.setActiveFile(fileId)
 
@@ -982,7 +971,7 @@ function EditorLayout() {
         })
       }, 0)
     },
-    [projectId]
+    [setActiveFile]
   )
 
   const handleEditorCursorClick = useCallback(
@@ -1153,10 +1142,7 @@ function EditorLayout() {
           const file = findFileByPath(target.file)
           if (!file?.id) return
 
-          await db.transact([
-            tx.files[file.id].update({ isOpen: true }),
-            tx.projects[projectId].update({ activeFileId: file.id }),
-          ])
+          setActiveFile(file.id)
 
           editorGotoNonceRef.current += 1
           setEditorGotoRequest({
@@ -1171,7 +1157,7 @@ function EditorLayout() {
         }
       })()
     },
-    [isPdfNavigationEnabled, synctexContext, findFileByPath, projectId]
+    [isPdfNavigationEnabled, synctexContext, findFileByPath, setActiveFile]
   )
 
   // Header content for the editor pane
@@ -1235,7 +1221,7 @@ function EditorLayout() {
     >
       <CollaborationRoomProvider
         projectId={projectId || 'unknown-project'}
-        fileId={currentlyOpen?.id || 'no-file'}
+        fileId={currentlyOpen?.id || null}
         filePath={activeFilePathForCollaboration}
         role={collaborationRole}
         userId={user?.id || 'anonymous'}

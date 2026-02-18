@@ -433,7 +433,7 @@ export const CodeEditor = ({
           if (model) {
             const yProvider = getYjsProviderForRoom(room)
             const yDoc = yProvider.getYDoc()
-            const yText = yDoc.getText('content')
+            const yText = yDoc.getText(`file:${collaboration.fileId}`)
             let disposed = false
             let didSeedFromSnapshot = false
 

@@ -1,22 +1,22 @@
 'use client'
-import React, { createContext, useContext, ReactNode, useEffect, useMemo } from 'react'
-import { useProjectData, useProjectFiles } from '@/hooks/data';
-import { useFrontend } from '@/contexts/FrontendContext';
-import { useRouter, useSearchParams } from 'next/navigation';
+import React, {
+  createContext,
+  useCallback,
+  useContext,
+  ReactNode,
+  useEffect,
+  useMemo,
+  useState,
+} from 'react'
+import { useProjectData, useProjectFiles } from '@/hooks/data'
+import { useFrontend } from '@/contexts/FrontendContext'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { db } from '@/lib/constants'
-import { tx } from '@instantdb/react'
-import { decodeShareTokenUnsafe } from '@/features/collaboration/share-token';
+import { decodeShareTokenUnsafe } from '@/features/collaboration/share-token'
 import type { CollaborationRole } from '@/features/collaboration/types'
 
-// TODO: Add better types
-interface ProjectContextType {
-  project: any
-  files: any
-  isLoading: boolean
-  error: any
-}
-
 const ProjectContext = createContext<any>(undefined)
+const TAB_SESSION_PREFIX = 'project-tab-session'
 
 function shouldEnableShareDebug(): boolean {
   if (typeof window === 'undefined') return false
@@ -29,6 +29,41 @@ function normalizeFileQueryParam(value: string | null): string | null {
   if (!value) return null
   const normalized = value.split('?')[0]?.trim()
   return normalized || null
+}
+
+function buildTabSessionStorageKey(projectId: string, userId?: string): string {
+  return `${TAB_SESSION_PREFIX}:${projectId}:${userId || 'anonymous'}`
+}
+
+function areStringArraysEqual(left: string[], right: string[]): boolean {
+  if (left.length !== right.length) return false
+  for (let index = 0; index < left.length; index += 1) {
+    if (left[index] !== right[index]) return false
+  }
+  return true
+}
+
+function parseStoredTabSession(raw: string | null): {
+  openFileIds: string[]
+  activeFileId: string | null
+} | null {
+  if (!raw) return null
+  try {
+    const parsed = JSON.parse(raw) as {
+      openFileIds?: unknown
+      activeFileId?: unknown
+    }
+    const openFileIds = Array.isArray(parsed.openFileIds)
+      ? parsed.openFileIds.filter((value): value is string => typeof value === 'string' && value.trim() !== '')
+      : []
+    const activeFileId =
+      typeof parsed.activeFileId === 'string' && parsed.activeFileId.trim() !== ''
+        ? parsed.activeFileId
+        : null
+    return { openFileIds, activeFileId }
+  } catch {
+    return null
+  }
 }
 
 export function ProjectProvider({
@@ -84,28 +119,126 @@ export function ProjectProvider({
     projectQueryOptions
   )
   const project = projectData?.projects?.[0]
-  const activeFileId = project?.activeFileId
-  const openFiles = filesData?.files?.filter((file: any) => file.isOpen === true) || []
+  const fileRecords = useMemo(() => {
+    return Array.isArray(filesData?.files) ? filesData.files : []
+  }, [filesData?.files])
+  const fileMap = useMemo(() => {
+    const index = new Map<string, any>()
+    if (!Array.isArray(fileRecords)) return index
+    fileRecords.forEach((file: any) => {
+      if (!file?.id || file.type !== 'file') return
+      index.set(file.id, file)
+    })
+    return index
+  }, [fileRecords])
+  const tabSessionStorageKey = useMemo(
+    () => buildTabSessionStorageKey(projectId, user?.id),
+    [projectId, user?.id]
+  )
+  const [openFileIds, setOpenFileIds] = useState<string[]>([])
+  const [activeFileId, setActiveFileIdState] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const stored = parseStoredTabSession(window.localStorage.getItem(tabSessionStorageKey))
+    setOpenFileIds(stored?.openFileIds || [])
+    setActiveFileIdState(stored?.activeFileId || null)
+  }, [tabSessionStorageKey])
+
+  const openFiles = useMemo(() => {
+    return openFileIds
+      .map((fileId) => fileMap.get(fileId))
+      .filter((file): file is any => Boolean(file))
+  }, [fileMap, openFileIds])
   const firstMainFile =
-    filesData?.files?.find((file: any) => file?.type === 'file' && file?.main_file) ??
-    filesData?.files?.find((file: any) => file?.type === 'file')
+    fileRecords.find((file: any) => file?.type === 'file' && file?.main_file) ??
+    fileRecords.find((file: any) => file?.type === 'file')
   const sharedTargetFile =
     sharedTargetFileId &&
-    Array.isArray(filesData?.files)
-      ? filesData.files.find(
+    Array.isArray(fileRecords)
+      ? fileRecords.find(
           (file: any) => file?.id === sharedTargetFileId && file?.type === 'file'
         )
       : null
+  const projectPreferredFileId =
+    typeof project?.activeFileId === 'string' && fileMap.has(project.activeFileId)
+      ? project.activeFileId
+      : null
+  const fallbackFileId = sharedTargetFile?.id || projectPreferredFileId || firstMainFile?.id || null
+
+  useEffect(() => {
+    const availableFileIds = new Set(fileMap.keys())
+    if (!availableFileIds.size) {
+      setOpenFileIds([])
+      setActiveFileIdState(null)
+      return
+    }
+
+    setOpenFileIds((previous) => {
+      const filtered = previous.filter((fileId) => availableFileIds.has(fileId))
+      if (sharedTargetFile?.id && !filtered.includes(sharedTargetFile.id)) {
+        filtered.push(sharedTargetFile.id)
+      }
+      if (!filtered.length && fallbackFileId) {
+        filtered.push(fallbackFileId)
+      }
+      return areStringArraysEqual(previous, filtered) ? previous : filtered
+    })
+
+    setActiveFileIdState((previous) => {
+      if (sharedTargetFile?.id && availableFileIds.has(sharedTargetFile.id)) {
+        return sharedTargetFile.id
+      }
+      if (previous && availableFileIds.has(previous)) return previous
+      return fallbackFileId
+    })
+  }, [fallbackFileId, fileMap, sharedTargetFile?.id])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    window.localStorage.setItem(
+      tabSessionStorageKey,
+      JSON.stringify({
+        openFileIds,
+        activeFileId,
+      })
+    )
+  }, [activeFileId, openFileIds, tabSessionStorageKey])
+
+  const setActiveFile = useCallback(
+    (fileId: string) => {
+      if (!fileId || !fileMap.has(fileId)) return
+      setOpenFileIds((previous) => {
+        if (previous.includes(fileId)) return previous
+        return [...previous, fileId]
+      })
+      setActiveFileIdState(fileId)
+    },
+    [fileMap]
+  )
+
+  const closeFile = useCallback((fileId: string) => {
+    setOpenFileIds((previous) => {
+      const index = previous.indexOf(fileId)
+      if (index < 0) return previous
+      const next = previous.filter((id) => id !== fileId)
+      setActiveFileIdState((current) => {
+        if (current !== fileId) return current
+        return next[index] || next[index - 1] || next[0] || null
+      })
+      return next
+    })
+  }, [])
+
   const currentlyOpen =
-    sharedTargetFile ??
-    filesData?.files?.find((file: any) => file.id === activeFileId) ??
+    (activeFileId ? fileMap.get(activeFileId) : null) ??
     openFiles.find((file: any) => file?.type === 'file') ??
     firstMainFile
 
   // Fallback: If no activeFileId but files are open, default to first open file, or no file
   // If activeFileId is set but not found (deleted?), handle gracefully
 
-  const router = useRouter();
+  const router = useRouter()
   useEffect(() => {
     if (!projectId) return
     if (isAuthLoading) return
@@ -126,7 +259,7 @@ export function ProjectProvider({
         })
         console.groupEnd()
       }
-      router.push('/404');
+      router.push('/404')
     }
   }, [
     filesData,
@@ -146,28 +279,6 @@ export function ProjectProvider({
       router.push('/trash')
     }
   }, [isProjectLoading, project?.trashed_at, router])
-
-  useEffect(() => {
-    if (isProjectLoading || isFilesLoading) return
-    if (isShareSession) return
-    if (!projectId || !project || project.activeFileId || !currentlyOpen?.id) return
-
-    db.transact([
-      tx.projects[projectId].update({
-        activeFileId: currentlyOpen.id,
-      }),
-    ]).catch((error) => {
-      console.warn('Failed to initialize active file for project:', error)
-    })
-  }, [
-    isProjectLoading,
-    isFilesLoading,
-    isShareSession,
-    projectId,
-    project,
-    project?.activeFileId,
-    currentlyOpen?.id,
-  ])
 
   useEffect(() => {
     if (!isShareSession) return
@@ -216,9 +327,11 @@ export function ProjectProvider({
   }, [
     filesData?.files,
     filesError,
+    activeFileId,
     isFilesLoading,
     isProjectLoading,
     isShareSession,
+    openFileIds,
     projectData?.projects,
     projectError,
     projectId,
@@ -230,10 +343,13 @@ export function ProjectProvider({
   const value = {
     projectId,
     project,
-    files: filesData?.files,
+    files: fileRecords,
     openFiles,
     currentlyOpen,
     activeFileId,
+    openFile: setActiveFile,
+    setActiveFile,
+    closeFile,
     isLoading: isProjectLoading || isFilesLoading,
     isProjectLoading,
     isFilesLoading,

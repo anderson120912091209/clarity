@@ -3,7 +3,7 @@ import type { CollaborationRole, CollaborationUserInfo } from './types'
 export interface CollaborationAuthContext {
   roomId: string
   projectId: string
-  fileId: string
+  fileId?: string
   role: CollaborationRole
   userId: string
   userInfo: CollaborationUserInfo

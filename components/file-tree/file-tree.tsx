@@ -8,13 +8,13 @@ import type { CollaborationRole } from '@/features/collaboration/types'
 import { db } from '@/lib/constants'
 
 interface FileTreeProps {
-  files: any[]
+  files: FileSystemNode[]
   projectId: string
   userId: string
   ownerUserId?: string
   shareToken?: string
   role?: CollaborationRole
-  onOpenFile: (file: any) => void
+  onOpenFile: (file: { id: string }) => void
   currentlyOpenId?: string
 }
 
@@ -199,7 +199,7 @@ export function FileTree({
                node={node}
                level={0}
                onSelect={(n) => {
-                 onOpenFile(files.find(f => f.id === n.id))
+                 onOpenFile(n)
                }}
                onToggleExpand={(n) => {
                  if (!canEdit) return

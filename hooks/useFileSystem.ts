@@ -159,7 +159,6 @@ export function useFileSystem(projectId: string, actorUserId: string, options?: 
         user_id: ownerUserId,
         parent_id: parentId,
         created_at: new Date().toISOString(),
-        isOpen: true,
       }),
       ...buildShareGrantOps(newId),
     ] as any[])
