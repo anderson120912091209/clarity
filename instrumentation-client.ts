@@ -4,11 +4,12 @@ const posthogKey = process.env.NEXT_PUBLIC_POSTHOG_KEY
 const ingestHost = process.env.NEXT_PUBLIC_POSTHOG_HOST
 const uiHostFromIngest = ingestHost?.replace('.i.posthog.com', '.posthog.com')
 const forceReplay = process.env.NEXT_PUBLIC_POSTHOG_FORCE_REPLAY === 'true'
+const posthogDebug = process.env.NEXT_PUBLIC_POSTHOG_DEBUG === 'true'
 const isDevelopment = process.env.NODE_ENV === 'development'
 const useProxy =
   process.env.NEXT_PUBLIC_POSTHOG_USE_PROXY === 'true' ||
-  (process.env.NEXT_PUBLIC_POSTHOG_USE_PROXY !== 'false' && !isDevelopment)
-const apiHost = useProxy ? '/ingest' : ingestHost ?? '/ingest'
+  process.env.NEXT_PUBLIC_POSTHOG_USE_PROXY !== 'false'
+const apiHost = useProxy ? '/ingest' : ingestHost ?? 'https://us.i.posthog.com'
 
 if (posthogKey) {
   posthog.init(posthogKey, {
@@ -20,8 +21,8 @@ if (posthogKey) {
     capture_exceptions: true,
     // Keep explicit so replay doesn't depend on implicit defaults.
     disable_session_recording: false,
-    // Turn on debug in development mode
-    debug: isDevelopment,
+    // Keep debug opt-in so network issues don't surface as runtime overlays in dev.
+    debug: posthogDebug,
     loaded: (ph) => {
       if (typeof window !== 'undefined') {
         ;(window as typeof window & { posthog?: typeof ph }).posthog = ph

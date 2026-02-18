@@ -1,11 +1,16 @@
 'use client'
-import React, { createContext, useState, useContext, ReactNode, useEffect } from 'react'
+import React, { createContext, useContext, ReactNode, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { usePathname } from 'next/navigation'
 import { db } from '@/lib/constants'
 import posthog from 'posthog-js'
-// TODO: Add types
-const FrontendContext = createContext<any>(undefined)
+
+type FrontendContextValue = {
+  user: Record<string, unknown> | null
+  isLoading: boolean
+}
+
+const FrontendContext = createContext<FrontendContextValue | undefined>(undefined)
 
 function toUserProperties(user: Record<string, unknown>) {
   return Object.entries(user).reduce<Record<string, unknown>>((acc, [key, value]) => {
@@ -20,6 +25,7 @@ export function FrontendProvider({ children }: { children: ReactNode }) {
   const { user, isLoading } = db.useAuth();
   const router = useRouter();
   const pathname = usePathname();
+  const isPublicRoute = pathname === '/' || pathname === '/login'
 
   useEffect(() => {
     if (!isLoading && user === null && pathname !== '/') {
@@ -42,11 +48,11 @@ export function FrontendProvider({ children }: { children: ReactNode }) {
     })
   }, [isLoading, user])
 
-  if (isLoading) {
+  if (isLoading && !isPublicRoute) {
     return null;
   }
   
-  const value = {
+  const value: FrontendContextValue = {
     user,
     isLoading,
   }

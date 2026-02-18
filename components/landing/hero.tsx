@@ -1,11 +1,15 @@
 'use client'
 
 import { Button } from '@/components/ui/button'
-import { ArrowRight, Sparkles, Terminal, Share2, FileCode2 } from 'lucide-react'
 import Link from 'next/link'
 
 export function Hero() {
-  const ctaSizeClass = 'h-[54px] w-full max-w-[250px]'
+  const ctaButtonSizeClass = 'h-[54px] w-full max-w-[250px]'
+  const badgeSizeClass = 'w-full max-w-[250px]'
+  const productHuntLaunchUrl =
+    'https://www.producthunt.com/products/clarity-21?embed=true&utm_source=badge-featured&utm_medium=badge&utm_campaign=badge-clarity-89170959-d8de-41bc-a06f-3686aed72d5b'
+  const productHuntBadgeSrc =
+    'https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=1080188&theme=light&t=1771420904394'
 
   return (
     <section className="relative pt-24 pb-16 md:pt-40 md:pb-24 px-6 overflow-hidden">
@@ -26,7 +30,7 @@ export function Hero() {
         <div className="w-full flex flex-col sm:flex-row items-center gap-4 mb-16 md:mb-20">
           <Button
             asChild
-            className={`${ctaSizeClass} px-8 bg-white text-black hover:bg-zinc-200
+            className={`${ctaButtonSizeClass} px-8 bg-white text-black hover:bg-zinc-200
              text-sm font-semibold shadow-md rounded-md transition-colors cursor-crosshair`}
           >
             <Link href="/login" className="flex h-full w-full items-center justify-center cursor-crosshair">
@@ -34,18 +38,18 @@ export function Hero() {
             </Link>
           </Button>
           <a
-            href="https://www.producthunt.com/products/clarity-21/launches/clarity-5e700cce-895a-4d47-82ba-fa0b32065d14?embed=true&utm_source=badge-featured&utm_medium=badge&utm_campaign=badge-clarity-5e700cce-895a-4d47-82ba-fa0b32065d14"
+            href={productHuntLaunchUrl}
             target="_blank"
             rel="noopener noreferrer"
             aria-label="Clarity on Product Hunt"
-            className={`${ctaSizeClass} cursor-crosshair hidden sm:block`}
+            className={`${badgeSizeClass} cursor-crosshair hidden sm:block`}
           >
             <img
-              src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=1046258&theme=light&t=1771405187279"
-              alt="{clarity} - notebook for science & math, type your math notes fast! | Product Hunt"
-              className="block h-full w-full"
-              width="250"
-              height="54"
+              src={productHuntBadgeSrc}
+              alt="{clarity} - AI powered overleaf alternative | Product Hunt"
+              className="block h-auto w-full"
+              width={250}
+              height={54}
               loading="lazy"
             />
           </a>
@@ -78,43 +82,23 @@ export function Hero() {
 
         {/* Product Hunt - Mobile Only */}
         <a
-          href="https://www.producthunt.com/products/clarity-21/launches/clarity-5e700cce-895a-4d47-82ba-fa0b32065d14?embed=true&utm_source=badge-featured&utm_medium=badge&utm_campaign=badge-clarity-5e700cce-895a-4d47-82ba-fa0b32065d14"
+          href={productHuntLaunchUrl}
           target="_blank"
           rel="noopener noreferrer"
           aria-label="Clarity on Product Hunt"
-          className={`${ctaSizeClass} cursor-crosshair mx-auto mt-8 block sm:hidden`}
+          className={`${badgeSizeClass} cursor-crosshair mx-auto mt-8 block sm:hidden`}
         >
           <img
-            src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=1046258&theme=light&t=1771405187279"
-            alt="{clarity} - notebook for science & math, type your math notes fast! | Product Hunt"
-            className="block h-full w-full"
-            width="250"
-            height="54"
+            src={productHuntBadgeSrc}
+            alt="{clarity} - AI powered overleaf alternative | Product Hunt"
+            className="block h-auto w-full"
+            width={250}
+            height={54}
             loading="lazy"
           />
         </a>
 
       </div>
     </section>
-  )
-}
-
-function Search(props: any) {
-  return (
-    <svg
-      {...props}
-      xmlns="http://www.w3.org/2000/svg"
-      width="24"
-      height="24"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <circle cx="11" cy="11" r="8" />
-      <path d="m21 21-4.3-4.3" />
-    </svg>
   )
 }
