@@ -5,9 +5,7 @@ import { Button } from '@/components/ui/button'
 import Link from 'next/link'
 
 export function AuthButton() {
-  const { user, isLoading } = db.useAuth()
-  
-  if (isLoading) return null
+  const { user } = db.useAuth()
 
   if (user) {
     return (
@@ -39,4 +37,3 @@ export function AuthButton() {
     </div>
   )
 }
-

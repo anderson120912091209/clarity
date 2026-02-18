@@ -31,10 +31,10 @@ export function FrontendProvider({ children }: { children: ReactNode }) {
   const isPublicRoute = pathname === '/' || pathname === '/login'
 
   useEffect(() => {
-    if (!isLoading && !user && pathname !== '/') {
+    if (!isLoading && !user && !isPublicRoute) {
       router.push('/login')
     }
-  }, [isLoading, user, router, pathname])
+  }, [isLoading, user, router, isPublicRoute])
 
   useEffect(() => {
     if (isLoading) return
