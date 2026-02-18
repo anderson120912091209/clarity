@@ -73,7 +73,8 @@ export default function TrashPage() {
   }, [searchTerm, sortOrder, trashedProjects])
 
   const handleEmptyTrash = async () => {
-    if (!user?.id || !trashedProjects.length || isEmptyingTrash) return
+    const userId = user?.id
+    if (!userId || !trashedProjects.length || isEmptyingTrash) return
 
     if (settings.confirmBeforePermanentDelete) {
       const confirmed = window.confirm(
@@ -88,7 +89,7 @@ export default function TrashPage() {
         trashedProjects.map((project: any) =>
           permanentlyDeleteProject({
             projectId: project.id,
-            userId: user.id,
+            userId,
             fileIds: fileMetaByProjectId.get(project.id)?.fileIds || [],
           })
         )

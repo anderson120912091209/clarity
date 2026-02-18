@@ -19,8 +19,8 @@ const ProjectContext = createContext<any>(undefined)
 
 export function ProjectProvider({ children, projectId }: { children: ReactNode; projectId: string }) {
   const { user } = useFrontend();
-  const { data: projectData, isLoading: isProjectLoading, error: projectError } = useProjectData(projectId, user.id)
-  const { data: filesData, isLoading: isFilesLoading, error: filesError } = useProjectFiles(projectId, user.id)
+  const { data: projectData, isLoading: isProjectLoading, error: projectError } = useProjectData(projectId, user?.id)
+  const { data: filesData, isLoading: isFilesLoading, error: filesError } = useProjectFiles(projectId, user?.id)
   const project = projectData?.projects?.[0]
   const activeFileId = project?.activeFileId
   const openFiles = filesData?.files?.filter((file: any) => file.isOpen === true) || []

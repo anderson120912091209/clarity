@@ -68,6 +68,12 @@ export default function NewDocument() {
       setTitleError('Title cannot be empty')
       return
     }
+    const userId = user?.id
+    if (!userId) {
+      setTitleError('You must be signed in to create a project')
+      return
+    }
+
     setTitleError('')
     setIsCreating(true)
 
@@ -94,7 +100,7 @@ export default function NewDocument() {
           content: content,
           isExpanded: null,
           pathname: fileName,
-          user_id: user.id,
+          user_id: userId,
         },
       ]
     }
@@ -103,7 +109,7 @@ export default function NewDocument() {
 
     db.transact([
       tx.projects[newProjectId].update({
-        user_id: user?.id,
+        user_id: userId,
         title: title.trim(),
         project_content: content, // Legacy field, check if still needed
         template: selectedTemplate,
@@ -119,7 +125,7 @@ export default function NewDocument() {
       }),
       ...fileStructure.map((node) =>
         tx.files[node.id].update({
-          user_id: user?.id,
+          user_id: userId,
           projectId: newProjectId,
           name: node.name,
           type: node.type,

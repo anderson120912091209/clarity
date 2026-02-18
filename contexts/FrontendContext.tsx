@@ -5,14 +5,17 @@ import { usePathname } from 'next/navigation'
 import { db } from '@/lib/constants'
 import posthog from 'posthog-js'
 
+type FrontendAuthState = ReturnType<(typeof db)['useAuth']>
+type FrontendUser = FrontendAuthState['user']
+
 type FrontendContextValue = {
-  user: Record<string, unknown> | null
+  user: FrontendUser
   isLoading: boolean
 }
 
 const FrontendContext = createContext<FrontendContextValue | undefined>(undefined)
 
-function toUserProperties(user: Record<string, unknown>) {
+function toUserProperties(user: NonNullable<FrontendUser>) {
   return Object.entries(user).reduce<Record<string, unknown>>((acc, [key, value]) => {
     if (key !== 'id') {
       acc[key] = value
@@ -28,7 +31,7 @@ export function FrontendProvider({ children }: { children: ReactNode }) {
   const isPublicRoute = pathname === '/' || pathname === '/login'
 
   useEffect(() => {
-    if (!isLoading && user === null && pathname !== '/') {
+    if (!isLoading && !user && pathname !== '/') {
       router.push('/login')
     }
   }, [isLoading, user, router, pathname])
@@ -41,7 +44,7 @@ export function FrontendProvider({ children }: { children: ReactNode }) {
       return
     }
 
-    const userProperties = toUserProperties(user as Record<string, unknown>)
+    const userProperties = toUserProperties(user)
     posthog.identify(user.id, {
       email: user.email,
       ...userProperties,
