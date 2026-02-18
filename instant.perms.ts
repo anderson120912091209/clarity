@@ -16,26 +16,56 @@ const rules = {
     ],
   },
   
-  // Files entity - users can only access files they own
+  // Files entity - owner access plus token-scoped shared access.
   files: {
     allow: {
-      view: "isOwner",
-      create: "isOwner",
-      update: "isOwner",
-      delete: "isOwner",
+      view: "isOwner || hasSharedViewAccess",
+      create: "isOwner || hasSharedEditAccess",
+      update: "isOwner || hasSharedEditAccess",
+      delete: "isOwner || hasSharedEditAccess",
     },
-    bind: ["isOwner", "auth.id != null && auth.id == data.user_id"],
+    bind: [
+      "isOwner",
+      "auth.id != null && auth.id == data.user_id",
+      "hasSharedViewAccess",
+      "ruleParams.shareToken != null && ruleParams.projectId != null && ruleParams.projectId == data.projectId",
+      "hasSharedEditAccess",
+      "ruleParams.shareToken != null && ruleParams.projectId != null && ruleParams.projectId == data.projectId && ruleParams.role == 'editor'",
+    ],
   },
   
-  // Projects entity - users can only access projects they own
+  // Projects entity - owner access plus token-scoped shared view access.
   projects: {
     allow: {
-      view: "isOwner",
+      view: "isOwner || hasSharedViewAccess",
       create: "isOwner",
       update: "isOwner",
       delete: "isOwner",
     },
-    bind: ["isOwner", "auth.id != null && auth.id == data.user_id"],
+    bind: [
+      "isOwner",
+      "auth.id != null && auth.id == data.user_id",
+      "hasSharedViewAccess",
+      "ruleParams.shareToken != null && ruleParams.projectId != null && ruleParams.projectId == data.id",
+    ],
+  },
+
+  // Token-bearing share links are owner-managed grant records.
+  project_share_links: {
+    allow: {
+      view: "isCreatorOrProjectOwner || hasTokenAccess",
+      create: "isCreator",
+      update: "isCreatorOrProjectOwner",
+      delete: "isCreatorOrProjectOwner",
+    },
+    bind: [
+      "isCreator",
+      "auth.id != null && auth.id == data.created_by_user_id",
+      "isCreatorOrProjectOwner",
+      "auth.id != null && (auth.id == data.created_by_user_id || auth.id in data.ref('project.user_id'))",
+      "hasTokenAccess",
+      "ruleParams.shareToken != null && ruleParams.shareToken == data.token",
+    ],
   },
 
   // AI threads are user-owned and project-scoped.

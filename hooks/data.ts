@@ -1,38 +1,97 @@
 import { db } from '@/lib/constants'
 import { tx } from '@instantdb/react'
+import { useMemo } from 'react'
 
-export function useProjectData(projectId: string, userId?: string) {
-  return db.useQuery({
-    projects: {
-      $: {
-        where: userId
-          ? {
-              id: projectId,
-              user_id: userId,
-            }
-          : {
-              id: projectId,
-            },
-      },
-    },
-  })
+interface AccessQueryOptions {
+  ownerScoped?: boolean
+  ruleParams?: Record<string, unknown>
 }
 
-export function useProjectFiles(projectId: string, userId?: string) {
-  return db.useQuery({
-    files: {
-      $: {
-        where: userId
-          ? {
-              projectId: projectId,
-              user_id: userId,
-            }
-          : {
-              projectId: projectId,
-            },
+function useQueryWithRuleParams(
+  query: Record<string, unknown>,
+  options?: AccessQueryOptions
+) {
+  const supportsQueryOptions =
+    typeof db.useQuery === 'function' && db.useQuery.length >= 2
+
+  const serializedQuery = useMemo(() => JSON.stringify(query), [query])
+  const serializedRuleParams = useMemo(
+    () => JSON.stringify(options?.ruleParams ?? null),
+    [options?.ruleParams]
+  )
+
+  const queryWithRuleParams = useMemo<Record<string, unknown>>(() => {
+    const parsedQuery = JSON.parse(serializedQuery) as Record<string, unknown>
+    if (serializedRuleParams === 'null') return parsedQuery
+
+    return {
+      $$ruleParams: JSON.parse(serializedRuleParams) as Record<string, unknown>,
+      ...parsedQuery,
+    }
+  }, [serializedQuery, serializedRuleParams])
+
+  if (supportsQueryOptions) {
+    return (db.useQuery as any)(
+      query,
+      options?.ruleParams ? { ruleParams: options.ruleParams } : undefined
+    )
+  }
+
+  return db.useQuery(queryWithRuleParams as any)
+}
+
+export function useProjectData(
+  projectId: string,
+  userId?: string,
+  options?: AccessQueryOptions
+) {
+  const ownerScoped = options?.ownerScoped ?? true
+
+  return useQueryWithRuleParams(
+    {
+      projects: {
+        $: {
+          where:
+            ownerScoped && userId
+              ? {
+                  id: projectId,
+                  user_id: userId,
+                }
+              : {
+                  id: projectId,
+                },
+        },
       },
     },
-  })
+    options
+  )
+}
+
+export function useProjectFiles(
+  projectId: string,
+  userId?: string,
+  options?: AccessQueryOptions
+) {
+  const ownerScoped = options?.ownerScoped ?? true
+
+  return useQueryWithRuleParams(
+    {
+      files: {
+        $: {
+          where:
+            ownerScoped && userId
+              ? {
+                  projectId: projectId,
+                  user_id: userId,
+                }
+              : {
+                  projectId: projectId,
+                },
+        },
+      },
+    },
+    options
+  )
 }
 
 export function getAllProjects(userId?: string) {
@@ -85,17 +144,15 @@ export function getAllUserFiles(userId?: string) {
 }
 
 interface ProjectFields {
-  [key: string]: unknown;
+  [key: string]: unknown
 }
 
 export function updateProject(projectId: string, fields: ProjectFields) {
-  const updateObject: ProjectFields = {};
+  const updateObject: ProjectFields = {}
 
   for (const [key, value] of Object.entries(fields)) {
-    updateObject[key] = value;
+    updateObject[key] = value
   }
 
-  return db.transact([
-    tx.projects[projectId].update(updateObject)
-  ]);
+  return db.transact([tx.projects[projectId].update(updateObject)])
 }

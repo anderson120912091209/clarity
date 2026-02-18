@@ -6,14 +6,20 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "test:collab": "vitest run features/collaboration/__tests__"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^1.0.6",
     "@ai-sdk/google": "^1.0.12",
     "@ai-sdk/openai": "^1.0.8",
-    "@instantdb/core": "^0.22.121",
-    "@instantdb/react": "^0.12.13",
+    "@instantdb/core": "^0.21.0",
+    "@instantdb/react": "^0.21.0",
+    "@liveblocks/client": "^3.14.0",
+    "@liveblocks/node": "^3.14.0",
+    "@liveblocks/react": "^3.14.0",
+    "@liveblocks/react-ui": "^3.14.0",
+    "@liveblocks/yjs": "^3.14.0",
     "@monaco-editor/react": "^4.6.0",
     "@posthog/react": "^1.7.1",
     "@radix-ui/react-alert-dialog": "^1.1.15",
@@ -62,7 +68,10 @@
     "rehype-raw": "^7.0.0",
     "remark-gfm": "^4.0.0",
     "tailwind-merge": "^2.5.4",
-    "tailwindcss-animate": "^1.0.7"
+    "tailwindcss-animate": "^1.0.7",
+    "y-monaco": "^0.1.6",
+    "y-protocols": "^1.0.7",
+    "yjs": "^13.6.29"
   },
   "devDependencies": {
     "@types/node": "^22.10.2",
@@ -73,6 +82,7 @@
     "postcss": "^8.4.49",
     "prettier": "^3.4.2",
     "tailwindcss": "^3.4.17",
-    "typescript": "^5.7.2"
+    "typescript": "^5.7.2",
+    "vitest": "^4.0.18"
   }
 }

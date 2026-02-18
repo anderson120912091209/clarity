@@ -23,6 +23,7 @@ interface FileTreeItemProps {
   onCreateFolder: (parentId: string) => void
   onDelete: (id: string) => void
   onRename: (id: string, newName: string) => void
+  canEdit?: boolean
   selectedId?: string
 }
 
@@ -35,6 +36,7 @@ export function FileTreeItem({
   onCreateFolder,
   onDelete,
   onRename,
+  canEdit = true,
   selectedId
 }: FileTreeItemProps) {
   const isFolder = node.type === 'folder'
@@ -106,51 +108,53 @@ export function FileTreeItem({
         )}
 
         <div className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <div 
-                role="button" 
-                className="p-0.5 hover:bg-zinc-700/50 rounded text-white/40 hover:text-white"
-                onClick={(e) => e.stopPropagation()}
+          {canEdit && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <div 
+                  role="button" 
+                  className="p-0.5 hover:bg-zinc-700/50 rounded text-white/40 hover:text-white"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <MoreHorizontal className="h-3.5 w-3.5" />
+                </div>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent 
+                align="end" 
+                className="w-48 bg-[#1C1D1F] border-white/[0.08] text-white/90 shadow-xl p-1"
               >
-                <MoreHorizontal className="h-3.5 w-3.5" />
-              </div>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent 
-              align="end" 
-              className="w-48 bg-[#1C1D1F] border-white/[0.08] text-white/90 shadow-xl p-1"
-            >
-              {isFolder && (
-                <>
-                  <DropdownMenuItem 
-                    onClick={() => onCreateFile(node.id)}
-                    className="focus:bg-[#151619] focus:text-white cursor-pointer text-[12px] px-2 py-1.5 rounded-sm"
-                  >
-                    <FilePlus className="mr-2 h-3.5 w-3.5 opacity-70" /> New File
-                  </DropdownMenuItem>
-                  <DropdownMenuItem 
-                    onClick={() => onCreateFolder(node.id)}
-                    className="focus:bg-[#151619] focus:text-white cursor-pointer text-[12px] px-2 py-1.5 rounded-sm"
-                  >
-                    <FolderPlus className="mr-2 h-3.5 w-3.5 opacity-70" /> New Folder
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator className="bg-white/[0.08] my-1" />
-                </>
-              )}
-              <DropdownMenuItem 
-                onClick={() => setIsEditing(true)}
-                className="focus:bg-[#151619] focus:text-white cursor-pointer text-[12px] px-2 py-1.5 rounded-sm"
-              >
-                <Edit2 className="mr-2 h-3.5 w-3.5 opacity-70" /> Rename
-              </DropdownMenuItem>
-              <DropdownMenuItem 
-                onClick={() => onDelete(node.id)} 
-                className="focus:bg-[#3f1616] focus:text-red-400 text-red-500 hover:text-red-400 cursor-pointer text-[12px] px-2 py-1.5 rounded-sm"
-              >
-                <Trash2 className="mr-2 h-3.5 w-3.5 opacity-70" /> Delete
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+                {isFolder && (
+                  <>
+                    <DropdownMenuItem 
+                      onClick={() => onCreateFile(node.id)}
+                      className="focus:bg-[#151619] focus:text-white cursor-pointer text-[12px] px-2 py-1.5 rounded-sm"
+                    >
+                      <FilePlus className="mr-2 h-3.5 w-3.5 opacity-70" /> New File
+                    </DropdownMenuItem>
+                    <DropdownMenuItem 
+                      onClick={() => onCreateFolder(node.id)}
+                      className="focus:bg-[#151619] focus:text-white cursor-pointer text-[12px] px-2 py-1.5 rounded-sm"
+                    >
+                      <FolderPlus className="mr-2 h-3.5 w-3.5 opacity-70" /> New Folder
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator className="bg-white/[0.08] my-1" />
+                  </>
+                )}
+                <DropdownMenuItem 
+                  onClick={() => setIsEditing(true)}
+                  className="focus:bg-[#151619] focus:text-white cursor-pointer text-[12px] px-2 py-1.5 rounded-sm"
+                >
+                  <Edit2 className="mr-2 h-3.5 w-3.5 opacity-70" /> Rename
+                </DropdownMenuItem>
+                <DropdownMenuItem 
+                  onClick={() => onDelete(node.id)} 
+                  className="focus:bg-[#3f1616] focus:text-red-400 text-red-500 hover:text-red-400 cursor-pointer text-[12px] px-2 py-1.5 rounded-sm"
+                >
+                  <Trash2 className="mr-2 h-3.5 w-3.5 opacity-70" /> Delete
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
         </div>
       </div>
 
@@ -167,6 +171,7 @@ export function FileTreeItem({
               onCreateFolder={onCreateFolder}
               onDelete={onDelete}
               onRename={onRename}
+              canEdit={canEdit}
               selectedId={selectedId}
             />
           ))}

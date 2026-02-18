@@ -4,19 +4,82 @@ import React, { useMemo, useRef } from 'react'
 import { FileSystemNode, useFileSystem } from '@/hooks/useFileSystem'
 import { FileTreeItem } from './file-tree-item'
 import { FilePlus, FolderPlus, Upload } from 'lucide-react'
+import type { CollaborationRole } from '@/features/collaboration/types'
 import { db } from '@/lib/constants'
-import { tx } from '@instantdb/react'
 
 interface FileTreeProps {
   files: any[]
   projectId: string
   userId: string
+  ownerUserId?: string
+  shareToken?: string
+  role?: CollaborationRole
   onOpenFile: (file: any) => void
   currentlyOpenId?: string
 }
 
-export function FileTree({ files, projectId, userId, onOpenFile, currentlyOpenId }: FileTreeProps) {
-  const { createFile, createFolder, deleteNode, renameNode, uploadFile } = useFileSystem(projectId, userId)
+export function FileTree({
+  files,
+  projectId,
+  userId,
+  ownerUserId,
+  shareToken,
+  role,
+  onOpenFile,
+  currentlyOpenId,
+}: FileTreeProps) {
+  const shouldLoadProjectShareTokens = !shareToken && role === 'editor'
+  const { data: shareLinksData } = db.useQuery(
+    shouldLoadProjectShareTokens && projectId
+      ? {
+          project_share_links: {
+            $: {
+              where: {
+                projectId,
+              },
+            },
+          },
+        }
+      : null
+  )
+  const projectShareTokens = useMemo(() => {
+    const rows = Array.isArray(shareLinksData?.project_share_links)
+      ? shareLinksData.project_share_links
+      : []
+    const now = Date.now()
+    const values = new Set<string>()
+
+    rows.forEach((row) => {
+      if (typeof row?.revoked_at === 'string' && row.revoked_at.trim()) return
+      if (typeof row?.expires_at_ms === 'number' && row.expires_at_ms <= now) return
+      const rawToken =
+        (typeof row?.token === 'string' && row.token) ||
+        (typeof row?.comment_token === 'string' && row.comment_token) ||
+        (typeof row?.edit_token === 'string' && row.edit_token) ||
+        ''
+
+      const token = rawToken.trim()
+      if (!token) return
+      values.add(token)
+    })
+
+    return Array.from(values)
+  }, [shareLinksData?.project_share_links])
+
+  const {
+    canEdit,
+    createFile,
+    createFolder,
+    deleteNode,
+    renameNode,
+    toggleNodeExpansion,
+    uploadFile,
+  } = useFileSystem(projectId, userId, {
+    ownerUserId,
+    shareToken,
+    projectShareTokens,
+    role,
+  })
   const fileInputRef = useRef<HTMLInputElement>(null)
   
   // Convert flat list to tree
@@ -26,7 +89,11 @@ export function FileTree({ files, projectId, userId, onOpenFile, currentlyOpenId
     // 1. Create a map for quick access
     const nodeMap = new Map<string, FileSystemNode>()
     files.forEach(f => {
-      nodeMap.set(f.id, { ...f, children: [] })
+      nodeMap.set(f.id, {
+        ...f,
+        isExpanded: canEdit ? f.isExpanded : true,
+        children: [],
+      })
     })
 
     // 2. Build tree
@@ -52,9 +119,10 @@ export function FileTree({ files, projectId, userId, onOpenFile, currentlyOpenId
     }
     sortNodes(roots)
     return roots
-  }, [files])
+  }, [canEdit, files])
 
   const handleUploadClick = () => {
+    if (!canEdit) return
     fileInputRef.current?.click()
   }
 
@@ -80,33 +148,49 @@ export function FileTree({ files, projectId, userId, onOpenFile, currentlyOpenId
         <div className="flex gap-1.5">
           <button
             type="button"
-            onClick={() => createFile('new-file.tex')}
-            className="w-6 h-6 rounded-md inline-flex items-center justify-center text-white/50 hover:text-white hover:bg-white/5 transition-colors"
+            onClick={() => {
+              if (!canEdit) return
+              void createFile('new-file.tex')
+            }}
+            className="w-6 h-6 rounded-md inline-flex items-center justify-center text-white/50 hover:text-white hover:bg-white/5 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
             title="New File"
             aria-label="New File"
+            disabled={!canEdit}
           >
             <FilePlus className="w-3.5 h-3.5" />
           </button>
           <button
             type="button"
-            onClick={() => createFolder('New Folder')}
-            className="w-6 h-6 rounded-md inline-flex items-center justify-center text-white/50 hover:text-white hover:bg-white/5 transition-colors"
+            onClick={() => {
+              if (!canEdit) return
+              void createFolder('New Folder')
+            }}
+            className="w-6 h-6 rounded-md inline-flex items-center justify-center text-white/50 hover:text-white hover:bg-white/5 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
             title="New Folder"
             aria-label="New Folder"
+            disabled={!canEdit}
           >
             <FolderPlus className="w-3.5 h-3.5" />
           </button>
           <button
             type="button"
             onClick={handleUploadClick}
-            className="w-6 h-6 rounded-md inline-flex items-center justify-center text-white/50 hover:text-white hover:bg-white/5 transition-colors"
+            className="w-6 h-6 rounded-md inline-flex items-center justify-center text-white/50 hover:text-white hover:bg-white/5 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
             title="Upload File"
             aria-label="Upload File"
+            disabled={!canEdit}
           >
             <Upload className="w-3.5 h-3.5" />
           </button>
         </div>
       </div>
+
+      {shareToken && (!Array.isArray(files) || files.length === 0) && (
+        <div className="mx-1.5 mb-2 rounded border border-amber-500/25 bg-amber-500/10 px-2 py-1 text-[11px] text-amber-200">
+          Shared session has no visible files. Add <code className="font-mono">?collabDebug=1</code>{' '}
+          to URL and check browser console for <code className="font-mono">[collab-debug]</code>.
+        </div>
+      )}
       
       <div className="flex-1 overflow-y-auto pb-1">
          {treeData.map(node => (
@@ -118,13 +202,21 @@ export function FileTree({ files, projectId, userId, onOpenFile, currentlyOpenId
                  onOpenFile(files.find(f => f.id === n.id))
                }}
                onToggleExpand={(n) => {
-                  const isExpanded = files.find(f => f.id === n.id)?.isExpanded
-                  db.transact([tx.files[n.id].update({ isExpanded: !isExpanded })])
+                 if (!canEdit) return
+                 const isExpanded = files.find(f => f.id === n.id)?.isExpanded
+                 void toggleNodeExpansion(n.id, !isExpanded)
                }}
-               onCreateFile={(parentId) => createFile('new-file.tex', '', parentId)}
-               onCreateFolder={(parentId) => createFolder('New Folder', parentId)}
+               onCreateFile={(parentId) => {
+                 if (!canEdit) return
+                 void createFile('new-file.tex', '', parentId)
+               }}
+               onCreateFolder={(parentId) => {
+                 if (!canEdit) return
+                 void createFolder('New Folder', parentId)
+               }}
                onDelete={deleteNode}
                onRename={renameNode}
+               canEdit={canEdit}
                selectedId={currentlyOpenId}
             />
          ))}

@@ -7,6 +7,7 @@ import { editorDefaultOptions } from './constants/editorDefaults'
 import { Loader2 } from 'lucide-react'
 import { historyService } from '@/services/agent/browser/history/historyService'
 import { chatApplyService } from '@/services/agent/browser/chat/chatApplyService'
+import posthog from 'posthog-js'
 import {
   isShikiMonacoReady,
   setupShikiMonaco,
@@ -14,6 +15,7 @@ import {
 } from './utils/shiki-monaco'
 import { useTheme } from 'next-themes'
 import type { editor as MonacoEditorNamespace, IDisposable } from 'monaco-editor'
+import type { JsonObject } from '@liveblocks/client'
 import {
   applyMonarchTokensProvider,
   resolveEditorLanguageId,
@@ -21,6 +23,15 @@ import {
 import type { EditorLanguageId } from './syntax/languages/registry'
 import { resolveMonacoThemeForSyntaxTheme } from './syntax/themes/catalog'
 import { DEFAULT_EDITOR_SYNTAX_THEME, type EditorSyntaxTheme } from './types'
+import { MonacoBinding } from 'y-monaco'
+import { getYjsProviderForRoom } from '@liveblocks/yjs'
+import type { Awareness as YjsAwareness } from 'y-protocols/awareness'
+import {
+  useOthers,
+  useRoom,
+  useUpdateMyPresence,
+} from '@/features/collaboration/liveblocks'
+import type { CollaborationRole } from '@/features/collaboration/types'
 
 type MonacoInstance = typeof import('monaco-editor')
 type MonacoModel = MonacoEditorNamespace.ITextModel
@@ -64,6 +75,19 @@ interface CodeEditorProps {
     column: number
     nonce: number
   } | null
+  collaboration?: EditorCollaborationConfig | null
+}
+
+export interface EditorCollaborationConfig {
+  enabled: boolean
+  role: CollaborationRole
+  userId: string
+  userName: string
+  userColor: string
+  fileId: string
+  filePath?: string
+  shareToken?: string
+  followConnectionId?: number | null
 }
 
 const EditorLoading = () => (
@@ -71,6 +95,18 @@ const EditorLoading = () => (
     <Loader2 className="w-5 h-5 animate-spin text-zinc-600" />
   </div>
 )
+
+function extractYjsClientIdFromPresence(presence: unknown): number | null {
+  if (!presence || typeof presence !== 'object') return null
+  const record = presence as Record<string, unknown>
+  const candidate = record.__yjs_clientid
+  if (typeof candidate !== 'number' || !Number.isFinite(candidate)) return null
+  return candidate
+}
+
+function sanitizeCssLabel(value: string): string {
+  return value.replace(/\\/g, '\\\\').replace(/"/g, '\\"')
+}
 
 export const CodeEditor = ({
   onChange,
@@ -84,6 +120,7 @@ export const CodeEditor = ({
   onActionsReady,
   onReady,
   gotoRequest,
+  collaboration,
 }: CodeEditorProps) => {
   const isAiChatEnabled = process.env.NEXT_PUBLIC_ENABLE_AI_CHAT === 'true'
   const activeLanguage = useMemo<EditorLanguageId>(
@@ -95,6 +132,9 @@ export const CodeEditor = ({
     value,
     activeLanguage
   )
+  const room = useRoom()
+  const updateMyPresence = useUpdateMyPresence()
+  const others = useOthers()
   const { handleAIAssist, triggerQuickEdit } = useAIAssist(onChange)
   const { setTheme } = useEditorTheme()
   const { theme, systemTheme } = useTheme()
@@ -108,6 +148,10 @@ export const CodeEditor = ({
   const applySyntaxThemeRef = useRef<() => Promise<void>>(
     async () => {}
   )
+  const yBindingRef = useRef<MonacoBinding | null>(null)
+  const remoteSelectionStyleRef = useRef<HTMLStyleElement | null>(null)
+  const presenceLastSentAtRef = useRef(0)
+  const followRevealAtRef = useRef(0)
   const applySeqRef = useRef(0)
   const isMac =
     typeof navigator !== 'undefined' && navigator.userAgent.includes('Macintosh')
@@ -195,6 +239,10 @@ export const CodeEditor = ({
     () => () => {
       defaultTokensDisposableRef.current?.dispose()
       defaultTokensDisposableRef.current = null
+      yBindingRef.current?.destroy()
+      yBindingRef.current = null
+      remoteSelectionStyleRef.current?.remove()
+      remoteSelectionStyleRef.current = null
     },
     []
   )
@@ -239,6 +287,118 @@ export const CodeEditor = ({
     editor.focus()
   }, [gotoRequest, editorRef])
 
+  useEffect(() => {
+    if (typeof document === 'undefined') return
+
+    if (!collaboration?.enabled) {
+      remoteSelectionStyleRef.current?.remove()
+      remoteSelectionStyleRef.current = null
+      return
+    }
+
+    const styleElement =
+      remoteSelectionStyleRef.current ?? document.createElement('style')
+    styleElement.setAttribute('data-collab-remote-cursors', 'true')
+    if (!remoteSelectionStyleRef.current) {
+      document.head.appendChild(styleElement)
+      remoteSelectionStyleRef.current = styleElement
+    }
+
+    const rules: string[] = []
+    for (const participant of others) {
+      const yClientId = extractYjsClientIdFromPresence(participant.presence)
+      if (yClientId === null) continue
+
+      const color =
+        typeof participant.info?.color === 'string' && participant.info.color.trim()
+          ? participant.info.color.trim()
+          : '#38BDF8'
+      const name =
+        typeof participant.info?.name === 'string' && participant.info.name.trim()
+          ? participant.info.name.trim()
+          : participant.id || `User ${participant.connectionId}`
+      const safeName = sanitizeCssLabel(name)
+
+      rules.push(`
+.monaco-editor .yRemoteSelection-${yClientId} {
+  background-color: ${color}33 !important;
+  border-left: 1px solid ${color} !important;
+}
+.monaco-editor .yRemoteSelectionHead-${yClientId}::after {
+  content: "${safeName}";
+  position: absolute;
+  top: -1.2rem;
+  left: 4px;
+  font-size: 10px;
+  line-height: 1;
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: ${color};
+  color: #0b0b0f;
+  font-weight: 700;
+  white-space: nowrap;
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  pointer-events: none;
+  z-index: 41;
+}
+.monaco-editor .yRemoteSelectionHead-${yClientId} {
+  position: relative;
+  overflow: visible !important;
+  border-left: 2px solid ${color} !important;
+  z-index: 40;
+}
+      `)
+    }
+
+    styleElement.textContent = rules.join('\n')
+  }, [collaboration?.enabled, others])
+
+  useEffect(() => {
+    if (!collaboration?.enabled) return
+    if (!collaboration.followConnectionId) return
+
+    const editor = editorRef.current
+    const model = editor?.getModel()
+    if (!editor || !model) return
+
+    const target = others.find(
+      (participant) => participant.connectionId === collaboration.followConnectionId
+    )
+    if (!target) return
+
+    const presence = (target.presence ?? {}) as {
+      cursor?: {
+        lineNumber?: number
+        column?: number
+      }
+      fileId?: string | null
+      idle?: boolean
+    }
+    if (!presence.cursor) return
+    if (presence.fileId && presence.fileId !== collaboration.fileId) return
+    if (presence.idle) return
+
+    const lineNumber =
+      typeof presence.cursor.lineNumber === 'number' ? presence.cursor.lineNumber : 1
+    const column = typeof presence.cursor.column === 'number' ? presence.cursor.column : 1
+
+    const now = Date.now()
+    if (now - followRevealAtRef.current < 120) return
+    followRevealAtRef.current = now
+
+    const safeLine = Math.min(Math.max(1, lineNumber), model.getLineCount())
+    const safeColumn = Math.min(Math.max(1, column), model.getLineMaxColumn(safeLine))
+    editor.revealPositionInCenter({ lineNumber: safeLine, column: safeColumn })
+  }, [
+    collaboration?.enabled,
+    collaboration?.fileId,
+    collaboration?.followConnectionId,
+    editorRef,
+    others,
+  ])
+
   const editorTheme =
     syntaxTheme === 'shiki' && !isShikiReady
       ? isDark
@@ -251,7 +411,8 @@ export const CodeEditor = ({
       language={activeLanguage}
       height="100%"
       width="100%"
-      value={value}
+      value={collaboration?.enabled ? undefined : value}
+      defaultValue={collaboration?.enabled ? value : undefined}
       theme={editorTheme}
       className="bg-transparent" // Let Monaco handle bg
       onMount={(editor, monaco) => {
@@ -267,14 +428,97 @@ export const CodeEditor = ({
           })
         }
         handleEditorDidMount(editor, monaco)
+        if (collaboration?.enabled) {
+          const model = editor.getModel()
+          if (model) {
+            const yProvider = getYjsProviderForRoom(room)
+            const yDoc = yProvider.getYDoc()
+            const yText = yDoc.getText('content')
+            let disposed = false
+            let didSeedFromSnapshot = false
+
+            const maybeSeedFromSnapshot = () => {
+              if (disposed || didSeedFromSnapshot) return
+              didSeedFromSnapshot = true
+
+              if (!value) return
+              if (yText.length === 0) {
+                yDoc.transact(() => {
+                  if (yText.length === 0) {
+                    yText.insert(0, value)
+                  }
+                }, 'initial-content-seed')
+                return
+              }
+
+              if (yText.toString() !== value) {
+                posthog.capture('collab_conflict_recovery_applied', {
+                  file_id: collaboration.fileId,
+                  strategy: 'yjs_authoritative',
+                })
+              }
+            }
+
+            let cleanupSyncListener: (() => void) | null = null
+            if (yProvider.synced) {
+              maybeSeedFromSnapshot()
+            } else {
+              const handleSynced = (synced: boolean) => {
+                if (!synced) return
+                maybeSeedFromSnapshot()
+              }
+              yProvider.on('synced', handleSynced)
+              cleanupSyncListener = () => {
+                yProvider.off('synced', handleSynced)
+              }
+            }
+
+            yBindingRef.current?.destroy()
+            yBindingRef.current = new MonacoBinding(
+              yText,
+              model,
+              new Set([editor]),
+              yProvider.awareness as unknown as YjsAwareness
+            )
+
+            const awarenessUserState: JsonObject = {
+              id: collaboration.userId,
+              name: collaboration.userName,
+              color: collaboration.userColor,
+            }
+            yProvider.awareness.setLocalStateField('user', awarenessUserState)
+
+            editor.onDidDispose(() => {
+              disposed = true
+              cleanupSyncListener?.()
+              cleanupSyncListener = null
+            })
+          }
+
+          editor.updateOptions({
+            readOnly: collaboration.role !== 'editor',
+          })
+        }
         onReady?.()
         const cleanupAIAssist = handleAIAssist(editor, monaco, setIsStreaming, onChange)
         editor.onDidDispose(() => {
           if (isAiChatEnabled) {
             chatApplyService.unbindActiveEditor(editor)
           }
+          yBindingRef.current?.destroy()
+          yBindingRef.current = null
           if (typeof cleanupAIAssist === 'function') {
             cleanupAIAssist()
+          }
+          if (collaboration?.enabled) {
+            updateMyPresence({
+              cursor: null,
+              selection: null,
+              idle: true,
+              lastActiveAt: Date.now(),
+              fileId: collaboration.fileId,
+              filePath: collaboration.filePath ?? null,
+            })
           }
         })
 
@@ -306,6 +550,55 @@ export const CodeEditor = ({
         }
 
         editor.addContentWidget(hintWidget)
+
+        const updatePresence = (
+          presence: Partial<{
+            cursor: {
+              lineNumber: number
+              column: number
+            } | null
+            selection: {
+              startLineNumber: number
+              startColumn: number
+              endLineNumber: number
+              endColumn: number
+            } | null
+            idle: boolean
+          }>,
+          minIntervalMs = 40
+        ) => {
+          if (!collaboration?.enabled) return
+          const now = Date.now()
+          if (
+            minIntervalMs > 0 &&
+            now - presenceLastSentAtRef.current < minIntervalMs
+          ) {
+            return
+          }
+          presenceLastSentAtRef.current = now
+          updateMyPresence({
+            ...presence,
+            fileId: collaboration.fileId,
+            filePath: collaboration.filePath ?? null,
+            lastActiveAt: now,
+          })
+        }
+
+        const emitCursorPresence = () => {
+          if (!collaboration?.enabled) return
+          const position = editor.getPosition()
+          if (!position) return
+          updatePresence(
+            {
+              cursor: {
+                lineNumber: position.lineNumber,
+                column: position.column,
+              },
+              idle: false,
+            },
+            32
+          )
+        }
 
         const updateInlineChatHint = () => {
           const model = editor.getModel()
@@ -376,11 +669,30 @@ export const CodeEditor = ({
           if (!payload) {
             isSelectionSettled = false
             selectionHandler(null)
+            updatePresence(
+              {
+                selection: null,
+                idle: false,
+              },
+              50
+            )
             return
           }
 
           isSelectionSettled = true
           selectionHandler(payload)
+          updatePresence(
+            {
+              selection: {
+                startLineNumber: payload.startLineNumber,
+                startColumn: payload.startColumn,
+                endLineNumber: payload.endLineNumber,
+                endColumn: payload.endColumn,
+              },
+              idle: false,
+            },
+            50
+          )
         }
 
         const scheduleSelectionPayload = () => {
@@ -390,6 +702,13 @@ export const CodeEditor = ({
           clearSelectionEmitTimeout()
           isSelectionSettled = false
           selectionHandler(null)
+          updatePresence(
+            {
+              selection: null,
+              idle: false,
+            },
+            50
+          )
           selectionEmitTimeout = setTimeout(() => {
             selectionEmitTimeout = null
             emitSelectionPayloadNow()
@@ -410,6 +729,13 @@ export const CodeEditor = ({
         editor.onDidFocusEditorWidget(() => {
           void applySyntaxThemeRef.current()
           updateInlineChatHint()
+          emitCursorPresence()
+          updatePresence(
+            {
+              idle: false,
+            },
+            0
+          )
         })
         editor.onDidBlurEditorWidget(() => {
           updateInlineChatHint()
@@ -417,6 +743,14 @@ export const CodeEditor = ({
           isSelectionSettled = false
           isPointerDown = false
           onSelectionChangeRef.current?.(null)
+          updatePresence(
+            {
+              cursor: null,
+              selection: null,
+              idle: true,
+            },
+            0
+          )
         })
 
         editor.onMouseDown((e) => {
@@ -435,16 +769,25 @@ export const CodeEditor = ({
             lineCount: model.getLineCount(),
             filePath,
           })
+          emitCursorPresence()
         })
 
         editor.onDidChangeCursorPosition(() => {
           updateInlineChatHint()
+          emitCursorPresence()
         })
         editor.onDidChangeCursorSelection(() => {
+          emitCursorPresence()
           if (isPointerDown) {
             clearSelectionEmitTimeout()
             isSelectionSettled = false
             onSelectionChangeRef.current?.(null)
+            updatePresence(
+              {
+                selection: null,
+              },
+              50
+            )
             return
           }
           scheduleSelectionPayload()
@@ -459,6 +802,7 @@ export const CodeEditor = ({
 
         void applySyntaxThemeRef.current()
         updateInlineChatHint()
+        emitCursorPresence()
         
         // Register undo/redo interception
         console.log('[Editor] Registering HistoryService', historyService)
@@ -489,6 +833,7 @@ export const CodeEditor = ({
          cursorBlinking: 'smooth',
          cursorSmoothCaretAnimation: 'off',
          renderLineHighlight: 'line', // cleaner than 'all'
+         readOnly: collaboration?.enabled ? collaboration.role !== 'editor' : false,
          guides: {
             indentation: true,
             bracketPairs: true

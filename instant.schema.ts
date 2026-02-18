@@ -3,7 +3,7 @@
 import { i } from '@instantdb/core'
 
 const _schema = i.schema({
-  // Schema includes project files plus AI chat/thread persistence entities.
+  // We inferred 55 attributes!
   // Take a look at this schema, and if everything looks good,
   // run `push schema` again to enforce the types.
   entities: {
@@ -11,99 +11,105 @@ const _schema = i.schema({
       path: i.string().unique().indexed(),
       url: i.string(),
     }),
+    $streams: i.entity({
+      abortReason: i.string().optional(),
+      clientId: i.string().unique().indexed(),
+      done: i.boolean().optional(),
+      size: i.number().optional(),
+    }),
     $users: i.entity({
       email: i.string().unique().indexed().optional(),
       imageURL: i.string().optional(),
       type: i.string().optional(),
     }),
+    ai_messages: i.entity({
+      content: i.string().optional(),
+      created_at: i.string().optional(),
+      error: i.string().optional(),
+      projectId: i.string().optional(),
+      role: i.string().optional(),
+      seq: i.number().optional(),
+      sourceMessageId: i.string().optional(),
+      status: i.string().optional(),
+      threadId: i.string().optional(),
+      tokenEstimate: i.number().optional(),
+      updated_at: i.string().optional(),
+      user_id: i.string().optional(),
+    }),
+    ai_runs: i.entity({
+      created_at: i.string().optional(),
+      ended_at: i.string().optional(),
+      failureReason: i.string().optional(),
+      messageId: i.string().optional(),
+      model: i.string().optional(),
+      requestId: i.string().optional(),
+      started_at: i.string().optional(),
+      status: i.string().optional(),
+      threadId: i.string().optional(),
+      updated_at: i.string().optional(),
+      user_id: i.string().optional(),
+    }),
+    ai_threads: i.entity({
+      created_at: i.string().optional(),
+      lastMessageAt: i.string().optional(),
+      lastMessagePreview: i.string().optional(),
+      projectId: i.string().optional(),
+      status: i.string().optional(),
+      summary: i.string().optional(),
+      summaryVersion: i.number().optional(),
+      title: i.string().optional(),
+      updated_at: i.string().optional(),
+      user_id: i.string().optional(),
+    }),
     files: i.entity({
       content: i.string().optional(),
       created_at: i.string().optional(),
-      isExpanded: i.any().optional(),
+      isExpanded: i.boolean().optional(),
       isOpen: i.boolean().optional(),
       main_file: i.boolean().optional(),
       name: i.string().optional(),
-      parent_id: i.any().optional(),
+      parent_id: i.string().optional(),
       pathname: i.string().optional(),
       projectId: i.string().optional(),
       type: i.string().optional(),
       url: i.string().optional(),
       user_id: i.string().optional(),
     }),
+    project_share_links: i.entity({
+      comment_token: i.string().optional(),
+      created_at: i.string().optional(),
+      created_by_user_id: i.string().optional(),
+      edit_token: i.string().optional(),
+      expires_at_ms: i.number().optional(),
+      fileId: i.string().optional(),
+      projectId: i.string().optional(),
+      revoked_at: i.string().optional(),
+      role: i.string().optional(),
+      token: i.string().optional(),
+      view_token: i.string().optional(),
+    }),
     projects: i.entity({
+      activeChatThreadId: i.string().optional(),
+      activeFileId: i.string().optional(),
+      cachedPdfExpiresAt: i.number().optional(),
+      cachedPdfUrl: i.string().optional(),
+      cachedPreviewExpiresAt: i.number().optional(),
+      cachedPreviewUrl: i.string().optional(),
       created_at: i.string().optional(),
       document_class: i.string().optional(),
+      isAutoFetching: i.boolean().optional(),
+      isPdfCaretNavigationEnabled: i.boolean().optional(),
       last_compiled: i.string().optional(),
-      trashed_at: i.string().optional(),
       page_count: i.number().optional(),
       pdfBackgroundTheme: i.string().optional(),
       project_content: i.string().optional(),
+      projectScale: i.number().optional(),
       template: i.string().optional(),
       title: i.string().optional(),
+      trashed_at: i.string().optional(),
+      type: i.string().optional(),
       user_id: i.string().optional(),
       word_count: i.number().optional(),
-      activeFileId: i.string().optional(),
-      activeChatThreadId: i.string().optional(),
-    }),
-    ai_threads: i.entity({
-      projectId: i.string().indexed().optional(),
-      user_id: i.string().indexed().optional(),
-      title: i.string().optional(),
-      status: i.string().indexed().optional(), // active | archived
-      lastMessagePreview: i.string().optional(),
-      lastMessageAt: i.string().indexed().optional(),
-      summary: i.string().optional(),
-      summaryVersion: i.number().optional(),
-      created_at: i.string().indexed().optional(),
-      updated_at: i.string().indexed().optional(),
-    }),
-    ai_messages: i.entity({
-      threadId: i.string().indexed().optional(),
-      projectId: i.string().indexed().optional(),
-      user_id: i.string().indexed().optional(),
-      role: i.string().indexed().optional(), // system | user | assistant | tool
-      content: i.string().optional(),
-      seq: i.number().indexed().optional(),
-      status: i.string().indexed().optional(), // completed | error | interrupted | streaming
-      error: i.string().optional(),
-      sourceMessageId: i.string().optional(),
-      tokenEstimate: i.number().optional(),
-      created_at: i.string().indexed().optional(),
-      updated_at: i.string().indexed().optional(),
-    }),
-    ai_runs: i.entity({
-      threadId: i.string().indexed().optional(),
-      messageId: i.string().indexed().optional(),
-      user_id: i.string().indexed().optional(),
-      requestId: i.string().indexed().optional(),
-      status: i.string().indexed().optional(), // streaming | completed | failed | aborted
-      model: i.string().optional(),
-      started_at: i.string().indexed().optional(),
-      ended_at: i.string().optional(),
-      failureReason: i.string().optional(),
-      created_at: i.string().indexed().optional(),
-      updated_at: i.string().indexed().optional(),
-    }),
-    ai_memory_items: i.entity({
-      user_id: i.string().indexed().optional(),
-      projectId: i.string().indexed().optional(),
-      threadId: i.string().indexed().optional(),
-      scope: i.string().indexed().optional(), // user | project | thread
-      kind: i.string().indexed().optional(), // preference | fact | constraint | summary
-      content: i.string().optional(),
-      sourceMessageId: i.string().optional(),
-      salience: i.number().optional(), // 0-1
-      lastUsedAt: i.string().optional(),
-      created_at: i.string().indexed().optional(),
-      updated_at: i.string().indexed().optional(),
-    }),
-    ai_thread_checkpoints: i.entity({
-      threadId: i.string().indexed().optional(),
-      user_id: i.string().indexed().optional(),
-      messageSeq: i.number().indexed().optional(),
-      label: i.string().optional(),
-      payload: i.any().optional(),
-      created_at: i.string().indexed().optional(),
     }),
     users: i.entity({
       app_id: i.string().optional(),
@@ -117,6 +123,19 @@ const _schema = i.schema({
     }),
   },
   links: {
+    $streams$files: {
+      forward: {
+        on: '$streams',
+        has: 'many',
+        label: '$files',
+      },
+      reverse: {
+        on: '$files',
+        has: 'one',
+        label: '$stream',
+        onDelete: 'cascade',
+      },
+    },
     $usersLinkedPrimaryUser: {
       forward: {
         on: '$users',
@@ -130,12 +149,39 @@ const _schema = i.schema({
         label: 'linkedGuestUsers',
       },
     },
+    projectShareLinkProject: {
+      forward: {
+        on: 'project_share_links',
+        has: 'one',
+        label: 'project',
+        onDelete: 'cascade',
+      },
+      reverse: {
+        on: 'projects',
+        has: 'many',
+        label: 'shareLinks',
+      },
+    },
+    projectShareLinkFile: {
+      forward: {
+        on: 'project_share_links',
+        has: 'one',
+        label: 'file',
+        onDelete: 'cascade',
+      },
+      reverse: {
+        on: 'files',
+        has: 'many',
+        label: 'shareLinks',
+      },
+    },
   },
   rooms: {},
 })
 
-// This helps Typescript display nicer intellisense
-type AppSchema = typeof _schema
+// This helps TypeScript display nicer intellisense
+type _AppSchema = typeof _schema
+interface AppSchema extends _AppSchema {}
 const schema: AppSchema = _schema
 
 export type { AppSchema }

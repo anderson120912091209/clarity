@@ -52,7 +52,8 @@ export default function EditorSidebar({ syntaxTheme, onSyntaxThemeChange }: Edit
     refresh: refreshQuickEditQuota,
   } = useQuickEditQuota({ autoRefreshMs: 30_000 })
   const { isCollapsed } = useSidebar()
-  const { projectId, project, files, currentlyOpen } = useProject()
+  const { projectId, project, files, currentlyOpen, isShareSession, shareToken, sessionRole } =
+    useProject()
   const isPdfCaretNavigationEnabled = project?.isPdfCaretNavigationEnabled ?? true
   const pdfBackgroundTheme = localPdfBackgroundTheme
   const selectedPdfBackgroundTheme = resolvePdfBackgroundTheme(pdfBackgroundTheme)
@@ -240,7 +241,20 @@ export default function EditorSidebar({ syntaxTheme, onSyntaxThemeChange }: Edit
                 files={files || []} 
                 projectId={projectId} 
                 userId={user?.id || ''}
+                ownerUserId={(typeof project?.user_id === 'string' && project.user_id) || user?.id || ''}
+                shareToken={shareToken}
+                role={sessionRole}
                 onOpenFile={(file: { id: string }) => {
+                  if (isShareSession) {
+                    const params = new URLSearchParams()
+                    if (shareToken) {
+                      params.set('share', shareToken)
+                    }
+                    params.set('file', file.id)
+                    router.push(`/project/${projectId}?${params.toString()}`)
+                    return
+                  }
+
                   db.transact([
                     tx.files[file.id].update({ isOpen: true }),
                     tx.projects[projectId].update({ activeFileId: file.id })

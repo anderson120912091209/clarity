@@ -12,7 +12,7 @@ import { ChatPanel, useChangeManagerState } from '@/features/agent'
 import { useFrontend } from '@/contexts/FrontendContext'
 import { useDashboardSettings } from '@/contexts/DashboardSettingsContext'
 import { ProjectProvider } from '@/contexts/ProjectContext'
-import { useParams } from 'next/navigation'
+import { useParams, useSearchParams } from 'next/navigation'
 import { useProject } from '@/contexts/ProjectContext'
 import { EditorTabs } from '@/components/editor/editor-tabs'
 import { PDFNavContent, useLatex } from '@/components/latex-render/latex'
@@ -36,15 +36,26 @@ import { changeManagerService, type StagedFileChange } from '@/features/agent/se
 import type { AgentWorkspaceFileContext } from '@/features/agent/types/chat-context'
 import { completeNavJourney, markNavMilestone } from '@/lib/perf/nav-trace'
 import { warmupShikiMonaco } from '@/components/editor/utils/shiki-monaco'
+import { resolveCollaborationColor } from '@/features/collaboration/color'
+import { decodeShareTokenUnsafe } from '@/features/collaboration/share-token'
+import type { CollaborationRole } from '@/features/collaboration/types'
+import { CollaborationRoomProvider } from '@/features/collaboration/components/collaboration-room-provider'
+import { CollaborationHeaderControls } from '@/features/collaboration/components/collaboration-header-controls'
+import { CollaborationEventToasts } from '@/features/collaboration/components/collaboration-event-toasts'
 
 export const maxDuration = 30
 const AI_CHAT_ENABLED = process.env.NEXT_PUBLIC_ENABLE_AI_CHAT === 'true'
 
 export default function Home() {
-  const { id } = useParams<{ id: string }>()
+  const params = useParams<{ id?: string | string[] }>()
+  const searchParams = useSearchParams()
+  const id = Array.isArray(params.id) ? params.id[0] : params.id
+  const shareToken = searchParams.get('share') ?? undefined
+
+  if (!id) return null
 
   return (
-    <ProjectProvider projectId={id}>
+    <ProjectProvider projectId={id} shareToken={shareToken}>
       <EditorLayout />
     </ProjectProvider>
   )
@@ -226,8 +237,18 @@ function buildSelectionHighlightBoxes(
     .sort((left, right) => left.page - right.page || left.v - right.v || left.h - right.h)
 }
 
+function normalizeFileQueryParam(value: string | null): string | null {
+  if (!value) return null
+  const normalized = value.split('?')[0]?.trim()
+  return normalized || null
+}
+
 function EditorLayout() {
+  const searchParams = useSearchParams()
   const [isChatVisible, setIsChatVisible] = useState(false)
+  const [followConnectionId, setFollowConnectionId] = useState<number | null>(null)
+  const [activeSelectionForComments, setActiveSelectionForComments] =
+    useState<EditorSelectionPayload | null>(null)
   const isAiChatEnabled = AI_CHAT_ENABLED
   const { user } = useFrontend()
   const { settings, updateSetting } = useDashboardSettings()
@@ -256,10 +277,49 @@ function EditorLayout() {
   )
   const [liveFileContentOverrides, setLiveFileContentOverrides] = useState<Record<string, string>>({})
   const fileContent = (currentlyOpen?.id ? liveFileContentOverrides[currentlyOpen.id] : undefined) ?? currentlyOpen?.content ?? ''
+  const shareToken = searchParams.get('share') ?? undefined
+  const decodedShareToken = useMemo(() => decodeShareTokenUnsafe(shareToken), [shareToken])
+  const activeShareToken = useMemo(() => {
+    if (!shareToken || !decodedShareToken) return undefined
+
+    const nowSeconds = Math.floor(Date.now() / 1000)
+    if (decodedShareToken.exp <= nowSeconds) return undefined
+    if (projectId && decodedShareToken.projectId !== projectId) return undefined
+    return shareToken
+  }, [decodedShareToken, projectId, shareToken])
+  const shareFileId = activeShareToken ? normalizeFileQueryParam(searchParams.get('file')) : null
+  const collaborationRole: CollaborationRole = activeShareToken
+    ? decodedShareToken?.role ?? 'viewer'
+    : 'editor'
+  const collaborationUserInfo = useMemo(
+    () => {
+      const imageUrl = (user as { imageURL?: string | null } | null)?.imageURL
+      return {
+        name:
+          (typeof user?.email === 'string' && user.email.trim()) ||
+          (typeof user?.id === 'string' && user.id.trim()) ||
+          'Anonymous',
+        avatar: typeof imageUrl === 'string' && imageUrl.trim() ? imageUrl : undefined,
+        email: typeof user?.email === 'string' ? user.email : undefined,
+        color: resolveCollaborationColor(
+          (typeof user?.id === 'string' && user.id) ||
+            (typeof user?.email === 'string' && user.email) ||
+            'anonymous'
+        ),
+        role: collaborationRole,
+      }
+    },
+    [collaborationRole, user]
+  )
 
   useEffect(() => {
     setEditorSyntaxTheme(settings.defaultEditorSyntaxTheme)
   }, [settings.defaultEditorSyntaxTheme])
+
+  useEffect(() => {
+    setFollowConnectionId(null)
+    setActiveSelectionForComments(null)
+  }, [currentlyOpen?.id])
 
   useEffect(() => {
     if (editorSyntaxTheme !== 'shiki') return
@@ -448,6 +508,22 @@ function EditorLayout() {
   }, [projectFiles])
 
   useEffect(() => {
+    if (!shareFileId || !projectId || !Array.isArray(projectFiles)) return
+    if (activeShareToken) return
+    if (currentlyOpen?.id === shareFileId) return
+
+    const target = projectFiles.find((file) => file?.id === shareFileId && file?.type === 'file')
+    if (!target?.id) return
+
+    db.transact([
+      tx.files[target.id].update({ isOpen: true }),
+      tx.projects[projectId].update({ activeFileId: target.id }),
+    ]).catch((error) => {
+      console.warn('Failed to open shared file on join:', error)
+    })
+  }, [activeShareToken, currentlyOpen?.id, projectFiles, projectId, shareFileId])
+
+  useEffect(() => {
     return () => {
       syncFromCodeAbortRef.current?.abort()
       syncFromPdfAbortRef.current?.abort()
@@ -515,6 +591,35 @@ function EditorLayout() {
     },
     [projectFiles, resolveFilePath]
   )
+
+  const activeFilePathForCollaboration = useMemo(() => {
+    if (!currentlyOpen) return null
+    return resolveFilePath(currentlyOpen) ?? currentlyOpen.name ?? null
+  }, [currentlyOpen, resolveFilePath])
+
+  const collaborationConfig = useMemo(() => {
+    if (!user?.id || !currentlyOpen?.id) return null
+    return {
+      enabled: true,
+      role: collaborationRole,
+      userId: user.id,
+      userName: collaborationUserInfo.name,
+      userColor: collaborationUserInfo.color,
+      fileId: currentlyOpen.id,
+      filePath: activeFilePathForCollaboration ?? undefined,
+      followConnectionId,
+      shareToken: activeShareToken,
+    }
+  }, [
+    activeShareToken,
+    activeFilePathForCollaboration,
+    collaborationRole,
+    collaborationUserInfo.color,
+    collaborationUserInfo.name,
+    currentlyOpen?.id,
+    followConnectionId,
+    user?.id,
+  ])
 
   const handleInsertAssistantContent = useCallback(
     (
@@ -1072,12 +1177,24 @@ function EditorLayout() {
   // Header content for the editor pane
   const editorHeader = (
     <div className="flex items-center w-full h-full gap-3 overflow-hidden">
-        <div className="pl-2 flex items-center">
-            <SidebarToggle />
-        </div>
-        <div className="flex-1 min-w-0 overflow-hidden pl-2">
-           <EditorTabs />
-        </div>
+      <div className="pl-2 flex items-center">
+        <SidebarToggle />
+      </div>
+      <div className="flex-1 min-w-0 overflow-hidden pl-2">
+        <EditorTabs />
+      </div>
+      {projectId && currentlyOpen?.id && user?.id ? (
+        <CollaborationHeaderControls
+          projectId={projectId}
+          fileId={currentlyOpen.id}
+          filePath={activeFilePathForCollaboration}
+          role={collaborationRole}
+          userId={user.id}
+          selection={activeSelectionForComments}
+          followConnectionId={followConnectionId}
+          onFollowConnectionIdChange={setFollowConnectionId}
+        />
+      ) : null}
     </div>
   )
 
@@ -1116,72 +1233,85 @@ function EditorLayout() {
       header={null}
       showHeader={false}
     >
-      {/* Content Panels */}
-      <ResizablePanelGroup direction="horizontal" className="flex-1" autoSaveId="project-editor-layout">
-        <ResizablePanel defaultSize={50} minSize={25}>
-          <CursorEditorContainer 
-            onChatToggle={() => setIsChatVisible(!isChatVisible)}
-            isChatVisible={isChatVisible}
-            header={editorHeader}
-            onCursorClick={handleEditorCursorClick}
-            onFindSelectionInPdf={handleFindSelectionInPdf}
-            isPdfNavigationEnabled={isPdfNavigationEnabled}
-            syntaxTheme={editorSyntaxTheme}
-            onFileContentChange={handleLiveFileContentChange}
-            onEditorReady={handleEditorReady}
-            gotoRequest={editorGotoRequest}
-          />
-        </ResizablePanel>
-        <ResizableHandle className="w-2 bg-transparent flex items-center justify-center group outline-none">
-          <div className="h-8 w-1 bg-zinc-700 rounded-full opacity-0 group-hover:opacity-100 transition-all" />
-        </ResizableHandle>
-        <ResizablePanel defaultSize={50} minSize={20} collapsible={true}>
-          <LatexRenderer 
-            pdfUrl={pdfUrl}
-            isLoading={isLoading}
-            error={error}
-            logs={logs}
-            showLogs={showLogs}
-            header={pdfHeader}
-            scrollRequest={pdfScrollRequest}
-            highlightRequest={pdfHighlightRequest}
-            onPdfPointSelect={handlePdfPointSelect}
-            isPdfNavigationEnabled={isPdfNavigationEnabled}
-            onPdfReady={handlePdfReady}
-          />
-        </ResizablePanel>
-        {isAiChatEnabled && isChatVisible && (
-          <>
-            <ResizableHandle className="w-2 bg-transparent flex items-center justify-center group outline-none">
-              <div className="h-8 w-1 bg-zinc-700 rounded-full opacity-0 group-hover:opacity-100 transition-all" />
-            </ResizableHandle>
-            <ResizablePanel defaultSize={20} minSize={20} maxSize={45} collapsible={true}>
-              <ChatPanel 
-                projectId={projectId}
-                userId={user?.id ?? ''}
-                initialActiveThreadId={project?.activeChatThreadId ?? null}
-                fileContent={fileContent}
-                isVisible={isChatVisible}
-                onToggle={() => setIsChatVisible(false)}
-                activeFileId={currentlyOpen?.id}
-                activeFileName={currentlyOpen?.name}
-                activeFilePath={currentlyOpen ? resolveFilePath(currentlyOpen) ?? currentlyOpen.name : undefined}
-                workspaceFiles={workspaceFilesForChat}
-                compileLogs={logs}
-                compileError={error}
-                onInsertIntoEditor={handleInsertAssistantContent}
-                stagedChanges={stagedChanges}
-                anyStagedStreaming={anyStagedStreaming}
-                onJumpToStagedFile={handleJumpToStagedFile}
-                onAcceptStagedFile={handleAcceptStagedFile}
-                onRejectStagedFile={handleRejectStagedFile}
-                onAcceptAllStaged={handleAcceptAllStaged}
-                onRejectAllStaged={handleRejectAllStaged}
-              />
-            </ResizablePanel>
-          </>
-        )}
-      </ResizablePanelGroup>
+      <CollaborationRoomProvider
+        projectId={projectId || 'unknown-project'}
+        fileId={currentlyOpen?.id || 'no-file'}
+        filePath={activeFilePathForCollaboration}
+        role={collaborationRole}
+        userId={user?.id || 'anonymous'}
+        userInfo={collaborationUserInfo}
+        shareToken={activeShareToken}
+      >
+        <CollaborationEventToasts currentUserId={user?.id || 'anonymous'} />
+        {/* Content Panels */}
+        <ResizablePanelGroup direction="horizontal" className="flex-1" autoSaveId="project-editor-layout">
+          <ResizablePanel defaultSize={50} minSize={25}>
+            <CursorEditorContainer 
+              onChatToggle={() => setIsChatVisible(!isChatVisible)}
+              isChatVisible={isChatVisible}
+              header={editorHeader}
+              onCursorClick={handleEditorCursorClick}
+              onFindSelectionInPdf={handleFindSelectionInPdf}
+              isPdfNavigationEnabled={isPdfNavigationEnabled}
+              syntaxTheme={editorSyntaxTheme}
+              onFileContentChange={handleLiveFileContentChange}
+              onEditorReady={handleEditorReady}
+              gotoRequest={editorGotoRequest}
+              collaboration={collaborationConfig}
+              onSelectionPayloadChange={setActiveSelectionForComments}
+            />
+          </ResizablePanel>
+          <ResizableHandle className="w-2 bg-transparent flex items-center justify-center group outline-none">
+            <div className="h-8 w-1 bg-zinc-700 rounded-full opacity-0 group-hover:opacity-100 transition-all" />
+          </ResizableHandle>
+          <ResizablePanel defaultSize={50} minSize={20} collapsible={true}>
+            <LatexRenderer 
+              pdfUrl={pdfUrl}
+              isLoading={isLoading}
+              error={error}
+              logs={logs}
+              showLogs={showLogs}
+              header={pdfHeader}
+              scrollRequest={pdfScrollRequest}
+              highlightRequest={pdfHighlightRequest}
+              onPdfPointSelect={handlePdfPointSelect}
+              isPdfNavigationEnabled={isPdfNavigationEnabled}
+              onPdfReady={handlePdfReady}
+            />
+          </ResizablePanel>
+          {isAiChatEnabled && isChatVisible && (
+            <>
+              <ResizableHandle className="w-2 bg-transparent flex items-center justify-center group outline-none">
+                <div className="h-8 w-1 bg-zinc-700 rounded-full opacity-0 group-hover:opacity-100 transition-all" />
+              </ResizableHandle>
+              <ResizablePanel defaultSize={20} minSize={20} maxSize={45} collapsible={true}>
+                <ChatPanel 
+                  projectId={projectId}
+                  userId={user?.id ?? ''}
+                  initialActiveThreadId={project?.activeChatThreadId ?? null}
+                  fileContent={fileContent}
+                  isVisible={isChatVisible}
+                  onToggle={() => setIsChatVisible(false)}
+                  activeFileId={currentlyOpen?.id}
+                  activeFileName={currentlyOpen?.name}
+                  activeFilePath={currentlyOpen ? resolveFilePath(currentlyOpen) ?? currentlyOpen.name : undefined}
+                  workspaceFiles={workspaceFilesForChat}
+                  compileLogs={logs}
+                  compileError={error}
+                  onInsertIntoEditor={handleInsertAssistantContent}
+                  stagedChanges={stagedChanges}
+                  anyStagedStreaming={anyStagedStreaming}
+                  onJumpToStagedFile={handleJumpToStagedFile}
+                  onAcceptStagedFile={handleAcceptStagedFile}
+                  onRejectStagedFile={handleRejectStagedFile}
+                  onAcceptAllStaged={handleAcceptAllStaged}
+                  onRejectAllStaged={handleRejectAllStaged}
+                />
+              </ResizablePanel>
+            </>
+          )}
+        </ResizablePanelGroup>
+      </CollaborationRoomProvider>
     </AppLayout>
   )
 }
