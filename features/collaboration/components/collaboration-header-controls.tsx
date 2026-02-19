@@ -120,7 +120,7 @@ export function CollaborationHeaderControls({
   onFollowConnectionIdChange,
   onRealtimeCollaborationRequested,
 }: CollaborationHeaderControlsProps) {
-  const { entitlements, isPro } = useFrontend()
+  const { entitlements, isPro, user } = useFrontend()
   const self = useSelf()
   const others = useOthers()
   const createThread = useCreateThread()
@@ -384,6 +384,9 @@ export function CollaborationHeaderControls({
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          ...(typeof user?.refresh_token === 'string' && user.refresh_token.trim()
+            ? { Authorization: `Bearer ${user.refresh_token.trim()}` }
+            : {}),
         },
         body: JSON.stringify({
           projectId,

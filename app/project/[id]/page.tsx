@@ -41,7 +41,10 @@ import { decodeShareTokenUnsafe } from '@/features/collaboration/share-token'
 import {
   SHARED_PROJECT_MEMBERSHIP_FILE_MARKER,
 } from '@/features/collaboration/shared-project-memberships'
-import { hasActiveProjectShareLink as hasActiveProjectShareLinkRecord } from '@/features/collaboration/share-link-records'
+import {
+  extractShareTokenFromRecord,
+  resolveShareLinkExpiryMs,
+} from '@/features/collaboration/share-link-records'
 import type { CollaborationRole } from '@/features/collaboration/types'
 import { CollaborationRoomProvider } from '@/features/collaboration/components/collaboration-room-provider'
 import { CollaborationHeaderControls } from '@/features/collaboration/components/collaboration-header-controls'
@@ -364,16 +367,49 @@ function EditorLayout() {
     const row = sortedRows[0]
     return typeof row?.id === 'string' ? row.id : null
   }, [membershipMarkerRowsData?.project_share_links])
-  const hasActiveProjectShareLink = useMemo(() => {
+  const latestProjectShareToken = useMemo(() => {
     const rows = Array.isArray(shareLinksData?.project_share_links)
       ? shareLinksData.project_share_links
       : []
+    if (!rows.length) return undefined
 
-    return hasActiveProjectShareLinkRecord(rows)
+    const nowMs = Date.now()
+    const sortedRows = rows
+      .slice()
+      .sort((left: Record<string, unknown>, right: Record<string, unknown>) => {
+        const leftCreated = Date.parse(
+          typeof left?.created_at === 'string' ? left.created_at : ''
+        )
+        const rightCreated = Date.parse(
+          typeof right?.created_at === 'string' ? right.created_at : ''
+        )
+        return (
+          (Number.isNaN(rightCreated) ? 0 : rightCreated) -
+          (Number.isNaN(leftCreated) ? 0 : leftCreated)
+        )
+      })
+
+    for (const row of sortedRows) {
+      if (typeof row?.revoked_at === 'string' && row.revoked_at.trim()) continue
+      const token = extractShareTokenFromRecord(row)
+      if (!token) continue
+
+      const expiresAtMs = resolveShareLinkExpiryMs(row, token)
+      if (typeof expiresAtMs === 'number' && expiresAtMs <= nowMs) continue
+
+      return token
+    }
+
+    return undefined
   }, [shareLinksData?.project_share_links])
+  const collaborationShareToken = activeShareToken ?? latestProjectShareToken
   const collaborationRole: CollaborationRole = activeShareToken
     ? decodedShareToken?.role ?? 'viewer'
     : 'editor'
+  const collaborationAuthToken =
+    typeof (user as { refresh_token?: string | null } | null)?.refresh_token === 'string'
+      ? (user as { refresh_token?: string | null }).refresh_token ?? undefined
+      : undefined
   const collaborationUserInfo = useMemo(
     () => {
       const imageUrl = (user as { imageURL?: string | null } | null)?.imageURL
@@ -400,9 +436,9 @@ function EditorLayout() {
   }, [settings.defaultEditorSyntaxTheme])
 
   useEffect(() => {
-    if (!activeShareToken) return
+    if (!collaborationShareToken) return
     setIsRealtimeCollaborationEnabled(true)
-  }, [activeShareToken])
+  }, [collaborationShareToken])
 
   useEffect(() => {
     if (!activeShareToken || !user?.id || !projectId) return
@@ -473,11 +509,6 @@ function EditorLayout() {
     projectId,
     user?.id,
   ])
-
-  useEffect(() => {
-    if (!hasActiveProjectShareLink) return
-    setIsRealtimeCollaborationEnabled(true)
-  }, [hasActiveProjectShareLink])
 
   useEffect(() => {
     setFollowConnectionId(null)
@@ -771,11 +802,11 @@ function EditorLayout() {
       fileId: currentlyOpen.id,
       filePath: activeFilePathForCollaboration ?? undefined,
       followConnectionId,
-      shareToken: activeShareToken,
+      shareToken: collaborationShareToken,
     }
   }, [
-    activeShareToken,
     activeFilePathForCollaboration,
+    collaborationShareToken,
     collaborationRole,
     collaborationUserInfo.color,
     collaborationUserInfo.name,
@@ -1385,7 +1416,8 @@ function EditorLayout() {
       role={collaborationRole}
       userId={user?.id || 'anonymous'}
       userInfo={collaborationUserInfo}
-      shareToken={activeShareToken}
+      shareToken={collaborationShareToken}
+      authToken={collaborationAuthToken}
     >
       <CollaborationEventToasts currentUserId={user?.id || 'anonymous'} />
       <AppLayout

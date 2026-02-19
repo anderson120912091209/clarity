@@ -28,9 +28,9 @@ const rules = {
       "isOwner",
       "auth.id != null && auth.id == data.user_id",
       "hasSharedViewAccess",
-      "ruleParams.shareToken != null && ruleParams.projectId != null && ruleParams.projectId == data.projectId",
+      "ruleParams.shareToken != null && ruleParams.projectId != null && ruleParams.projectId == data.projectId && ruleParams.shareToken in data.ref('project_share_links.token')",
       "hasSharedEditAccess",
-      "ruleParams.shareToken != null && ruleParams.projectId != null && ruleParams.projectId == data.projectId && ruleParams.role == 'editor'",
+      "ruleParams.shareToken != null && ruleParams.projectId != null && ruleParams.projectId == data.projectId && ruleParams.shareToken in data.ref('project_share_links.edit_token')",
     ],
   },
   
@@ -46,25 +46,28 @@ const rules = {
       "isOwner",
       "auth.id != null && auth.id == data.user_id",
       "hasSharedViewAccess",
-      "ruleParams.shareToken != null && ruleParams.projectId != null && ruleParams.projectId == data.id",
+      "ruleParams.shareToken != null && ruleParams.projectId != null && ruleParams.projectId == data.id && ruleParams.shareToken in data.ref('project_share_links.token')",
     ],
   },
 
   // Token-bearing share links are owner-managed grant records.
+  // Exception: shared-membership marker rows are user-owned.
   project_share_links: {
     allow: {
-      view: "isCreatorOrProjectOwner || hasTokenAccess",
-      create: "isCreator",
-      update: "isCreatorOrProjectOwner",
-      delete: "isCreatorOrProjectOwner",
+      view: "isProjectOwner || isCreator || hasTokenAccess",
+      create: "isProjectOwner || isMembershipMarkerOwner",
+      update: "isProjectOwner || isMembershipMarkerOwner",
+      delete: "isProjectOwner || isMembershipMarkerOwner",
     },
     bind: [
       "isCreator",
       "auth.id != null && auth.id == data.created_by_user_id",
-      "isCreatorOrProjectOwner",
-      "auth.id != null && (auth.id == data.created_by_user_id || auth.id in data.ref('project.user_id'))",
+      "isProjectOwner",
+      "auth.id != null && auth.id in data.ref('project.user_id')",
+      "isMembershipMarkerOwner",
+      "auth.id != null && auth.id == data.created_by_user_id && data.fileId == '__shared_membership__'",
       "hasTokenAccess",
-      "ruleParams.shareToken != null && ruleParams.shareToken == data.token",
+      "ruleParams.shareToken != null && ruleParams.shareToken == data.token && data.fileId != '__shared_membership__'",
     ],
   },
 

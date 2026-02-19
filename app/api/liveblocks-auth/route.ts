@@ -8,6 +8,10 @@ import {
 } from '@/features/collaboration/roles'
 import { verifyShareToken } from '@/features/collaboration/share-token.server'
 import type { CollaborationRole, CollaborationUserInfo } from '@/features/collaboration/types'
+import {
+  authenticateInstantRequest,
+  isAuthenticatedUserMismatch,
+} from '@/features/collaboration/server/instant-auth'
 
 export const runtime = 'nodejs'
 
@@ -27,18 +31,36 @@ function asNonEmptyString(value: unknown): string | null {
   return normalized.length > 0 ? normalized : null
 }
 
-function normalizeUserInfo(input: unknown, role: CollaborationRole): CollaborationUserInfo {
+function normalizeUserInfo(
+  input: unknown,
+  role: CollaborationRole,
+  fallback: { id: string; email?: string }
+): CollaborationUserInfo {
   const base = (input && typeof input === 'object' ? input : {}) as Partial<CollaborationUserInfo>
   return {
-    name: typeof base.name === 'string' && base.name.trim() ? base.name.trim() : 'Anonymous',
+    name:
+      typeof base.name === 'string' && base.name.trim()
+        ? base.name.trim()
+        : fallback.email?.trim() || fallback.id,
     avatar: typeof base.avatar === 'string' && base.avatar.trim() ? base.avatar.trim() : undefined,
-    email: typeof base.email === 'string' && base.email.trim() ? base.email.trim() : undefined,
+    email:
+      typeof base.email === 'string' && base.email.trim()
+        ? base.email.trim()
+        : fallback.email,
     color: typeof base.color === 'string' && base.color.trim() ? base.color.trim() : '#38BDF8',
     role,
   }
 }
 
 export async function POST(req: Request) {
+  const auth = await authenticateInstantRequest(req)
+  if (!auth.ok) {
+    return NextResponse.json(
+      { error: auth.failure.error },
+      { status: auth.failure.status }
+    )
+  }
+
   const liveblocksSecret = process.env.LIVEBLOCKS_SECRET_KEY?.trim()
   if (!liveblocksSecret) {
     return NextResponse.json(
@@ -55,10 +77,13 @@ export async function POST(req: Request) {
   const room = asNonEmptyString(rawBody.room)
   const projectId = asNonEmptyString(rawBody.projectId)
   const fileId = asNonEmptyString(rawBody.fileId)
-  const userId = asNonEmptyString(rawBody.userId)
-  if (!room || !projectId || !userId) {
+  if (isAuthenticatedUserMismatch(rawBody.userId, auth.user.id)) {
+    return NextResponse.json({ error: 'Authenticated user mismatch.' }, { status: 403 })
+  }
+
+  if (!room || !projectId) {
     return NextResponse.json(
-      { error: 'Missing required fields: room, projectId, userId.' },
+      { error: 'Missing required fields: room, projectId.' },
       { status: 400 }
     )
   }
@@ -74,8 +99,8 @@ export async function POST(req: Request) {
 
   const requestedFileId = fileId || parsedRoom.fileId || null
 
-  let effectiveRole = normalizeCollaborationRole(rawBody.role, 'editor')
   const shareToken = asNonEmptyString(rawBody.shareToken)
+  let effectiveRole: CollaborationRole = 'viewer'
   if (shareToken) {
     const shareSecret = process.env.COLLAB_SHARE_SECRET?.trim()
     if (!shareSecret) {
@@ -115,15 +140,22 @@ export async function POST(req: Request) {
       })
     }
 
-    effectiveRole = clampRoleByCeiling(effectiveRole, claims.role)
+    const requestedRole = normalizeCollaborationRole(rawBody.role, claims.role)
+    effectiveRole =
+      claims.issuedByUserId === auth.user.id
+        ? 'editor'
+        : clampRoleByCeiling(requestedRole, claims.role)
   }
 
-  const userInfo = normalizeUserInfo(rawBody.userInfo, effectiveRole)
+  const userInfo = normalizeUserInfo(rawBody.userInfo, effectiveRole, {
+    id: auth.user.id,
+    email: auth.user.email,
+  })
   const liveblocks = new Liveblocks({
     secret: liveblocksSecret,
   })
 
-  const session = liveblocks.prepareSession(userId, {
+  const session = liveblocks.prepareSession(auth.user.id, {
     userInfo,
   })
   session.allow(room, permissionsForRole(session, effectiveRole))

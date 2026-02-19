@@ -8,6 +8,7 @@ export interface CollaborationAuthContext {
   userId: string
   userInfo: CollaborationUserInfo
   shareToken?: string
+  authToken?: string
 }
 
 const authContextByRoom = new Map<string, CollaborationAuthContext>()

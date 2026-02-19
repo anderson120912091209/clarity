@@ -2,6 +2,10 @@ import { NextResponse } from 'next/server'
 import { createShareToken } from '@/features/collaboration/share-token.server'
 import { normalizeCollaborationRole } from '@/features/collaboration/roles'
 import { buildCollaborationRoomId } from '@/features/collaboration/room'
+import {
+  authenticateInstantRequest,
+  isAuthenticatedUserMismatch,
+} from '@/features/collaboration/server/instant-auth'
 
 export const runtime = 'nodejs'
 const NEVER_EXPIRY_UNIX_SECONDS = 253402300799 // 9999-12-31T23:59:59Z
@@ -27,6 +31,14 @@ function normalizeExpiryHours(value: unknown): number | null {
 }
 
 export async function POST(req: Request) {
+  const auth = await authenticateInstantRequest(req)
+  if (!auth.ok) {
+    return NextResponse.json(
+      { error: auth.failure.error },
+      { status: auth.failure.status }
+    )
+  }
+
   const shareSecret = process.env.COLLAB_SHARE_SECRET?.trim()
   if (!shareSecret) {
     return NextResponse.json(
@@ -42,10 +54,16 @@ export async function POST(req: Request) {
 
   const projectId = asNonEmptyString(body.projectId)
   const fileId = asNonEmptyString(body.fileId)
-  const userId = asNonEmptyString(body.userId)
-  if (!projectId || !userId) {
+  if (isAuthenticatedUserMismatch(body.userId, auth.user.id)) {
     return NextResponse.json(
-      { error: 'Missing required fields: projectId, userId.' },
+      { error: 'Authenticated user mismatch.' },
+      { status: 403 }
+    )
+  }
+
+  if (!projectId) {
+    return NextResponse.json(
+      { error: 'Missing required field: projectId.' },
       { status: 400 }
     )
   }
@@ -64,7 +82,7 @@ export async function POST(req: Request) {
       projectId,
       fileId: '*',
       role,
-      issuedByUserId: userId,
+      issuedByUserId: auth.user.id,
       iat: issuedAt,
       exp: expiresAt,
     },

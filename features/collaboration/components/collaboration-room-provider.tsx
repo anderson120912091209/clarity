@@ -18,6 +18,7 @@ interface CollaborationRoomProviderProps {
   userId: string
   userInfo: CollaborationUserInfo
   shareToken?: string
+  authToken?: string
   children: React.ReactNode
 }
 
@@ -96,6 +97,7 @@ export function CollaborationRoomProvider({
   userId,
   userInfo,
   shareToken,
+  authToken,
   children,
 }: CollaborationRoomProviderProps) {
   const roomId = useMemo(() => buildCollaborationRoomId(projectId), [projectId])
@@ -108,8 +110,9 @@ export function CollaborationRoomProvider({
       userId,
       userInfo,
       shareToken,
+      authToken,
     }),
-    [fileId, projectId, role, roomId, shareToken, userId, userInfo]
+    [authToken, fileId, projectId, role, roomId, shareToken, userId, userInfo]
   )
 
   const initialPresence = useMemo<CollaborationPresence>(

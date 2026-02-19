@@ -28,6 +28,9 @@ const collaborationClient = createClient<CollaborationUserMeta>({
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        ...(authContext.authToken
+          ? { Authorization: `Bearer ${authContext.authToken}` }
+          : {}),
       },
       body: JSON.stringify({
         room,
