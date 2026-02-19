@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { createShareToken } from '../share-token.server'
 import {
+  activeSharedProjectIdsForCreator,
   extractShareTokenFromRecord,
   hasActiveProjectShareLink,
   isShareLinkRecordActive,
@@ -131,5 +132,40 @@ describe('share link record helpers', () => {
         nowMs
       )
     ).toBe(false)
+  })
+
+  it('tracks active shared project ids for a creator user', () => {
+    const activeToken = createTestToken(1700007200)
+    const expiredToken = createTestToken(1700000001)
+    const nowMs = 1700003600000
+
+    const projectIds = activeSharedProjectIdsForCreator(
+      [
+        {
+          token: activeToken,
+          projectId: 'project-a',
+          created_by_user_id: 'owner-1',
+        },
+        {
+          token: activeToken,
+          projectId: 'project-a',
+          created_by_user_id: 'owner-1',
+        },
+        {
+          token: activeToken,
+          projectId: 'project-b',
+          created_by_user_id: 'owner-2',
+        },
+        {
+          token: expiredToken,
+          projectId: 'project-c',
+          created_by_user_id: 'owner-1',
+        },
+      ],
+      'owner-1',
+      nowMs
+    )
+
+    expect(projectIds).toEqual(['project-a'])
   })
 })

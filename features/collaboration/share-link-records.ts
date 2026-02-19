@@ -69,3 +69,39 @@ export function hasActiveProjectShareLink(
     return isShareLinkRecordActive(row as ShareLinkRecord, nowMs)
   })
 }
+
+export function activeSharedProjectIdsForCreator(
+  rows: unknown[] | null | undefined,
+  creatorUserId: string,
+  nowMs = Date.now()
+): string[] {
+  const normalizedCreatorUserId = creatorUserId.trim()
+  if (!normalizedCreatorUserId) return []
+  if (!Array.isArray(rows) || rows.length === 0) return []
+
+  const activeProjectIds = new Set<string>()
+
+  rows.forEach((row) => {
+    if (!row || typeof row !== 'object') return
+    const record = row as ShareLinkRecord
+
+    const createdByUserId =
+      typeof record.created_by_user_id === 'string'
+        ? record.created_by_user_id.trim()
+        : ''
+    if (!createdByUserId || createdByUserId !== normalizedCreatorUserId) return
+    if (!isShareLinkRecordActive(record, nowMs)) return
+
+    const projectId =
+      typeof record.projectId === 'string'
+        ? record.projectId.trim()
+        : typeof record.project_id === 'string'
+          ? record.project_id.trim()
+          : ''
+    if (!projectId) return
+
+    activeProjectIds.add(projectId)
+  })
+
+  return Array.from(activeProjectIds)
+}

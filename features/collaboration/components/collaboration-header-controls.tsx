@@ -40,9 +40,11 @@ import type { CollaborationRole } from '../types'
 import { useProject } from '@/contexts/ProjectContext'
 import { buildShareGrantRecord } from '../share-grants'
 import {
+  activeSharedProjectIdsForCreator,
   extractShareTokenFromRecord,
   resolveShareLinkExpiryMs,
 } from '../share-link-records'
+import { UpgradeModal } from '@/components/upgrade-modal'
 
 interface AnchorSelection {
   startLineNumber: number
@@ -72,6 +74,7 @@ interface SavedShareLink {
 }
 
 const MAX_CUSTOM_EXPIRY_HOURS = 24 * 365
+const ACTIVE_SHARED_PROJECT_LIMIT = 1
 
 function userDisplayName(user: { info?: { name?: string | null } | null; id?: string | null }): string {
   if (typeof user.info?.name === 'string' && user.info.name.trim()) return user.info.name.trim()
@@ -178,6 +181,8 @@ export function CollaborationHeaderControls({
   const [shareExpiresAtMs, setShareExpiresAtMs] = useState<number | null>(null)
   const [isCreatingShare, setIsCreatingShare] = useState(false)
   const [hasCopiedUrl, setHasCopiedUrl] = useState(false)
+  const [isShareLimitDialogOpen, setIsShareLimitDialogOpen] = useState(false)
+  const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false)
 
   const canComment = role !== 'viewer'
   // const roleLabel = role === 'editor' ? 'Editor' : role === 'commenter' ? 'Commenter' : 'Viewer'
@@ -189,6 +194,20 @@ export function CollaborationHeaderControls({
             $: {
               where: {
                 projectId,
+              },
+            },
+          },
+        }
+      : null
+  )
+  const shouldLoadCreatorShareLinks = role === 'editor' && Boolean(userId)
+  const { data: creatorShareLinksData } = db.useQuery(
+    shouldLoadCreatorShareLinks
+      ? {
+          project_share_links: {
+            $: {
+              where: {
+                created_by_user_id: userId,
               },
             },
           },
@@ -369,9 +388,33 @@ export function CollaborationHeaderControls({
     typeof shareExpiresAtMs === 'number' ? shareExpiresAtMs <= Date.now() : false
   const shareExpiryLabel = formatShareExpiryLabel(shareExpiresAtMs, isShareLinkExpired)
   const hasPersistedShareLink = Boolean(shareUrl)
+  const activeSharedProjectIdsByCreator = useMemo(() => {
+    const rows = Array.isArray(creatorShareLinksData?.project_share_links)
+      ? creatorShareLinksData.project_share_links
+      : []
+    return activeSharedProjectIdsForCreator(rows, userId)
+  }, [creatorShareLinksData?.project_share_links, userId])
+  const hasActiveShareInCurrentProject = activeSharedProjectIdsByCreator.includes(projectId)
+  const isShareProjectLimitReached =
+    ACTIVE_SHARED_PROJECT_LIMIT > 0 &&
+    !hasActiveShareInCurrentProject &&
+    activeSharedProjectIdsByCreator.length >= ACTIVE_SHARED_PROJECT_LIMIT
+  const blockingSharedProjectId = !hasActiveShareInCurrentProject
+    ? activeSharedProjectIdsByCreator[0] ?? null
+    : null
 
   const createShareLink = useCallback(async (forceRegenerate = false) => {
     if (!forceRegenerate && hasPersistedShareLink && !isShareLinkExpired) {
+      return
+    }
+    if (isShareProjectLimitReached) {
+      setIsShareLimitDialogOpen(true)
+      posthog.capture('collab_share_project_limit_reached', {
+        project_id: projectId,
+        blocking_project_id: blockingSharedProjectId,
+        active_shared_project_count: activeSharedProjectIdsByCreator.length,
+        limit: ACTIVE_SHARED_PROJECT_LIMIT,
+      })
       return
     }
 
@@ -476,8 +519,11 @@ export function CollaborationHeaderControls({
       setIsCreatingShare(false)
     }
   }, [
+    activeSharedProjectIdsByCreator.length,
+    blockingSharedProjectId,
     fileId,
     hasPersistedShareLink,
+    isShareProjectLimitReached,
     isShareLinkExpired,
     onRealtimeCollaborationRequested,
     projectId,
@@ -733,6 +779,11 @@ export function CollaborationHeaderControls({
                     : 'Create Invite Link'}
               </Button>
             )}
+            {isShareProjectLimitReached ? (
+              <p className="text-[11px] text-amber-300/90">
+                You already have an active shared project. Upgrade your plan to share more than one project.
+              </p>
+            ) : null}
 
             {hasPersistedShareLink && (
               <div className="grid gap-2 p-3 rounded-md bg-white/[0.03] border border-white/5">
@@ -781,6 +832,42 @@ export function CollaborationHeaderControls({
           </div>
         </DialogContent>
       </Dialog>
+      <Dialog open={isShareLimitDialogOpen} onOpenChange={setIsShareLimitDialogOpen}>
+        <DialogContent className="max-w-md border-white/10 bg-[#121317] text-zinc-100">
+          <DialogHeader>
+            <DialogTitle>Collaboration Limit Reached</DialogTitle>
+            <DialogDescription className="text-zinc-400">
+              You already have one active shared project. Upgrade to share multiple projects at the same time.
+            </DialogDescription>
+          </DialogHeader>
+          {blockingSharedProjectId ? (
+            <p className="text-[11px] text-zinc-500">
+              Active shared project: <span className="font-mono text-zinc-300">{blockingSharedProjectId}</span>
+            </p>
+          ) : null}
+          <div className="mt-2 flex justify-end gap-2">
+            <Button
+              type="button"
+              variant="ghost"
+              className="text-zinc-300 hover:bg-white/5 hover:text-white"
+              onClick={() => setIsShareLimitDialogOpen(false)}
+            >
+              Not Now
+            </Button>
+            <Button
+              type="button"
+              className="bg-indigo-600 text-white hover:bg-indigo-500"
+              onClick={() => {
+                setIsShareLimitDialogOpen(false)
+                setIsUpgradeModalOpen(true)
+              }}
+            >
+              Upgrade Plan
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+      <UpgradeModal open={isUpgradeModalOpen} onOpenChange={setIsUpgradeModalOpen} />
 
       <Dialog>
         <DialogTrigger asChild>
