@@ -1,6 +1,10 @@
 import { EditorTabs } from './editor-tabs'
 import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react'
-import { CodeEditor, type EditorSelectionPayload } from './editor'
+import {
+  CodeEditor,
+  type EditorSelectionPayload,
+  type EditorCollaborationConfig,
+} from './editor'
 import { useTheme } from 'next-themes'
 import { db } from '@/lib/constants'
 import { tx } from '@instantdb/react'
@@ -35,6 +39,8 @@ interface CursorEditorContainerProps {
   } | null
   onFindSelectionInPdf?: (payload: EditorSelectionPayload) => void
   isPdfNavigationEnabled?: boolean
+  collaboration?: EditorCollaborationConfig | null
+  onSelectionPayloadChange?: (payload: EditorSelectionPayload | null) => void
 }
 
 const CursorEditorContainer: React.FC<CursorEditorContainerProps> = ({ 
@@ -48,6 +54,8 @@ const CursorEditorContainer: React.FC<CursorEditorContainerProps> = ({
   gotoRequest,
   onFindSelectionInPdf,
   isPdfNavigationEnabled = true,
+  collaboration,
+  onSelectionPayloadChange,
 }) => {
   const isAiChatEnabled = process.env.NEXT_PUBLIC_ENABLE_AI_CHAT === 'true'
   const { theme, systemTheme } = useTheme()
@@ -56,7 +64,7 @@ const CursorEditorContainer: React.FC<CursorEditorContainerProps> = ({
   const [selectionPayload, setSelectionPayload] = useState<EditorSelectionPayload | null>(null)
   const [isSelectionActionsVisible, setIsSelectionActionsVisible] = useState(false)
   const [isQuickEditInputOpen, setIsQuickEditInputOpen] = useState(false)
-  const { currentlyOpen, isFilesLoading, isProjectLoading, files } = useProject()
+  const { currentlyOpen, isFilesLoading, isProjectLoading, files, projectId } = useProject()
   const isStreamingRef = useRef(false)
   const localContentRef = useRef('')
   const quickEditTriggerRef = useRef<(() => void) | null>(null)
@@ -64,6 +72,7 @@ const CursorEditorContainer: React.FC<CursorEditorContainerProps> = ({
   const persistTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const pendingPersistRef = useRef<{ fileId: string; content: string } | null>(null)
   const isPersistingRef = useRef(false)
+  const persistDebounceMs = collaboration?.enabled ? 1100 : 180
   
   const fileType = getFileExtension(currentlyOpen?.name || '')
   const ext = fileType.toLowerCase()
@@ -106,7 +115,20 @@ const CursorEditorContainer: React.FC<CursorEditorContainerProps> = ({
     isPersistingRef.current = true
 
     try {
-      await db.transact([tx.files[pending.fileId].update({ content: pending.content })])
+      const baseFileTx = tx.files[pending.fileId] as unknown as {
+        ruleParams?: (params: Record<string, unknown>) => { update: (data: { content: string }) => unknown }
+        update: (data: { content: string }) => unknown
+      }
+      const fileTx =
+        collaboration?.shareToken && typeof baseFileTx.ruleParams === 'function'
+          ? baseFileTx.ruleParams({
+              shareToken: collaboration.shareToken,
+              projectId,
+              role: collaboration.role,
+            })
+          : baseFileTx
+
+      await db.transact([fileTx.update({ content: pending.content }) as any])
     } catch (error) {
       console.error('Failed to persist editor content:', error)
     } finally {
@@ -115,7 +137,7 @@ const CursorEditorContainer: React.FC<CursorEditorContainerProps> = ({
         void flushPendingPersist()
       }
     }
-  }, [])
+  }, [collaboration?.role, collaboration?.shareToken, projectId])
 
   const schedulePersist = useCallback(
     (fileId: string, content: string) => {
@@ -128,9 +150,9 @@ const CursorEditorContainer: React.FC<CursorEditorContainerProps> = ({
       persistTimeoutRef.current = setTimeout(() => {
         persistTimeoutRef.current = null
         void flushPendingPersist()
-      }, 180)
+      }, persistDebounceMs)
     },
-    [flushPendingPersist]
+    [flushPendingPersist, persistDebounceMs]
   )
 
   useEffect(() => {
@@ -164,7 +186,8 @@ const CursorEditorContainer: React.FC<CursorEditorContainerProps> = ({
   useEffect(() => {
     setSelectionPayload(null)
     setIsSelectionActionsVisible(false)
-  }, [openFile?.id, isImageFile, isPdfFile])
+    onSelectionPayloadChange?.(null)
+  }, [openFile?.id, isImageFile, isPdfFile, onSelectionPayloadChange])
 
   useEffect(() => {
     if (typeof window === 'undefined') return
@@ -176,6 +199,7 @@ const CursorEditorContainer: React.FC<CursorEditorContainerProps> = ({
       if (open) {
         setSelectionPayload(null)
         setIsSelectionActionsVisible(false)
+        onSelectionPayloadChange?.(null)
       }
     }
 
@@ -183,17 +207,19 @@ const CursorEditorContainer: React.FC<CursorEditorContainerProps> = ({
     return () => {
       window.removeEventListener(QUICK_EDIT_INPUT_VISIBILITY_EVENT, handleQuickEditVisibility)
     }
-  }, [])
+  }, [onSelectionPayloadChange])
 
   const handleSelectionChange = useCallback((payload: EditorSelectionPayload | null) => {
     if (isQuickEditInputOpen) {
       setSelectionPayload(null)
       setIsSelectionActionsVisible(false)
+      onSelectionPayloadChange?.(null)
       return
     }
     setSelectionPayload(payload)
     setIsSelectionActionsVisible(Boolean(payload))
-  }, [isQuickEditInputOpen])
+    onSelectionPayloadChange?.(payload)
+  }, [isQuickEditInputOpen, onSelectionPayloadChange])
 
   const handleEditorActionsReady = useCallback(
     (actions: { triggerQuickEdit: () => void }) => {
@@ -205,14 +231,16 @@ const CursorEditorContainer: React.FC<CursorEditorContainerProps> = ({
   const handleSelectionQuickEdit = useCallback(() => {
     setSelectionPayload(null)
     setIsSelectionActionsVisible(false)
+    onSelectionPayloadChange?.(null)
     quickEditTriggerRef.current?.()
-  }, [])
+  }, [onSelectionPayloadChange])
 
   const handleFindSelectionInPdf = useCallback(() => {
     if (!selectionPayload || !onFindSelectionInPdf || !isPdfNavigationEnabled) return
     onFindSelectionInPdf(selectionPayload)
     setIsSelectionActionsVisible(false)
-  }, [selectionPayload, onFindSelectionInPdf, isPdfNavigationEnabled])
+    onSelectionPayloadChange?.(null)
+  }, [isPdfNavigationEnabled, onFindSelectionInPdf, onSelectionPayloadChange, selectionPayload])
 
   const selectionActionStyle = useMemo(() => {
     if (!selectionPayload) return undefined
@@ -320,7 +348,12 @@ const CursorEditorContainer: React.FC<CursorEditorContainerProps> = ({
         </div>
       ) : (
         // Edit Selection Actions Popover UI
-        <div ref={editorPaneRef} className="relative flex-grow h-full overflow-hidden">
+        <div
+          ref={editorPaneRef}
+          className={`relative flex-grow h-full ${
+            collaboration?.enabled ? 'overflow-visible' : 'overflow-hidden'
+          }`}
+        >
             {isSelectionActionsVisible && selectionPayload && (
               <div className="absolute z-30" style={selectionActionStyle}>
                 <div className="flex items-center gap-1 rounded-md border border-[#2D2E33] bg-[#1E1F24] px-0.5">
@@ -358,7 +391,8 @@ const CursorEditorContainer: React.FC<CursorEditorContainerProps> = ({
               onActionsReady={handleEditorActionsReady}
               onReady={onEditorReady}
               gotoRequest={activeGotoRequest}
-              key={`${theme || systemTheme}-${openFile?.id}`}
+              collaboration={collaboration}
+              key={`${theme || systemTheme}-${openFile?.id}-${collaboration?.enabled ? 'collab' : 'solo'}`}
             />
         </div>
       )}

@@ -3,56 +3,20 @@
 import React from 'react'
 import { X, File, FileText, Image as ImageIcon } from 'lucide-react'
 import { useProject } from '@/contexts/ProjectContext'
-import { db } from '@/lib/constants'
-import { tx } from '@instantdb/react'
 import { cn } from '@/lib/utils'
 import { getFileExtension } from '@/lib/utils/client-utils'
 
 export function EditorTabs() {
-  const { openFiles, currentlyOpen, activeFileId, projectId } = useProject()
+  const { openFiles, activeFileId, setActiveFile, closeFile } = useProject()
 
   const handleTabClick = (fileId: string) => {
     if (fileId === activeFileId) return
-    db.transact([
-      tx.projects[projectId].update({ activeFileId: fileId })
-    ])
+    setActiveFile(fileId)
   }
 
   const handleCloseTab = (e: React.MouseEvent, fileId: string) => {
     e.stopPropagation()
-    
-    // Logic to update active file if we close the active one
-    let newActiveId = activeFileId
-    if (fileId === activeFileId) {
-      const currentIndex = openFiles.findIndex((f: any) => f.id === fileId)
-      // Try next, then previous, then null
-      const nextFile = openFiles[currentIndex + 1] || openFiles[currentIndex - 1]
-      newActiveId = nextFile ? nextFile.id : null
-    }
-
-    const txs: any[] = [
-      tx.files[fileId].update({ isOpen: false })
-    ]
-    
-    if (newActiveId !== activeFileId) {
-       // If no new active file (all closed), checking null
-       if (newActiveId) {
-         txs.push(tx.projects[projectId].update({ activeFileId: newActiveId }))
-       } else {
-         // Should we clear activeFileId? Yes.
-         // InstantDB update might not accept null for optional string? 
-         // Usually we can omitting it or setting it to undefined? 
-         // Let's assume setting to empty string or rely on the query to fail gracefully.
-         // Actually better to keep it stale or update to empty if schema allows.
-         // Let's force update to empty string or null if allowed. 
-         // If schema is optional string, null might be okay or undefined.
-         // Let's just not update activeFileId if it becomes null? No, we must clear it.
-         // Let's try updating to undefined or empty string.
-         // Or just pick another file if available.
-       }
-    }
-    
-    db.transact(txs)
+    closeFile(fileId)
   }
 
   // If no files open, don't show tabs? Or show empty? usually don't show tabs if no files.
@@ -62,7 +26,7 @@ export function EditorTabs() {
   // The scrollbar acts as the separator.
   return (
     <div className="flex items-center w-full h-10 px-1 gap-1.5 bg-[#101011] overflow-x-auto [&::-webkit-scrollbar]:h-[2px] [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-white/10 hover:[&::-webkit-scrollbar-thumb]:bg-white/20"> {
-        openFiles.map((file: any) => {
+        openFiles.map((file: { id: string; name: string }) => {
         const isActive = file.id === activeFileId
         const ext = getFileExtension(file.name).toLowerCase()
         const isImage = ['png', 'jpg', 'jpeg', 'gif', 'svg'].includes(ext)

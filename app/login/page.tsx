@@ -17,6 +17,7 @@ import posthog from 'posthog-js'
 import { fetchPdf } from '@/lib/utils/pdf-utils'
 import { savePdfToStorage, savePreviewToStorage } from '@/lib/utils/db-utils'
 import { createPathname } from '@/lib/utils/client-utils'
+import { normalizeSubscriptionPlan } from '@/lib/subscription/entitlements'
 
 type AuthenticatedUser = NonNullable<ReturnType<typeof db.useAuth>['user']>
 
@@ -53,7 +54,15 @@ function toUserUpdate(user: AuthenticatedUser) {
   }
 }
 
-async function warmWelcomeProjects(userId: string, projects: WelcomeProjectSeed[]) {
+function resolveBootstrapPlan(rawPlan: unknown) {
+  return normalizeSubscriptionPlan(rawPlan)
+}
+
+async function warmWelcomeProjects(
+  userId: string,
+  projects: WelcomeProjectSeed[],
+  userPlan?: string
+) {
   await Promise.allSettled(
     projects.map(async (project) => {
       const { blob } = await fetchPdf(project.projectId, [
@@ -67,6 +76,7 @@ async function warmWelcomeProjects(userId: string, projects: WelcomeProjectSeed[
       ], {
         mode: 'manual',
         clientUserId: userId,
+        clientUserPlan: userPlan,
       })
 
       const pathname = createPathname(userId, project.projectId)
@@ -87,7 +97,20 @@ export default function Login() {
   const bootstrapState = db.useQuery(
     user
       ? {
-          users: {},
+          account_plans: {
+            $: {
+              where: {
+                user_id: user.id,
+              },
+            },
+          },
+          users: {
+            $: {
+              where: {
+                id: user.id,
+              },
+            },
+          },
           projects: {
             $: {
               where: {
@@ -112,8 +135,10 @@ export default function Login() {
 
     const bootstrapUser = async () => {
       const userRecord = bootstrapState.data?.users?.[0]
+      const accountPlanRecord = bootstrapState.data?.account_plans?.[0]
       const hasProjects = (bootstrapState.data?.projects?.length ?? 0) > 0
       const hasWelcomeSeeded = (userRecord?.welcome_seed_version ?? 0) >= WELCOME_SEED_VERSION
+      const resolvedPlan = resolveBootstrapPlan(accountPlanRecord?.plan ?? userRecord?.type)
       const nowISO = new Date().toISOString()
       const userProperties = toUserUpdate(user)
       const userUpdate = {
@@ -121,11 +146,27 @@ export default function Login() {
         welcome_seed_version: WELCOME_SEED_VERSION,
         welcome_seeded_at: nowISO,
       }
+      const shouldSeedAccountPlan = !accountPlanRecord?.id
+      const accountPlanSeedTx = shouldSeedAccountPlan
+        ? [
+            tx.account_plans[user.id].update({
+              user_id: user.id,
+              plan: resolvedPlan,
+              status: 'active',
+              source: 'bootstrap',
+              created_at: nowISO,
+              updated_at: nowISO,
+            }),
+          ]
+        : []
 
       const isNewUser = !hasWelcomeSeeded && !hasProjects
 
       if (hasWelcomeSeeded || hasProjects) {
-        await db.transact(tx.users[user.id].update(userUpdate))
+        await db.transact([
+          tx.users[user.id].update(userUpdate),
+          ...accountPlanSeedTx,
+        ])
         router.push('/projects')
         return
       }
@@ -133,11 +174,16 @@ export default function Login() {
       const { transactions, welcomeProjects } = buildWelcomeProjectTransactions(user.id, nowISO)
       await db.transact([
         tx.users[user.id].update(userUpdate),
+        ...accountPlanSeedTx,
         ...transactions,
       ])
 
       // Best effort: pre-warm welcome project thumbnails and cached PDFs without blocking login for too long.
-      const warmupTask = warmWelcomeProjects(user.id, welcomeProjects).catch((error) => {
+      const warmupTask = warmWelcomeProjects(
+        user.id,
+        welcomeProjects,
+        resolvedPlan
+      ).catch((error) => {
         console.warn('Failed to pre-warm welcome projects:', error)
       })
       await Promise.race([

@@ -45,6 +45,7 @@ interface FetchPdfOptions {
   signal?: AbortSignal
   mode?: 'manual' | 'auto'
   clientUserId?: string
+  clientUserPlan?: string
 }
 
 export interface SynctexContext {
@@ -320,6 +321,9 @@ export async function fetchPdf(
   const requestHeaders: HeadersInit = { 'Content-Type': 'application/json' }
   if (options.clientUserId?.trim()) {
     requestHeaders['x-clarity-user-id'] = options.clientUserId.trim()
+  }
+  if (options.clientUserPlan?.trim()) {
+    requestHeaders['x-clarity-user-plan'] = options.clientUserPlan.trim().toLowerCase()
   }
 
   for (const candidateUrl of clsiCandidates) {

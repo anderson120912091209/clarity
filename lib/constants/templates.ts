@@ -487,7 +487,7 @@ This is a blank Typst document. You can start typing your content here.
 
 == Section
 
-Math is simple: $E=mc^2$.
+Math is simple: $E=m c^2$.
 `
 
 const typstReportContent = `#set text(font: "Linux Libertine", size: 11pt)
@@ -620,4 +620,3 @@ export const typstTemplateContent = {
   resume: typstResumeContent,
   letter: typstLetterContent,
 }
-

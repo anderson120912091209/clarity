@@ -9,7 +9,8 @@ import {
   getFixedQuotaSnapshot,
   type FixedQuotaResult,
 } from '@/lib/server/rate-limit'
-import { buildQuickEditQuotaKey, QUICK_EDIT_CLIENT_QUOTA } from '@/lib/server/quick-edit-quota'
+import { buildQuickEditQuotaKey } from '@/lib/server/quick-edit-quota'
+import { getSubscriptionEntitlements } from '@/lib/subscription/entitlements'
 
 export const runtime = 'nodejs'
 
@@ -104,10 +105,29 @@ function createQuotaResponse(
   return new Response(body, { ...init, headers })
 }
 
+function sanitizeHeaderValue(value: string | null): string | null {
+  if (typeof value !== 'string') return null
+  const normalized = value.trim()
+  if (!normalized || normalized.length > 200) return null
+  return normalized
+}
+
+function resolveQuickEditQuotaContext(req: Request): {
+  userId: string | null
+  quotaLimit: number
+} {
+  const userId = sanitizeHeaderValue(req.headers.get('x-clarity-user-id'))
+  const plan = sanitizeHeaderValue(req.headers.get('x-clarity-user-plan'))
+  const quotaLimit = getSubscriptionEntitlements(plan).quickEditQuotaLimit
+
+  return { userId, quotaLimit }
+}
+
 export async function GET(req: Request) {
+  const quotaContext = resolveQuickEditQuotaContext(req)
   const quota = await getFixedQuotaSnapshot({
-    key: buildQuickEditQuotaKey(req),
-    limit: QUICK_EDIT_CLIENT_QUOTA,
+    key: buildQuickEditQuotaKey(req, { userId: quotaContext.userId }),
+    limit: quotaContext.quotaLimit,
   })
 
   return Response.json({
@@ -127,9 +147,10 @@ export async function POST(req: Request) {
     typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
       ? crypto.randomUUID()
       : `qe-${Date.now()}`
+  const quotaContext = resolveQuickEditQuotaContext(req)
   const quota = await checkFixedQuota({
-    key: buildQuickEditQuotaKey(req),
-    limit: QUICK_EDIT_CLIENT_QUOTA,
+    key: buildQuickEditQuotaKey(req, { userId: quotaContext.userId }),
+    limit: quotaContext.quotaLimit,
   })
 
   if (!quota.allowed) {

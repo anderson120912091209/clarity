@@ -92,6 +92,16 @@ export default function EditorDefaultsSettingsPage() {
               onCheckedChange={(checked) => updateSetting('defaultPdfCaretNavigation', checked)}
             />
           </SettingsRow>
+
+          <SettingsRow
+            label="Enable Typst auto-compile by default"
+            description="When off, Typst documents compile only on demand (Compile button / Cmd+S)."
+          >
+            <Switch
+              checked={settings.defaultTypstAutoCompile}
+              onCheckedChange={(checked) => updateSetting('defaultTypstAutoCompile', checked)}
+            />
+          </SettingsRow>
         </SettingsRows>
       </SettingsSectionCard>
     </div>

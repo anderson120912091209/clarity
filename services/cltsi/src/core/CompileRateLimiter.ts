@@ -92,6 +92,35 @@ function hashIdentity(identity: string): string {
   return crypto.createHash('sha256').update(identity).digest('hex');
 }
 
+function normalizePlan(value: string | null): 'free' | 'pro' {
+  if (!value) return 'free';
+  const normalized = value.trim().toLowerCase();
+  if (normalized === 'pro' || normalized === 'supporter' || normalized === 'premium') {
+    return 'pro';
+  }
+  return 'free';
+}
+
+function hasUnlimitedCompileAccess(req: Request): boolean {
+  const rawPlan = getHeaderValue(req, settings.compileRateLimit.clientUserPlanHeader);
+  return normalizePlan(rawPlan) === 'pro';
+}
+
+function buildUnlimitedCompileResult(): CompileRateLimitResult {
+  return {
+    allowed: true,
+    reason: null,
+    quota: {
+      scope: 'daily',
+      limit: Number.MAX_SAFE_INTEGER,
+      used: 0,
+      remaining: Number.MAX_SAFE_INTEGER,
+      retryAfterSec: settings.compileRateLimit.dailyWindowSec,
+      store: 'memory',
+    },
+  };
+}
+
 async function callUpstash(command: string, method: 'GET' | 'POST'): Promise<number | null> {
   if (!UPSTASH_URL || !UPSTASH_TOKEN) {
     return null;
@@ -232,6 +261,10 @@ export async function checkCompileRateLimit(
   projectId: string,
   compileMode: CompileMode
 ): Promise<CompileRateLimitResult> {
+  if (hasUnlimitedCompileAccess(req)) {
+    return buildUnlimitedCompileResult();
+  }
+
   if (!settings.compileRateLimit.enabled) {
     return {
       allowed: true,

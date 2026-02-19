@@ -16,8 +16,63 @@ const rules = {
     ],
   },
   
-  // Files entity - users can only access files they own
+  // Files entity - owner access plus token-scoped shared access.
   files: {
+    allow: {
+      view: "isOwner || hasSharedViewAccess",
+      create: "isOwner || hasSharedEditAccess",
+      update: "isOwner || hasSharedEditAccess",
+      delete: "isOwner || hasSharedEditAccess",
+    },
+    bind: [
+      "isOwner",
+      "auth.id != null && auth.id == data.user_id",
+      "hasSharedViewAccess",
+      "ruleParams.shareToken != null && ruleParams.projectId != null && ruleParams.projectId == data.projectId && ruleParams.shareToken in data.ref('project_share_links.token')",
+      "hasSharedEditAccess",
+      "ruleParams.shareToken != null && ruleParams.projectId != null && ruleParams.projectId == data.projectId && ruleParams.shareToken in data.ref('project_share_links.edit_token')",
+    ],
+  },
+  
+  // Projects entity - owner access plus token-scoped shared view access.
+  projects: {
+    allow: {
+      view: "isOwner || hasSharedViewAccess",
+      create: "isOwner",
+      update: "isOwner",
+      delete: "isOwner",
+    },
+    bind: [
+      "isOwner",
+      "auth.id != null && auth.id == data.user_id",
+      "hasSharedViewAccess",
+      "ruleParams.shareToken != null && ruleParams.projectId != null && ruleParams.projectId == data.id && ruleParams.shareToken in data.ref('project_share_links.token')",
+    ],
+  },
+
+  // Token-bearing share links are owner-managed grant records.
+  // Exception: shared-membership marker rows are user-owned.
+  project_share_links: {
+    allow: {
+      view: "isProjectOwner || isCreator || hasTokenAccess",
+      create: "isProjectOwner || isMembershipMarkerOwner",
+      update: "isProjectOwner || isMembershipMarkerOwner",
+      delete: "isProjectOwner || isMembershipMarkerOwner",
+    },
+    bind: [
+      "isCreator",
+      "auth.id != null && auth.id == data.created_by_user_id",
+      "isProjectOwner",
+      "auth.id != null && auth.id in data.ref('project.user_id')",
+      "isMembershipMarkerOwner",
+      "auth.id != null && auth.id == data.created_by_user_id && data.fileId == '__shared_membership__'",
+      "hasTokenAccess",
+      "ruleParams.shareToken != null && ruleParams.shareToken == data.token && data.fileId != '__shared_membership__'",
+    ],
+  },
+
+  // Persisted memberships for users who have accepted/opened shared projects.
+  shared_project_memberships: {
     allow: {
       view: "isOwner",
       create: "isOwner",
@@ -26,9 +81,20 @@ const rules = {
     },
     bind: ["isOwner", "auth.id != null && auth.id == data.user_id"],
   },
-  
-  // Projects entity - users can only access projects they own
-  projects: {
+
+  // Subscription rows are user-owned and determine entitlement limits.
+  account_plans: {
+    allow: {
+      view: "isOwner",
+      create: "isOwner",
+      update: "isOwner",
+      delete: "isOwner",
+    },
+    bind: ["isOwner", "auth.id != null && auth.id == data.user_id"],
+  },
+
+  // Plan change history is user-owned for auditing/debugging.
+  account_plan_events: {
     allow: {
       view: "isOwner",
       create: "isOwner",

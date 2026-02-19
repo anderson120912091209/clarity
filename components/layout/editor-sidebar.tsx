@@ -34,9 +34,14 @@ import { UpgradeModal } from '@/components/upgrade-modal'
 interface EditorSidebarProps {
   syntaxTheme: EditorSyntaxTheme
   onSyntaxThemeChange: (theme: EditorSyntaxTheme) => void
+  collaborationControls?: React.ReactNode
 }
 
-export default function EditorSidebar({ syntaxTheme, onSyntaxThemeChange }: EditorSidebarProps) {
+export default function EditorSidebar({
+  syntaxTheme,
+  onSyntaxThemeChange,
+  collaborationControls,
+}: EditorSidebarProps) {
   const router = useRouter()
   const { user } = db.useAuth()
   const { settings } = useDashboardSettings()
@@ -52,7 +57,16 @@ export default function EditorSidebar({ syntaxTheme, onSyntaxThemeChange }: Edit
     refresh: refreshQuickEditQuota,
   } = useQuickEditQuota({ autoRefreshMs: 30_000 })
   const { isCollapsed } = useSidebar()
-  const { projectId, project, files, currentlyOpen } = useProject()
+  const {
+    projectId,
+    project,
+    files,
+    currentlyOpen,
+    shareToken,
+    sessionRole,
+    setActiveFile,
+  } =
+    useProject()
   const isPdfCaretNavigationEnabled = project?.isPdfCaretNavigationEnabled ?? true
   const pdfBackgroundTheme = localPdfBackgroundTheme
   const selectedPdfBackgroundTheme = resolvePdfBackgroundTheme(pdfBackgroundTheme)
@@ -240,17 +254,23 @@ export default function EditorSidebar({ syntaxTheme, onSyntaxThemeChange }: Edit
                 files={files || []} 
                 projectId={projectId} 
                 userId={user?.id || ''}
+                ownerUserId={(typeof project?.user_id === 'string' && project.user_id) || user?.id || ''}
+                shareToken={shareToken}
+                role={sessionRole}
                 onOpenFile={(file: { id: string }) => {
-                  db.transact([
-                    tx.files[file.id].update({ isOpen: true }),
-                    tx.projects[projectId].update({ activeFileId: file.id })
-                  ])
+                  setActiveFile(file.id)
                 }}
                 currentlyOpenId={currentlyOpen?.id}
               />
             </div>
           </div>
         )}
+
+        {!isCollapsed && collaborationControls ? (
+          <div className="px-3 pb-2">
+            {collaborationControls}
+          </div>
+        ) : null}
 
         {!isCollapsed && (
           <div className="px-3 py-2">

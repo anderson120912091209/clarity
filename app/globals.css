@@ -302,3 +302,45 @@ code, kbd, samp, pre {
     transform: translateX(100%);
   }
 }
+
+/* Monaco collaborative cursor defaults (individual participant colors are injected at runtime). */
+.monaco-editor .yRemoteSelection {
+  position: relative;
+  border-radius: 2px;
+}
+
+.monaco-editor .yRemoteSelectionHead {
+  position: relative;
+  overflow: visible !important;
+  z-index: 40;
+}
+
+.monaco-editor .yRemoteSelectionHead::after {
+  content: 'Collaborator';
+  position: absolute;
+  top: -1.2rem;
+  left: 4px;
+  font-size: 10px;
+  line-height: 1;
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.9);
+  color: #0b0b0f;
+  font-weight: 700;
+  white-space: nowrap;
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  pointer-events: none;
+  z-index: 41;
+}
+
+.monaco-editor [class*='yRemoteSelectionHead-'] {
+  position: relative;
+  overflow: visible !important;
+  z-index: 40;
+}
+
+.monaco-editor [class*='yRemoteSelectionHead-']::after {
+  z-index: 41;
+}
