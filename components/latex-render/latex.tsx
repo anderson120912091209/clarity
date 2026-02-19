@@ -44,7 +44,7 @@ const SOLAR_ICON_WEIGHT = 'Linear' as const
 
 // Hook for managing LaTeX compilation state
 export function useLatex(liveFileContentOverrides: Record<string, string> = {}) {
-  const { user } = useFrontend()
+  const { user, plan } = useFrontend()
   const { settings } = useDashboardSettings()
   const { project: data, isLoading: isDataLoading, projectId, files } = useProject()
   const [pdfUrl, setPdfUrl] = useState<string | null>(null)
@@ -215,6 +215,7 @@ export function useLatex(liveFileContentOverrides: Record<string, string> = {}) 
         signal: abortController.signal,
         mode,
         clientUserId: user.id,
+        clientUserPlan: plan,
       })
       if (runId !== compileRunRef.current) return
 
@@ -249,7 +250,7 @@ export function useLatex(liveFileContentOverrides: Record<string, string> = {}) 
         activeAutoCompileAbortRef.current = null
       }
     }
-  }, [isDataLoading, user, effectiveFiles, projectId, queuePersist])
+  }, [isDataLoading, user, effectiveFiles, projectId, queuePersist, plan])
 
   // Auto-compile effect
   useEffect(() => {

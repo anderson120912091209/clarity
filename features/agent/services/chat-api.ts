@@ -1,4 +1,5 @@
 import type { ChatMessage } from '@/features/agent/types/chat.types'
+import { readRuntimeUserHeaders } from '@/lib/client/runtime-user-context'
 
 type AgentRole = 'user' | 'assistant'
 
@@ -111,7 +112,10 @@ export async function generate(input: string): Promise<string> {
 
   const response = await fetch(resolveApiUrl('/api/agent/quick-edit'), {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      ...readRuntimeUserHeaders(),
+    },
     body: JSON.stringify({
       messages: [{ role: 'user', content: prompt }],
     }),

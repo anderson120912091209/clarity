@@ -1,18 +1,17 @@
 'use client'
 
 import {
-  SETTINGS_SELECT_TRIGGER_CLASS,
   SettingsPageHeader,
-  SettingsRow,
-  SettingsRows,
   SettingsSectionCard,
 } from '@/components/settings/settings-page-ui'
 import { Button } from '@/components/ui/button'
 import { Check } from 'lucide-react'
 import { UpgradeModal } from '@/components/upgrade-modal'
 import { useState } from 'react'
+import { useFrontend } from '@/contexts/FrontendContext'
 
 export default function BillingSettingsPage() {
+  const { isPro } = useFrontend()
   const [showUpgradeModal, setShowUpgradeModal] = useState(false)
 
   return (
@@ -24,13 +23,15 @@ export default function BillingSettingsPage() {
 
       <SettingsSectionCard
         title="Current Plan"
-        description="You are currently on the Free plan."
+        description={`You are currently on the ${isPro ? 'Pro' : 'Free'} plan.`}
       >
         <div className="px-4 py-3">
           <div className="flex items-center justify-between mb-4">
             <div>
-              <h3 className="text-lg font-semibold text-white">Free Plan</h3>
-              <p className="text-sm text-zinc-400">Basic features for individual use</p>
+              <h3 className="text-lg font-semibold text-white">{isPro ? 'Pro Plan' : 'Free Plan'}</h3>
+              <p className="text-sm text-zinc-400">
+                {isPro ? 'Extended limits for collaboration and AI editing' : 'Basic features for individual use'}
+              </p>
             </div>
             <span className="px-3 py-1 bg-zinc-800 text-zinc-300 text-xs font-medium rounded-full">
               Active
@@ -87,8 +88,11 @@ export default function BillingSettingsPage() {
                 open={showUpgradeModal}
                 onOpenChange={setShowUpgradeModal}
                 trigger={
-                  <Button className="w-full bg-white text-black hover:bg-zinc-200">
-                    Upgrade Now
+                  <Button
+                    className="w-full bg-white text-black hover:bg-zinc-200 disabled:opacity-60"
+                    disabled={isPro}
+                  >
+                    {isPro ? 'Current Plan' : 'Upgrade Now'}
                   </Button>
                 }
               />

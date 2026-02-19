@@ -5,6 +5,7 @@
  * This intentionally uses a plain text stream route and avoids
  * structured tool/event parsing used by chat.
  */
+import { readRuntimeUserHeaders } from '@/lib/client/runtime-user-context'
 
 export interface StreamDelta {
   content?: string
@@ -49,7 +50,10 @@ class QuickEditChatService implements IChatService {
     try {
       const response = await fetch('/api/agent/quick-edit', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...readRuntimeUserHeaders(),
+        },
         body: JSON.stringify({
           messages: opts.messages,
           model: opts.model,

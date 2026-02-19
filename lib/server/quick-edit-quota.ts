@@ -1,6 +1,5 @@
 import crypto from 'node:crypto'
 
-export const QUICK_EDIT_CLIENT_QUOTA = 20
 const QUICK_EDIT_QUOTA_PREFIX = 'quick-edit:quota:v1'
 
 function getClientIdentifier(req: Request): string {
@@ -22,6 +21,25 @@ function hashIdentifier(value: string): string {
   return crypto.createHash('sha256').update(value).digest('hex')
 }
 
-export function buildQuickEditQuotaKey(req: Request): string {
-  return `${QUICK_EDIT_QUOTA_PREFIX}:${hashIdentifier(getClientIdentifier(req))}`
+interface BuildQuickEditQuotaKeyOptions {
+  userId?: string | null
+}
+
+function normalizeUserId(value: string | null | undefined): string | null {
+  if (typeof value !== 'string') return null
+  const normalized = value.trim()
+  if (!normalized || normalized.length > 200) return null
+  return normalized
+}
+
+export function buildQuickEditQuotaKey(
+  req: Request,
+  options: BuildQuickEditQuotaKeyOptions = {}
+): string {
+  const normalizedUserId = normalizeUserId(options.userId)
+  if (normalizedUserId) {
+    return `${QUICK_EDIT_QUOTA_PREFIX}:user:${hashIdentifier(normalizedUserId)}`
+  }
+
+  return `${QUICK_EDIT_QUOTA_PREFIX}:client:${hashIdentifier(getClientIdentifier(req))}`
 }

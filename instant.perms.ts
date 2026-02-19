@@ -68,6 +68,39 @@ const rules = {
     ],
   },
 
+  // Persisted memberships for users who have accepted/opened shared projects.
+  shared_project_memberships: {
+    allow: {
+      view: "isOwner",
+      create: "isOwner",
+      update: "isOwner",
+      delete: "isOwner",
+    },
+    bind: ["isOwner", "auth.id != null && auth.id == data.user_id"],
+  },
+
+  // Subscription rows are user-owned and determine entitlement limits.
+  account_plans: {
+    allow: {
+      view: "isOwner",
+      create: "isOwner",
+      update: "isOwner",
+      delete: "isOwner",
+    },
+    bind: ["isOwner", "auth.id != null && auth.id == data.user_id"],
+  },
+
+  // Plan change history is user-owned for auditing/debugging.
+  account_plan_events: {
+    allow: {
+      view: "isOwner",
+      create: "isOwner",
+      update: "isOwner",
+      delete: "isOwner",
+    },
+    bind: ["isOwner", "auth.id != null && auth.id == data.user_id"],
+  },
+
   // AI threads are user-owned and project-scoped.
   ai_threads: {
     allow: {

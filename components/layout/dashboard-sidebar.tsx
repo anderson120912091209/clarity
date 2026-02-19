@@ -4,7 +4,7 @@ import React from 'react'
 import Link from 'next/link'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { TooltipProvider } from '@/components/ui/tooltip'
-import { User, ChevronDown, SquarePen, Loader2, Settings, Trash2 } from 'lucide-react'
+import { User, ChevronDown, SquarePen, Loader2, Settings, Trash2, Users } from 'lucide-react'
 import { db } from '@/lib/constants'
 import { useRouter, usePathname } from 'next/navigation'
 import { useState } from 'react'
@@ -19,11 +19,12 @@ import { useDashboardSettings } from '@/contexts/DashboardSettingsContext'
 import { useQuickEditQuota } from '@/hooks/useQuickEditQuota'
 import { AiQuotaDisplay } from '@/components/ai-quota-display'
 import { UpgradeModal } from '@/components/upgrade-modal'
+import { useFrontend } from '@/contexts/FrontendContext'
 
 export default function DashboardSidebar() {
   const router = useRouter()
   const pathname = usePathname()
-  const { user } = db.useAuth()
+  const { user, isPro } = useFrontend()
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const [showUpgradeModal, setShowUpgradeModal] = useState(false)
   const { isCollapsed } = useSidebar()
@@ -38,6 +39,7 @@ export default function DashboardSidebar() {
   const projects = projectsData?.projects as Array<{ trashed_at?: string | null }> | undefined
   
   const isProjectsActive = pathname?.startsWith('/projects')
+  const isSharedActive = pathname?.startsWith('/shared')
   const isTrashActive = pathname?.startsWith('/trash')
   const isSettingsActive = pathname?.startsWith('/settings')
   const trashedCount = projects?.filter((project) => Boolean(project.trashed_at)).length ?? 0
@@ -90,7 +92,7 @@ export default function DashboardSidebar() {
               <div className="flex flex-col">
                 <div className="px-3 py-2 border-b border-white/[0.06]">
                   <div className="text-[12px] font-medium text-white truncate">{user?.email || 'User'}</div>
-                  <div className="text-[10px] text-white/50">Free Plan</div>
+                  <div className="text-[10px] text-white/50">{isPro ? 'Pro Plan' : 'Free Plan'}</div>
                   <div className="mt-2">
                     <AiQuotaDisplay
                       used={quickEditQuota.used}
@@ -187,6 +189,27 @@ export default function DashboardSidebar() {
               `}
             />
             {!isCollapsed && <span>Projects</span>}
+          </Link>
+
+          <Link
+            href="/shared"
+            className={`group flex items-center text-[12px] font-medium
+            rounded-md outline-none focus-visible:ring-2 focus-visible:ring-white/20 transition-colors
+            ${isCollapsed ? 'justify-center py-1.5' : 'gap-2 px-2 py-1.5'}
+            ${
+              isSharedActive
+                ? 'bg-[#1E1F22] text-[#E3E4E5]'
+                : 'text-[#E3E4E5] hover:bg-[#151619]'
+            }`}
+            onClick={() => setIsMobileMenuOpen(false)}
+            title={isCollapsed ? 'Shared' : undefined}
+          >
+            <Users
+              className={`h-4 w-4 shrink-0 transition-opacity ${
+                isSharedActive ? 'opacity-100' : 'opacity-70 group-hover:opacity-100'
+              }`}
+            />
+            {!isCollapsed && <span>Shared</span>}
           </Link>
 
           <Link

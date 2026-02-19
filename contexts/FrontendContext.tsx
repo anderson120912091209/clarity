@@ -4,6 +4,17 @@ import { useRouter } from 'next/navigation'
 import { usePathname } from 'next/navigation'
 import { db } from '@/lib/constants'
 import posthog from 'posthog-js'
+import {
+  getSubscriptionEntitlements,
+  isProSubscription,
+  normalizeSubscriptionPlan,
+  type SubscriptionEntitlements,
+  type SubscriptionPlan,
+} from '@/lib/subscription/entitlements'
+import {
+  clearRuntimeUserContext,
+  writeRuntimeUserContext,
+} from '@/lib/client/runtime-user-context'
 
 type FrontendAuthState = ReturnType<(typeof db)['useAuth']>
 type FrontendUser = FrontendAuthState['user']
@@ -11,6 +22,9 @@ type FrontendUser = FrontendAuthState['user']
 type FrontendContextValue = {
   user: FrontendUser
   isLoading: boolean
+  plan: SubscriptionPlan
+  isPro: boolean
+  entitlements: SubscriptionEntitlements
 }
 
 const FrontendContext = createContext<FrontendContextValue | undefined>(undefined)
@@ -25,10 +39,35 @@ function toUserProperties(user: NonNullable<FrontendUser>) {
 }
 
 export function FrontendProvider({ children }: { children: ReactNode }) {
-  const { user, isLoading } = db.useAuth();
-  const router = useRouter();
-  const pathname = usePathname();
+  const { user, isLoading } = db.useAuth()
+  const router = useRouter()
+  const pathname = usePathname()
   const isPublicRoute = pathname === '/' || pathname === '/login'
+  const accountPlanQuery = db.useQuery(
+    user
+      ? {
+          account_plans: {
+            $: {
+              where: {
+                user_id: user.id,
+              },
+            },
+          },
+          users: {
+            $: {
+              where: {
+                id: user.id,
+              },
+            },
+          },
+        }
+      : null
+  )
+  const accountPlanRecord = accountPlanQuery.data?.account_plans?.[0]
+  const legacyUserRecord = accountPlanQuery.data?.users?.[0]
+  const plan = normalizeSubscriptionPlan(accountPlanRecord?.plan ?? legacyUserRecord?.type)
+  const isPro = isProSubscription(plan)
+  const entitlements = getSubscriptionEntitlements(plan)
 
   useEffect(() => {
     if (!isLoading && !user && !isPublicRoute) {
@@ -51,13 +90,25 @@ export function FrontendProvider({ children }: { children: ReactNode }) {
     })
   }, [isLoading, user])
 
+  useEffect(() => {
+    if (!user) {
+      clearRuntimeUserContext()
+      return
+    }
+
+    writeRuntimeUserContext(user.id, plan)
+  }, [plan, user])
+
   if (isLoading && !isPublicRoute) {
-    return null;
+    return null
   }
   
   const value: FrontendContextValue = {
     user,
     isLoading,
+    plan,
+    isPro,
+    entitlements,
   }
   return <FrontendContext.Provider value={value}>{children}</FrontendContext.Provider>
 }

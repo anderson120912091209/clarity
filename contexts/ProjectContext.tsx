@@ -14,6 +14,13 @@ import { useFrontend } from '@/contexts/FrontendContext'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { db } from '@/lib/constants'
 import { decodeShareTokenUnsafe } from '@/features/collaboration/share-token'
+import {
+  SHARED_PROJECT_MEMBERSHIP_FILE_MARKER,
+  resolveLatestActiveMembershipToken,
+  toSharedMembershipFromShareLinkRecord,
+  type SharedProjectMembershipRecord,
+} from '@/features/collaboration/shared-project-memberships'
+import type { ShareLinkRecord } from '@/features/collaboration/share-link-records'
 import { resolveShareSessionActiveFile } from '@/features/collaboration/share-session-file-selection'
 import type { CollaborationRole } from '@/features/collaboration/types'
 
@@ -79,10 +86,53 @@ export function ProjectProvider({
 }) {
   const { user, isLoading: isAuthLoading } = useFrontend();
   const searchParams = useSearchParams()
-  const decodedShareToken = decodeShareTokenUnsafe(shareToken)
   const nowSeconds = Math.floor(Date.now() / 1000)
-  const isShareSession = Boolean(
+  const decodedUrlShareToken = decodeShareTokenUnsafe(shareToken)
+  const isUrlShareTokenValid = Boolean(
     shareToken &&
+      decodedUrlShareToken &&
+      decodedUrlShareToken.projectId === projectId &&
+      decodedUrlShareToken.exp > nowSeconds
+  )
+  const shouldLoadStoredMembership = Boolean(!isUrlShareTokenValid && user?.id && projectId)
+  const {
+    data: sharedMembershipData,
+    isLoading: isSharedMembershipLoading,
+    error: sharedMembershipError,
+  } = db.useQuery(
+    shouldLoadStoredMembership
+      ? {
+          project_share_links: {
+            $: {
+              where: {
+                created_by_user_id: user?.id,
+                projectId,
+                fileId: SHARED_PROJECT_MEMBERSHIP_FILE_MARKER,
+              },
+            },
+          },
+        }
+      : null
+  )
+  const storedMemberships = useMemo(
+    () => {
+      const rows = Array.isArray(sharedMembershipData?.project_share_links)
+        ? (sharedMembershipData.project_share_links as ShareLinkRecord[])
+        : []
+      return rows
+        .map((row) => toSharedMembershipFromShareLinkRecord(row))
+        .filter((membership): membership is SharedProjectMembershipRecord => Boolean(membership))
+    },
+    [sharedMembershipData?.project_share_links]
+  )
+  const storedMembershipToken = useMemo(
+    () => resolveLatestActiveMembershipToken(storedMemberships, projectId) ?? undefined,
+    [projectId, storedMemberships]
+  )
+  const effectiveShareToken = (isUrlShareTokenValid ? shareToken : storedMembershipToken) ?? undefined
+  const decodedShareToken = decodeShareTokenUnsafe(effectiveShareToken)
+  const isShareSession = Boolean(
+    effectiveShareToken &&
       decodedShareToken &&
       decodedShareToken.projectId === projectId &&
       decodedShareToken.exp > nowSeconds
@@ -90,17 +140,17 @@ export function ProjectProvider({
   const sessionRole: CollaborationRole = isShareSession
     ? decodedShareToken?.role ?? 'viewer'
     : 'editor'
-  const sharedTargetFileId = isShareSession ? normalizeFileQueryParam(searchParams.get('file')) : null
+  const sharedTargetFileId = isUrlShareTokenValid ? normalizeFileQueryParam(searchParams.get('file')) : null
   const shareRuleParams = useMemo(
     () =>
-      isShareSession && shareToken
+      isShareSession && effectiveShareToken
         ? {
-            shareToken,
+            shareToken: effectiveShareToken,
             projectId,
             role: sessionRole,
           }
         : undefined,
-    [isShareSession, projectId, sessionRole, shareToken]
+    [effectiveShareToken, isShareSession, projectId, sessionRole]
   )
   const projectQueryOptions = useMemo(
     () => ({
@@ -143,7 +193,7 @@ export function ProjectProvider({
 
   useEffect(() => {
     hasInitializedSharedTargetRef.current = false
-  }, [isShareSession, projectId, sharedTargetFileId, shareToken])
+  }, [effectiveShareToken, isShareSession, projectId, sharedTargetFileId])
 
   useEffect(() => {
     if (typeof window === 'undefined') return
@@ -258,10 +308,43 @@ export function ProjectProvider({
 
   const router = useRouter()
   useEffect(() => {
+    if (!shouldLoadStoredMembership) return
+    if (isSharedMembershipLoading) return
+    if (!shouldEnableShareDebug()) return
+
+    const rawRows = Array.isArray(sharedMembershipData?.project_share_links)
+      ? sharedMembershipData.project_share_links.length
+      : 0
+    console.groupCollapsed('[collab-debug] stored shared membership lookup')
+    console.log({
+      projectId,
+      userId: user?.id ?? null,
+      rawRows,
+      mappedRows: storedMemberships.length,
+      hasStoredMembershipToken: Boolean(storedMembershipToken),
+      sharedMembershipError: sharedMembershipError
+        ? sharedMembershipError instanceof Error
+          ? sharedMembershipError.message
+          : String(sharedMembershipError)
+        : null,
+    })
+    console.groupEnd()
+  }, [
+    isSharedMembershipLoading,
+    projectId,
+    sharedMembershipData?.project_share_links,
+    sharedMembershipError,
+    shouldLoadStoredMembership,
+    storedMembershipToken,
+    storedMemberships.length,
+    user?.id,
+  ])
+
+  useEffect(() => {
     if (!projectId) return
     if (isAuthLoading) return
-    // Prevent premature redirect while share-token validation is still settling.
-    if (shareToken) return
+    if (shouldLoadStoredMembership && isSharedMembershipLoading) return
+    if (isUrlShareTokenValid) return
     if (isShareSession) return
     if (!isProjectLoading && !projectData?.projects.length && !isFilesLoading && !filesData?.files.length) {
       if (shouldEnableShareDebug()) {
@@ -271,7 +354,8 @@ export function ProjectProvider({
           userId: user?.id ?? null,
           isAuthLoading,
           isShareSession,
-          hasShareToken: Boolean(shareToken),
+          hasShareToken: Boolean(effectiveShareToken),
+          usingStoredMembershipToken: Boolean(!isUrlShareTokenValid && storedMembershipToken),
           projectCount: Array.isArray(projectData?.projects) ? projectData.projects.length : 0,
           fileCount: Array.isArray(filesData?.files) ? filesData.files.length : 0,
         })
@@ -284,11 +368,15 @@ export function ProjectProvider({
     isAuthLoading,
     isFilesLoading,
     isProjectLoading,
+    isSharedMembershipLoading,
     isShareSession,
+    isUrlShareTokenValid,
     projectData,
     projectId,
     router,
-    shareToken,
+    shouldLoadStoredMembership,
+    storedMembershipToken,
+    effectiveShareToken,
     user?.id,
   ]);
 
@@ -311,11 +399,14 @@ export function ProjectProvider({
       sessionRole,
       useQueryArity,
       runtimeSupportsRuleParams: typeof useQueryArity === 'number' ? useQueryArity >= 2 : null,
-      hasShareToken: Boolean(shareToken),
+      hasShareToken: Boolean(effectiveShareToken),
+      isUrlShareTokenValid,
+      usingStoredMembershipToken: Boolean(!isUrlShareTokenValid && storedMembershipToken),
+      storedMembershipCount: storedMemberships.length,
       shareTokenPrefix:
-        typeof shareToken === 'string' && shareToken.length > 16
-          ? `${shareToken.slice(0, 16)}...`
-          : shareToken ?? null,
+        typeof effectiveShareToken === 'string' && effectiveShareToken.length > 16
+          ? `${effectiveShareToken.slice(0, 16)}...`
+          : effectiveShareToken ?? null,
       projectCount,
       fileCount,
       firstFileIds:
@@ -331,6 +422,11 @@ export function ProjectProvider({
         ? filesError instanceof Error
           ? filesError.message
           : String(filesError)
+        : null,
+      sharedMembershipError: sharedMembershipError
+        ? sharedMembershipError instanceof Error
+          ? sharedMembershipError.message
+          : String(sharedMembershipError)
         : null,
     }
 
@@ -354,7 +450,11 @@ export function ProjectProvider({
     projectError,
     projectId,
     sessionRole,
-    shareToken,
+    effectiveShareToken,
+    isUrlShareTokenValid,
+    sharedMembershipError,
+    storedMembershipToken,
+    storedMemberships.length,
     user?.id,
   ])
 
@@ -368,13 +468,16 @@ export function ProjectProvider({
     openFile: setActiveFile,
     setActiveFile,
     closeFile,
-    isLoading: isProjectLoading || isFilesLoading,
+    isLoading:
+      isProjectLoading ||
+      isFilesLoading ||
+      (shouldLoadStoredMembership && isSharedMembershipLoading),
     isProjectLoading,
     isFilesLoading,
     isShareSession,
     sessionRole,
-    shareToken: isShareSession ? shareToken : undefined,
-    error: projectError || filesError,
+    shareToken: isShareSession ? effectiveShareToken : undefined,
+    error: projectError || filesError || sharedMembershipError,
   }
 
   return <ProjectContext.Provider value={value}>{children}</ProjectContext.Provider>

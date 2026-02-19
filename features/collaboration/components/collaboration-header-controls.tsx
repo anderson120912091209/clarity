@@ -45,6 +45,7 @@ import {
   resolveShareLinkExpiryMs,
 } from '../share-link-records'
 import { UpgradeModal } from '@/components/upgrade-modal'
+import { useFrontend } from '@/contexts/FrontendContext'
 
 interface AnchorSelection {
   startLineNumber: number
@@ -74,7 +75,6 @@ interface SavedShareLink {
 }
 
 const MAX_CUSTOM_EXPIRY_HOURS = 24 * 365
-const ACTIVE_SHARED_PROJECT_LIMIT = 1
 
 function userDisplayName(user: { info?: { name?: string | null } | null; id?: string | null }): string {
   if (typeof user.info?.name === 'string' && user.info.name.trim()) return user.info.name.trim()
@@ -120,6 +120,7 @@ export function CollaborationHeaderControls({
   onFollowConnectionIdChange,
   onRealtimeCollaborationRequested,
 }: CollaborationHeaderControlsProps) {
+  const { entitlements, isPro } = useFrontend()
   const self = useSelf()
   const others = useOthers()
   const createThread = useCreateThread()
@@ -351,11 +352,13 @@ export function CollaborationHeaderControls({
       : []
     return activeSharedProjectIdsForCreator(rows, userId)
   }, [creatorShareLinksData?.project_share_links, userId])
+  const activeSharedProjectLimit = entitlements.activeSharedProjectLimit
   const hasActiveShareInCurrentProject = activeSharedProjectIdsByCreator.includes(projectId)
   const isShareProjectLimitReached =
-    ACTIVE_SHARED_PROJECT_LIMIT > 0 &&
+    typeof activeSharedProjectLimit === 'number' &&
+    activeSharedProjectLimit > 0 &&
     !hasActiveShareInCurrentProject &&
-    activeSharedProjectIdsByCreator.length >= ACTIVE_SHARED_PROJECT_LIMIT
+    activeSharedProjectIdsByCreator.length >= activeSharedProjectLimit
   const blockingSharedProjectId = !hasActiveShareInCurrentProject
     ? activeSharedProjectIdsByCreator[0] ?? null
     : null
@@ -370,7 +373,7 @@ export function CollaborationHeaderControls({
         project_id: projectId,
         blocking_project_id: blockingSharedProjectId,
         active_shared_project_count: activeSharedProjectIdsByCreator.length,
-        limit: ACTIVE_SHARED_PROJECT_LIMIT,
+        limit: activeSharedProjectLimit ?? 'unlimited',
       })
       return
     }
@@ -477,6 +480,7 @@ export function CollaborationHeaderControls({
     }
   }, [
     activeSharedProjectIdsByCreator.length,
+    activeSharedProjectLimit,
     blockingSharedProjectId,
     fileId,
     hasPersistedShareLink,
@@ -736,7 +740,7 @@ export function CollaborationHeaderControls({
             )}
             {isShareProjectLimitReached ? (
               <p className="text-[11px] text-amber-300/90">
-                You already have an active shared project. Upgrade your plan to share more than one project.
+                You already reached your active shared project limit. Upgrade your plan to share more projects.
               </p>
             ) : null}
 
@@ -792,7 +796,7 @@ export function CollaborationHeaderControls({
           <DialogHeader>
             <DialogTitle>Collaboration Limit Reached</DialogTitle>
             <DialogDescription className="text-zinc-400">
-              You already have one active shared project. Upgrade to share multiple projects at the same time.
+              Free accounts can share one active project at a time. Upgrade to unlock unlimited active shared projects.
             </DialogDescription>
           </DialogHeader>
           {blockingSharedProjectId ? (
@@ -817,7 +821,7 @@ export function CollaborationHeaderControls({
                 setIsUpgradeModalOpen(true)
               }}
             >
-              Upgrade Plan
+              {isPro ? 'Manage Plan' : 'Upgrade Plan'}
             </Button>
           </div>
         </DialogContent>

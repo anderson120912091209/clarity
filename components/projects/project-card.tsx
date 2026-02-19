@@ -28,7 +28,7 @@ export default function ProjectCard({ project, detailed = false, loading = false
   const [isDropdownOpen, setIsDropdownOpen] = useState(false)
   const [imageURL, setImageURL] = useState('')
   const [imageError, setImageError] = useState(false)
-  const { user } = useFrontend();
+  const { user, plan } = useFrontend();
   const { id: userId } = user || { id: '' }
   const { settings } = useDashboardSettings()
   const [downloadURL, setDownloadURL] = useState('');
@@ -94,6 +94,7 @@ export default function ProjectCard({ project, detailed = false, loading = false
         const { blob } = await fetchPdf(project.id, files.files, {
           mode: 'manual',
           clientUserId: userId,
+          clientUserPlan: plan,
         })
         await Promise.allSettled([
           savePdfToStorage(blob, `${pathname}main.pdf`, project.id),
@@ -118,6 +119,7 @@ export default function ProjectCard({ project, detailed = false, loading = false
     project?.cachedPdfExpiresAt,
     project?.cachedPreviewExpiresAt,
     userId,
+    plan,
     loading,
     files?.files,
   ])

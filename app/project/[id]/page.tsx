@@ -18,7 +18,7 @@ import { EditorTabs } from '@/components/editor/editor-tabs'
 import { PDFNavContent, useLatex } from '@/components/latex-render/latex'
 import type { EditorSyntaxTheme } from '@/components/editor/types'
 import { db } from '@/lib/constants'
-import { tx } from '@instantdb/react'
+import { id as instantId, tx } from '@instantdb/react'
 import {
   normalizeComparablePath,
   syncPdfToSource,
@@ -38,6 +38,9 @@ import { completeNavJourney, markNavMilestone } from '@/lib/perf/nav-trace'
 import { warmupShikiMonaco } from '@/components/editor/utils/shiki-monaco'
 import { resolveCollaborationColor } from '@/features/collaboration/color'
 import { decodeShareTokenUnsafe } from '@/features/collaboration/share-token'
+import {
+  SHARED_PROJECT_MEMBERSHIP_FILE_MARKER,
+} from '@/features/collaboration/shared-project-memberships'
 import { hasActiveProjectShareLink as hasActiveProjectShareLinkRecord } from '@/features/collaboration/share-link-records'
 import type { CollaborationRole } from '@/features/collaboration/types'
 import { CollaborationRoomProvider } from '@/features/collaboration/components/collaboration-room-provider'
@@ -244,6 +247,13 @@ function normalizeFileQueryParam(value: string | null): string | null {
   return normalized || null
 }
 
+function shouldEnableCollabDebug(): boolean {
+  if (typeof window === 'undefined') return false
+  const params = new URLSearchParams(window.location.search)
+  if (params.get('collabDebug') === '1') return true
+  return process.env.NEXT_PUBLIC_COLLAB_DEBUG === 'true'
+}
+
 function EditorLayout() {
   const searchParams = useSearchParams()
   const [isChatVisible, setIsChatVisible] = useState(false)
@@ -261,6 +271,7 @@ function EditorLayout() {
     isProjectLoading,
     isFilesLoading,
     setActiveFile,
+    shareToken: projectShareToken,
   } = useProject()
   const { files: stagedChanges, anyStreaming: anyStagedStreaming } = useChangeManagerState()
   const isPdfNavigationEnabled =
@@ -274,12 +285,15 @@ function EditorLayout() {
   const syncFromCodeAbortRef = useRef<AbortController | null>(null)
   const syncFromPdfAbortRef = useRef<AbortController | null>(null)
   const syncSelectionAbortRef = useRef<AbortController | null>(null)
+  const sharedMembershipWriteKeyRef = useRef<string | null>(null)
+  const sharedMembershipRowIdRef = useRef<string | null>(null)
   const [editorSyntaxTheme, setEditorSyntaxTheme] = useState<EditorSyntaxTheme>(
     settings.defaultEditorSyntaxTheme
   )
   const [liveFileContentOverrides, setLiveFileContentOverrides] = useState<Record<string, string>>({})
   const fileContent = (currentlyOpen?.id ? liveFileContentOverrides[currentlyOpen.id] : undefined) ?? currentlyOpen?.content ?? ''
-  const shareToken = searchParams.get('share') ?? undefined
+  const shareTokenFromUrl = searchParams.get('share') ?? undefined
+  const shareToken = projectShareToken ?? shareTokenFromUrl
   const decodedShareToken = useMemo(() => decodeShareTokenUnsafe(shareToken), [shareToken])
   const activeShareToken = useMemo(() => {
     if (!shareToken || !decodedShareToken) return undefined
@@ -292,7 +306,10 @@ function EditorLayout() {
   const [isRealtimeCollaborationEnabled, setIsRealtimeCollaborationEnabled] = useState<boolean>(
     () => Boolean(activeShareToken)
   )
-  const shareFileId = activeShareToken ? normalizeFileQueryParam(searchParams.get('file')) : null
+  const shareFileId =
+    activeShareToken && shareTokenFromUrl
+      ? normalizeFileQueryParam(searchParams.get('file'))
+      : null
   const shouldLoadProjectShareLinks = Boolean(projectId && user?.id && !activeShareToken)
   const { data: shareLinksData } = db.useQuery(
     shouldLoadProjectShareLinks
@@ -307,6 +324,46 @@ function EditorLayout() {
         }
       : null
   )
+  const shouldLoadMembershipMarkerRows = Boolean(activeShareToken && projectId && user?.id)
+  const {
+    data: membershipMarkerRowsData,
+    isLoading: isMembershipMarkerRowsLoading,
+  } = db.useQuery(
+    shouldLoadMembershipMarkerRows
+      ? {
+          project_share_links: {
+            $: {
+              where: {
+                created_by_user_id: user?.id,
+                projectId,
+                fileId: SHARED_PROJECT_MEMBERSHIP_FILE_MARKER,
+              },
+            },
+          },
+        }
+      : null
+  )
+  const existingMembershipMarkerRowId = useMemo(() => {
+    const rows = Array.isArray(membershipMarkerRowsData?.project_share_links)
+      ? membershipMarkerRowsData.project_share_links
+      : []
+    if (!rows.length) return null
+
+    const sortedRows = rows
+      .filter((row: Record<string, unknown>) => typeof row?.id === 'string')
+      .sort((left: Record<string, unknown>, right: Record<string, unknown>) => {
+        const leftCreated = Date.parse(
+          typeof left?.created_at === 'string' ? left.created_at : ''
+        )
+        const rightCreated = Date.parse(
+          typeof right?.created_at === 'string' ? right.created_at : ''
+        )
+        return (Number.isNaN(rightCreated) ? 0 : rightCreated) - (Number.isNaN(leftCreated) ? 0 : leftCreated)
+      })
+
+    const row = sortedRows[0]
+    return typeof row?.id === 'string' ? row.id : null
+  }, [membershipMarkerRowsData?.project_share_links])
   const hasActiveProjectShareLink = useMemo(() => {
     const rows = Array.isArray(shareLinksData?.project_share_links)
       ? shareLinksData.project_share_links
@@ -346,6 +403,76 @@ function EditorLayout() {
     if (!activeShareToken) return
     setIsRealtimeCollaborationEnabled(true)
   }, [activeShareToken])
+
+  useEffect(() => {
+    if (!activeShareToken || !user?.id || !projectId) return
+    if (isMembershipMarkerRowsLoading) return
+
+    if (existingMembershipMarkerRowId) {
+      sharedMembershipRowIdRef.current = existingMembershipMarkerRowId
+    }
+
+    if (!sharedMembershipRowIdRef.current) {
+      sharedMembershipRowIdRef.current = instantId()
+    }
+
+    const membershipId = sharedMembershipRowIdRef.current
+    const nowIso = new Date().toISOString()
+    const writeKey = [
+      membershipId,
+      activeShareToken,
+      collaborationRole,
+    ].join('::')
+
+    if (sharedMembershipWriteKeyRef.current === writeKey) return
+    sharedMembershipWriteKeyRef.current = writeKey
+
+    void db
+      .transact([
+        tx.project_share_links[membershipId].update({
+          created_by_user_id: user.id,
+          projectId,
+          fileId: SHARED_PROJECT_MEMBERSHIP_FILE_MARKER,
+          token: activeShareToken,
+          role: collaborationRole,
+          created_at: nowIso,
+          expires_at_ms:
+            typeof decodedShareToken?.exp === 'number'
+              ? decodedShareToken.exp * 1000
+              : undefined,
+        }),
+      ])
+      .then(() => {
+        if (!shouldEnableCollabDebug()) return
+        console.debug('[collab-debug] persisted shared membership marker row', {
+          membershipId,
+          projectId,
+          userId: user.id,
+          role: collaborationRole,
+        })
+      })
+      .catch((error) => {
+        sharedMembershipWriteKeyRef.current = null
+        if (shouldEnableCollabDebug()) {
+          console.error('[collab-debug] failed to persist shared membership marker row', {
+            membershipId,
+            projectId,
+            userId: user.id,
+            role: collaborationRole,
+            error: error instanceof Error ? error.message : String(error),
+          })
+        }
+        console.warn('Failed to persist shared project membership', error)
+      })
+  }, [
+    activeShareToken,
+    collaborationRole,
+    decodedShareToken?.exp,
+    existingMembershipMarkerRowId,
+    isMembershipMarkerRowsLoading,
+    projectId,
+    user?.id,
+  ])
 
   useEffect(() => {
     if (!hasActiveProjectShareLink) return

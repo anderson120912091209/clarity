@@ -1,6 +1,6 @@
 // Docs: https://www.instantdb.com/docs/modeling-data
 
-import { i } from '@instantdb/core'
+import { i } from '@instantdb/react'
 
 const _schema = i.schema({
   // We inferred 55 attributes!
@@ -61,6 +61,23 @@ const _schema = i.schema({
       updated_at: i.string().optional(),
       user_id: i.string().optional(),
     }),
+    account_plan_events: i.entity({
+      actor_user_id: i.string().optional(),
+      changed_at: i.string().optional(),
+      from_plan: i.string().optional(),
+      note: i.string().optional(),
+      source: i.string().optional(),
+      to_plan: i.string().optional(),
+      user_id: i.string().optional(),
+    }),
+    account_plans: i.entity({
+      created_at: i.string().optional(),
+      source: i.string().optional(),
+      status: i.string().optional(),
+      updated_at: i.string().optional(),
+      user_id: i.string().unique().indexed().optional(),
+      plan: i.string().optional(),
+    }),
     files: i.entity({
       content: i.string().optional(),
       created_at: i.string().optional(),
@@ -83,10 +100,8 @@ const _schema = i.schema({
       expires_at_ms: i.number().optional(),
       fileId: i.string().optional(),
       projectId: i.string().optional(),
-      revoked_at: i.string().optional(),
       role: i.string().optional(),
       token: i.string().optional(),
-      view_token: i.string().optional(),
     }),
     projects: i.entity({
       activeChatThreadId: i.string().optional(),
@@ -149,30 +164,28 @@ const _schema = i.schema({
         label: 'linkedGuestUsers',
       },
     },
-    projectShareLinkProject: {
+    project_share_linksFile: {
       forward: {
         on: 'project_share_links',
-        has: 'one',
-        label: 'project',
-        onDelete: 'cascade',
-      },
-      reverse: {
-        on: 'projects',
         has: 'many',
-        label: 'shareLinks',
-      },
-    },
-    projectShareLinkFile: {
-      forward: {
-        on: 'project_share_links',
-        has: 'one',
         label: 'file',
-        onDelete: 'cascade',
       },
       reverse: {
         on: 'files',
         has: 'many',
-        label: 'shareLinks',
+        label: 'project_share_links',
+      },
+    },
+    project_share_linksProject: {
+      forward: {
+        on: 'project_share_links',
+        has: 'many',
+        label: 'project',
+      },
+      reverse: {
+        on: 'projects',
+        has: 'many',
+        label: 'project_share_links',
       },
     },
   },

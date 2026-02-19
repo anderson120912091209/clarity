@@ -1,6 +1,7 @@
 import { db } from '@/lib/constants'
 import { tx } from '@instantdb/react'
 import { useMemo } from 'react'
+import { SHARED_PROJECT_MEMBERSHIP_FILE_MARKER } from '@/features/collaboration/shared-project-memberships'
 
 interface AccessQueryOptions {
   ownerScoped?: boolean
@@ -102,6 +103,23 @@ export function getAllProjects(userId?: string) {
             $: {
               where: {
                 user_id: userId,
+              },
+            },
+          },
+        }
+      : null
+  )
+}
+
+export function getSharedProjectMemberships(userId?: string) {
+  return db.useQuery(
+    userId
+      ? {
+          project_share_links: {
+            $: {
+              where: {
+                created_by_user_id: userId,
+                fileId: SHARED_PROJECT_MEMBERSHIP_FILE_MARKER,
               },
             },
           },

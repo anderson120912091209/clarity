@@ -19,6 +19,7 @@ interface CLSISettings {
   compileRateLimit: {
     enabled: boolean;
     clientUserIdHeader: string;
+    clientUserPlanHeader: string;
     cooldownLimit: number;
     cooldownWindowSec: number;
     burstLimit: number;
@@ -71,6 +72,7 @@ const settings: CLSISettings = {
   compileRateLimit: {
     enabled: parseBoolean(process.env.COMPILE_RATE_LIMIT_ENABLED, true),
     clientUserIdHeader: process.env.COMPILE_RATE_LIMIT_USER_HEADER || 'x-clarity-user-id',
+    clientUserPlanHeader: process.env.COMPILE_RATE_LIMIT_PLAN_HEADER || 'x-clarity-user-plan',
     cooldownLimit: parsePositiveInt(process.env.COMPILE_RATE_LIMIT_COOLDOWN_LIMIT, 1),
     cooldownWindowSec: parsePositiveInt(process.env.COMPILE_RATE_LIMIT_COOLDOWN_WINDOW_SEC, 2),
     burstLimit: parsePositiveInt(process.env.COMPILE_RATE_LIMIT_BURST_LIMIT, 60),
