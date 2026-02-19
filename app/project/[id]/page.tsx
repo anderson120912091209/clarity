@@ -654,6 +654,7 @@ function EditorLayout() {
     handleDownload,
     logs,
     synctexContext,
+    setPrivateScale,
   } = useLatex(liveFileContentOverrides)
   
   const [showLogs, setShowLogs] = useState(false)
@@ -1424,6 +1425,8 @@ function EditorLayout() {
               pdfUrl={pdfUrl}
               isLoading={isLoading}
               error={error}
+              scale={scale}
+              onScaleChange={setPrivateScale}
               logs={logs}
               showLogs={showLogs}
               header={pdfHeader}

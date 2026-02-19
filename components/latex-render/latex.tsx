@@ -23,7 +23,6 @@ import { useFrontend } from '@/contexts/FrontendContext'
 import { fetchPdf, type SynctexContext } from '@/lib/utils/pdf-utils'
 import LatexLoading from './latex-loading'
 import LatexCanvas from './latex-canvas'
-import { updateProject } from '@/hooks/data'
 import { cn } from '@/lib/utils'
 import type { SynctexPdfPosition } from '@/lib/utils/synctex-utils'
 import {
@@ -34,6 +33,11 @@ import {
   resolvePdfBackgroundTheme,
   type PdfBackgroundThemeKey,
 } from '@/lib/constants/pdf-background-themes'
+import {
+  DEFAULT_PDF_SCALE,
+  getPdfScaleStorageKey,
+  normalizePdfScale,
+} from '@/lib/constants/pdf-scale-preferences'
 
 if (typeof window !== 'undefined') {
   pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.mjs`
@@ -65,7 +69,7 @@ export function useLatex(liveFileContentOverrides: Record<string, string> = {}) 
   } | null>(null)
   const isPersistingRef = useRef(false)
   
-  const scale = data?.projectScale ?? 0.9
+  const [scale, setScale] = useState(DEFAULT_PDF_SCALE)
   const autoFetch = data?.isAutoFetching ?? false
   const effectiveFiles = useMemo(() => {
     if (!Array.isArray(files)) return files
@@ -111,6 +115,39 @@ export function useLatex(liveFileContentOverrides: Record<string, string> = {}) 
     }
     pendingPersistRef.current = null
   }, [projectId])
+
+  useEffect(() => {
+    if (!projectId) return
+
+    const fallbackScale = DEFAULT_PDF_SCALE
+    if (typeof window === 'undefined') {
+      setScale(fallbackScale)
+      return
+    }
+
+    const storageKey = getPdfScaleStorageKey(projectId, user?.id)
+    const storedScale = window.localStorage.getItem(storageKey)
+    if (storedScale !== null) {
+      setScale(normalizePdfScale(storedScale, fallbackScale))
+      return
+    }
+
+    setScale(fallbackScale)
+    window.localStorage.setItem(storageKey, String(fallbackScale))
+  }, [projectId, user?.id])
+
+  const setPrivateScale = useCallback(
+    (nextScale: number) => {
+      const normalized = normalizePdfScale(nextScale, DEFAULT_PDF_SCALE)
+      setScale(normalized)
+      if (typeof window === 'undefined' || !projectId) return
+      window.localStorage.setItem(
+        getPdfScaleStorageKey(projectId, user?.id),
+        String(normalized)
+      )
+    },
+    [projectId, user?.id]
+  )
 
   // Hydrate cached PDF once per project load.
   useEffect(() => {
@@ -288,17 +325,15 @@ export function useLatex(liveFileContentOverrides: Record<string, string> = {}) 
   ])
 
   const handleZoomIn = () => {
-    const newScale = Math.min(scale + 0.1, 2.0)
-    updateProject(projectId, { projectScale: newScale })
+    setPrivateScale(scale + 0.1)
   }
 
   const handleZoomOut = () => {
-    const newScale = Math.max(scale - 0.1, 0.5)
-    updateProject(projectId, { projectScale: newScale })
+    setPrivateScale(scale - 0.1)
   }
 
   const handleResetZoom = () => {
-    updateProject(projectId, { projectScale: 0.9 })
+    setPrivateScale(DEFAULT_PDF_SCALE)
   }
 
   const handleDownload = () => {
@@ -333,6 +368,7 @@ export function useLatex(liveFileContentOverrides: Record<string, string> = {}) 
     handleDownload,
     logs,
     synctexContext,
+    setPrivateScale,
   }
 }
 
@@ -383,6 +419,8 @@ interface LatexRendererProps {
   pdfUrl: string | null
   isLoading: boolean
   error: string | null
+  scale: number
+  onScaleChange: (nextScale: number) => void
   logs?: string | null
   showLogs?: boolean
   header?: React.ReactNode
@@ -410,6 +448,8 @@ function LatexRenderer({
   pdfUrl,
   isLoading,
   error,
+  scale,
+  onScaleChange,
   logs,
   showLogs,
   header,
@@ -421,7 +461,6 @@ function LatexRenderer({
 }: LatexRendererProps) {
   const { project: data, projectId } = useProject();
   const { settings } = useDashboardSettings()
-  const scale = data?.projectScale ?? 0.9;
   const [localPdfBackgroundTheme, setLocalPdfBackgroundTheme] = useState<PdfBackgroundThemeKey>(DEFAULT_PDF_BACKGROUND_THEME)
   const pdfBackgroundTheme = resolvePdfBackgroundTheme(localPdfBackgroundTheme)
   const containerRef = useRef<HTMLDivElement>(null);
@@ -479,12 +518,12 @@ function LatexRenderer({
         // Use a smaller step for finer control with trackpad
         const delta = -e.deltaY
         const factor = 0.01 
-        const newScale = Math.min(Math.max(0.5, scale + delta * factor), 3.0)
+        const newScale = normalizePdfScale(scale + delta * factor, scale)
         
         // Simple throttling could be done here if needed, 
         // but for now we'll rely on React's batching or rapid updates.
         // We limit the update frequency to avoid flooding
-        updateProject(projectId, { projectScale: newScale })
+        onScaleChange(newScale)
       }
     }
 
@@ -494,7 +533,7 @@ function LatexRenderer({
     return () => {
       container.removeEventListener('wheel', handleWheel)
     }
-  }, [scale, projectId])
+  }, [onScaleChange, scale])
 
   useEffect(() => {
     setNumPages(0)
