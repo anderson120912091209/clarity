@@ -1209,21 +1209,21 @@ function EditorLayout() {
       <div className="flex-1 min-w-0 overflow-hidden pl-2">
         <EditorTabs />
       </div>
-      {projectId && currentlyOpen?.id && user?.id ? (
-        <CollaborationHeaderControls
-          projectId={projectId}
-          fileId={currentlyOpen.id}
-          filePath={activeFilePathForCollaboration}
-          role={collaborationRole}
-          userId={user.id}
-          selection={activeSelectionForComments}
-          followConnectionId={followConnectionId}
-          onFollowConnectionIdChange={setFollowConnectionId}
-          onRealtimeCollaborationRequested={handleEnableRealtimeCollaboration}
-        />
-      ) : null}
     </div>
   )
+  const collaborationControls = projectId && currentlyOpen?.id && user?.id ? (
+    <CollaborationHeaderControls
+      projectId={projectId}
+      fileId={currentlyOpen.id}
+      filePath={activeFilePathForCollaboration}
+      role={collaborationRole}
+      userId={user.id}
+      selection={activeSelectionForComments}
+      followConnectionId={followConnectionId}
+      onFollowConnectionIdChange={setFollowConnectionId}
+      onRealtimeCollaborationRequested={handleEnableRealtimeCollaboration}
+    />
+  ) : null
 
   // Header content for the PDF pane
   const pdfHeader = (
@@ -1250,26 +1250,27 @@ function EditorLayout() {
   )
 
   return (
-    <AppLayout
-      sidebar={
-        <EditorSidebar
-          syntaxTheme={editorSyntaxTheme}
-          onSyntaxThemeChange={handleEditorSyntaxThemeChange}
-        />
-      }
-      header={null}
-      showHeader={false}
+    <CollaborationRoomProvider
+      projectId={projectId || 'unknown-project'}
+      fileId={currentlyOpen?.id || null}
+      filePath={activeFilePathForCollaboration}
+      role={collaborationRole}
+      userId={user?.id || 'anonymous'}
+      userInfo={collaborationUserInfo}
+      shareToken={activeShareToken}
     >
-      <CollaborationRoomProvider
-        projectId={projectId || 'unknown-project'}
-        fileId={currentlyOpen?.id || null}
-        filePath={activeFilePathForCollaboration}
-        role={collaborationRole}
-        userId={user?.id || 'anonymous'}
-        userInfo={collaborationUserInfo}
-        shareToken={activeShareToken}
+      <CollaborationEventToasts currentUserId={user?.id || 'anonymous'} />
+      <AppLayout
+        sidebar={
+          <EditorSidebar
+            syntaxTheme={editorSyntaxTheme}
+            onSyntaxThemeChange={handleEditorSyntaxThemeChange}
+            collaborationControls={collaborationControls}
+          />
+        }
+        header={null}
+        showHeader={false}
       >
-        <CollaborationEventToasts currentUserId={user?.id || 'anonymous'} />
         {/* Content Panels */}
         <ResizablePanelGroup direction="horizontal" className="flex-1" autoSaveId="project-editor-layout">
           <ResizablePanel defaultSize={50} minSize={25}>
@@ -1338,7 +1339,7 @@ function EditorLayout() {
             </>
           )}
         </ResizablePanelGroup>
-      </CollaborationRoomProvider>
-    </AppLayout>
+      </AppLayout>
+    </CollaborationRoomProvider>
   )
 }

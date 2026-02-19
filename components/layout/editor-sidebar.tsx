@@ -34,9 +34,14 @@ import { UpgradeModal } from '@/components/upgrade-modal'
 interface EditorSidebarProps {
   syntaxTheme: EditorSyntaxTheme
   onSyntaxThemeChange: (theme: EditorSyntaxTheme) => void
+  collaborationControls?: React.ReactNode
 }
 
-export default function EditorSidebar({ syntaxTheme, onSyntaxThemeChange }: EditorSidebarProps) {
+export default function EditorSidebar({
+  syntaxTheme,
+  onSyntaxThemeChange,
+  collaborationControls,
+}: EditorSidebarProps) {
   const router = useRouter()
   const { user } = db.useAuth()
   const { settings } = useDashboardSettings()
@@ -260,6 +265,12 @@ export default function EditorSidebar({ syntaxTheme, onSyntaxThemeChange }: Edit
             </div>
           </div>
         )}
+
+        {!isCollapsed && collaborationControls ? (
+          <div className="px-3 pb-2">
+            {collaborationControls}
+          </div>
+        ) : null}
 
         {!isCollapsed && (
           <div className="px-3 py-2">

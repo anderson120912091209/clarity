@@ -35,7 +35,7 @@ import { cn } from '@/lib/utils'
 import { db } from '@/lib/constants'
 import { id, tx } from '@instantdb/react'
 import { createPlainTextCommentBody, extractMentionHandles } from '../comment-body'
-import { useCreateComment, useCreateThread, useMarkThreadAsResolved, useMarkThreadAsUnresolved, useOthers, useSelf, useStatus, useThreads } from '../liveblocks'
+import { useCreateComment, useCreateThread, useMarkThreadAsResolved, useMarkThreadAsUnresolved, useOthers, useSelf, useThreads } from '../liveblocks'
 import type { CollaborationRole } from '../types'
 import { useProject } from '@/contexts/ProjectContext'
 import { buildShareGrantRecord } from '../share-grants'
@@ -91,48 +91,6 @@ function initials(name: string): string {
     .join('')
 }
 
-function StatusIndicator({ status }: { status: string }) {
-  const colorClass = useMemo(() => {
-    switch (status) {
-      case 'connected': return 'bg-emerald-500'
-      case 'reconnecting': return 'bg-amber-500'
-      case 'connecting': return 'bg-blue-500'
-      case 'disconnected': return 'bg-zinc-500'
-      default: return 'bg-zinc-500'
-    }
-  }, [status])
-
-  const label = useMemo(() => {
-    switch (status) {
-      case 'connected': return 'Live'
-      case 'reconnecting': return 'Reconnecting'
-      case 'connecting': return 'Connecting'
-      case 'disconnected': return 'Offline'
-      default: return 'Initializing'
-    }
-  }, [status])
-
-  return (
-    <TooltipProvider>
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <div className="flex items-center justify-center p-1.5">
-            <div className="relative flex h-2 w-2">
-              {status === 'connected' && (
-                <span className={cn("animate-ping absolute inline-flex h-full w-full rounded-full opacity-75", colorClass)}></span>
-              )}
-              <span className={cn("relative inline-flex rounded-full h-2 w-2", colorClass)}></span>
-            </div>
-          </div>
-        </TooltipTrigger>
-        <TooltipContent side="bottom" className="text-xs bg-[#121317] border-white/10 text-zinc-300">
-          <p>{label}</p>
-        </TooltipContent>
-      </Tooltip>
-    </TooltipProvider>
-  )
-}
-
 function resolveExpiryHoursFromPreset(
   preset: ShareExpiryPreset,
   customHours: number
@@ -162,7 +120,6 @@ export function CollaborationHeaderControls({
   onFollowConnectionIdChange,
   onRealtimeCollaborationRequested,
 }: CollaborationHeaderControlsProps) {
-  const status = useStatus()
   const self = useSelf()
   const others = useOthers()
   const createThread = useCreateThread()
@@ -609,10 +566,8 @@ export function CollaborationHeaderControls({
   )
 
   return (
-    <div className="flex items-center gap-1 pr-1 h-full">
-      <StatusIndicator status={status} />
-
-      <div className="flex items-center -space-x-1.5 mx-1.5">
+    <div className="w-full min-w-0 h-8 px-2 flex items-center gap-1">
+      <div className="flex items-center -space-x-1.5 mr-1.5">
         {participants.slice(0, 4).map((participant) => (
            <TooltipProvider key={participant.key}>
             <Tooltip>
