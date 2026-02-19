@@ -4,9 +4,7 @@ import { pdfjs } from 'react-pdf'
 import 'react-pdf/dist/Page/AnnotationLayer.css'
 import 'react-pdf/dist/Page/TextLayer.css'
 import { Button } from '@/components/ui/button'
-import { Switch } from '@/components/ui/switch'
 import LatexError from './latex-error'
-import { Label } from '@/components/ui/label'
 import { Loader2 } from 'lucide-react'
 import {
   ChatRound,
@@ -47,6 +45,7 @@ const SOLAR_ICON_WEIGHT = 'Linear' as const
 // Hook for managing LaTeX compilation state
 export function useLatex(liveFileContentOverrides: Record<string, string> = {}) {
   const { user } = useFrontend()
+  const { settings } = useDashboardSettings()
   const { project: data, isLoading: isDataLoading, projectId, files } = useProject()
   const [pdfUrl, setPdfUrl] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
@@ -83,7 +82,9 @@ export function useLatex(liveFileContentOverrides: Record<string, string> = {}) 
     })
   }, [files, liveFileContentOverrides])
   const hasMainTyp = effectiveFiles?.some((f: any) => f.name === 'main.typ') ?? false
-  const shouldAutoPreview = autoFetch || hasMainTyp
+  const shouldAutoPreview = hasMainTyp
+    ? settings.defaultTypstAutoCompile
+    : autoFetch
   const compileSourceContent =
     effectiveFiles?.find((f: any) => f.name === 'main.tex')?.content ??
     effectiveFiles?.find((f: any) => f.name === 'main.typ')?.content
@@ -277,7 +278,13 @@ export function useLatex(liveFileContentOverrides: Record<string, string> = {}) 
       clearTimeout(debounceTimer)
       activeAutoCompileAbortRef.current?.abort()
     }
-  }, [autoCompileFingerprint, compileSourceContent, shouldAutoPreview, hasMainTyp, compile])
+  }, [
+    autoCompileFingerprint,
+    compileSourceContent,
+    shouldAutoPreview,
+    hasMainTyp,
+    compile,
+  ])
 
   const handleZoomIn = () => {
     const newScale = Math.min(scale + 0.1, 2.0)

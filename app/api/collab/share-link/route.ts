@@ -4,6 +4,7 @@ import { normalizeCollaborationRole } from '@/features/collaboration/roles'
 import { buildCollaborationRoomId } from '@/features/collaboration/room'
 
 export const runtime = 'nodejs'
+const NEVER_EXPIRY_UNIX_SECONDS = 253402300799 // 9999-12-31T23:59:59Z
 
 interface ShareLinkRequestBody {
   projectId?: unknown
@@ -19,9 +20,10 @@ function asNonEmptyString(value: unknown): string | null {
   return normalized.length > 0 ? normalized : null
 }
 
-function normalizeExpiryHours(value: unknown): number {
+function normalizeExpiryHours(value: unknown): number | null {
+  if (value === null || value === 'never') return null
   if (typeof value !== 'number' || Number.isNaN(value)) return 24
-  return Math.min(24 * 30, Math.max(1, Math.round(value)))
+  return Math.min(24 * 365, Math.max(1, Math.round(value)))
 }
 
 export async function POST(req: Request) {
@@ -51,7 +53,10 @@ export async function POST(req: Request) {
   const role = normalizeCollaborationRole(body.role, 'commenter')
   const expiresInHours = normalizeExpiryHours(body.expiresInHours)
   const issuedAt = Math.floor(Date.now() / 1000)
-  const expiresAt = issuedAt + expiresInHours * 60 * 60
+  const expiresAt =
+    expiresInHours === null
+      ? NEVER_EXPIRY_UNIX_SECONDS
+      : issuedAt + expiresInHours * 60 * 60
 
   const token = createShareToken(
     {
@@ -79,7 +84,7 @@ export async function POST(req: Request) {
     shareUrl: shareUrl.toString(),
     token,
     role,
-    expiresAt,
+    expiresAt: expiresInHours === null ? null : expiresAt,
     roomId: buildCollaborationRoomId(projectId),
   })
 }

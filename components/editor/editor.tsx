@@ -31,6 +31,11 @@ import {
   useRoom,
   useUpdateMyPresence,
 } from '@/features/collaboration/liveblocks'
+import {
+  markRoomHydrated,
+  resolveCollaborationRoomKey,
+  shouldBlockInitialHydration,
+} from '@/features/collaboration/editor-hydration'
 import type { CollaborationRole } from '@/features/collaboration/types'
 
 type MonacoInstance = typeof import('monaco-editor')
@@ -108,6 +113,8 @@ function sanitizeCssLabel(value: string): string {
   return value.replace(/\\/g, '\\\\').replace(/"/g, '\\"')
 }
 
+const COLLAB_HYDRATION_TIMEOUT_MS = 6000
+
 export const CodeEditor = ({
   onChange,
   value,
@@ -133,6 +140,10 @@ export const CodeEditor = ({
     activeLanguage
   )
   const room = useRoom()
+  const collaborationRoomKey = useMemo(
+    () => resolveCollaborationRoomKey(room as { id?: string } | null),
+    [room]
+  )
   const updateMyPresence = useUpdateMyPresence()
   const others = useOthers()
   const { handleAIAssist, triggerQuickEdit } = useAIAssist(onChange)
@@ -160,6 +171,10 @@ export const CodeEditor = ({
   const [isShikiReady, setIsShikiReady] = useState<boolean>(() =>
     isShikiMonacoReady()
   )
+  const [isCollaborationHydrating, setIsCollaborationHydrating] =
+    useState<boolean>(() =>
+      shouldBlockInitialHydration(Boolean(collaboration?.enabled), collaborationRoomKey)
+    )
 
   const applyDefaultSyntaxTheme = useCallback(
     (monacoInstance: MonacoInstance, model: MonacoModel) => {
@@ -258,6 +273,17 @@ export const CodeEditor = ({
   useEffect(() => {
     onActionsReadyRef.current = onActionsReady
   }, [onActionsReady])
+
+  useEffect(() => {
+    if (!collaboration?.enabled) {
+      setIsCollaborationHydrating(false)
+      return
+    }
+
+    setIsCollaborationHydrating(
+      shouldBlockInitialHydration(true, collaborationRoomKey)
+    )
+  }, [collaboration?.enabled, collaborationRoomKey])
 
   useEffect(() => {
     if (!isAiChatEnabled) return
@@ -407,15 +433,16 @@ export const CodeEditor = ({
       : resolveMonacoThemeForSyntaxTheme(syntaxTheme, isDark)
 
   return (
-    <Editor
-      language={activeLanguage}
-      height="100%"
-      width="100%"
-      value={collaboration?.enabled ? undefined : value}
-      defaultValue={collaboration?.enabled ? value : undefined}
-      theme={editorTheme}
-      className="bg-transparent" // Let Monaco handle bg
-      onMount={(editor, monaco) => {
+    <div className="relative h-full w-full">
+      <Editor
+        language={activeLanguage}
+        height="100%"
+        width="100%"
+        value={collaboration?.enabled ? undefined : value}
+        defaultValue={collaboration?.enabled ? value : undefined}
+        theme={editorTheme}
+        className="bg-transparent" // Let Monaco handle bg
+        onMount={(editor, monaco) => {
         monacoRef.current = monaco
         if (!originalSetThemeRef.current) {
           originalSetThemeRef.current = monaco.editor.setTheme
@@ -430,49 +457,107 @@ export const CodeEditor = ({
         handleEditorDidMount(editor, monaco)
         if (collaboration?.enabled) {
           const model = editor.getModel()
-          if (model) {
-            const yProvider = getYjsProviderForRoom(room)
-            const yDoc = yProvider.getYDoc()
-            const yText = yDoc.getText(`file:${collaboration.fileId}`)
-            let disposed = false
-            let didSeedFromSnapshot = false
+          const yProvider = getYjsProviderForRoom(room)
+          const yDoc = yProvider.getYDoc()
+          const yText = yDoc.getText(`file:${collaboration.fileId}`)
+          const shouldBlockHydration = shouldBlockInitialHydration(
+            true,
+            collaborationRoomKey
+          )
 
-            const maybeSeedFromSnapshot = () => {
-              if (disposed || didSeedFromSnapshot) return
+          let disposed = false
+          let didSeedFromSnapshot = false
+          let didFinishHydration = false
+          let hydrationTimeout: ReturnType<typeof setTimeout> | null = null
+
+          const markCollaborationReady = (source: 'seed' | 'timeout') => {
+            if (disposed || didFinishHydration) return
+            didFinishHydration = true
+            markRoomHydrated(collaborationRoomKey)
+
+            if (source === 'timeout') {
               didSeedFromSnapshot = true
-
-              if (!value) return
-              if (yText.length === 0) {
-                yDoc.transact(() => {
-                  if (yText.length === 0) {
-                    yText.insert(0, value)
-                  }
-                }, 'initial-content-seed')
-                return
-              }
-
-              if (yText.toString() !== value) {
-                posthog.capture('collab_conflict_recovery_applied', {
-                  file_id: collaboration.fileId,
-                  strategy: 'yjs_authoritative',
-                })
-              }
+              posthog.capture('collab_hydration_timeout_fallback', {
+                file_id: collaboration.fileId,
+                room_id: collaborationRoomKey,
+                provider_status: yProvider.getStatus(),
+              })
             }
 
-            let cleanupSyncListener: (() => void) | null = null
-            if (yProvider.synced) {
+            if (hydrationTimeout) {
+              clearTimeout(hydrationTimeout)
+              hydrationTimeout = null
+            }
+
+            setIsCollaborationHydrating(false)
+            editor.updateOptions({
+              readOnly: collaboration.role !== 'editor',
+            })
+          }
+
+          const maybeSeedFromSnapshot = () => {
+            if (disposed || didSeedFromSnapshot) return
+            didSeedFromSnapshot = true
+
+            if (value && yText.length === 0) {
+              yDoc.transact(() => {
+                if (yText.length === 0) {
+                  yText.insert(0, value)
+                }
+              }, 'initial-content-seed')
+            }
+
+            if (value && yText.toString() !== value) {
+              posthog.capture('collab_conflict_recovery_applied', {
+                file_id: collaboration.fileId,
+                strategy: 'yjs_authoritative',
+              })
+            }
+
+            markCollaborationReady('seed')
+          }
+
+          setIsCollaborationHydrating(shouldBlockHydration)
+          editor.updateOptions({
+            readOnly: shouldBlockHydration || collaboration.role !== 'editor',
+          })
+
+          if (shouldBlockHydration) {
+            hydrationTimeout = setTimeout(() => {
+              markCollaborationReady('timeout')
+            }, COLLAB_HYDRATION_TIMEOUT_MS)
+          }
+
+          let cleanupSyncListener: (() => void) | null = null
+          if (yProvider.synced || yProvider.getStatus() !== 'loading') {
+            maybeSeedFromSnapshot()
+          } else {
+            const handleSynced = (synced: boolean) => {
+              if (!synced) return
               maybeSeedFromSnapshot()
-            } else {
-              const handleSynced = (synced: boolean) => {
-                if (!synced) return
+            }
+            const handleStatus = () => {
+              if (yProvider.getStatus() !== 'loading') {
                 maybeSeedFromSnapshot()
               }
-              yProvider.on('synced', handleSynced)
-              cleanupSyncListener = () => {
-                yProvider.off('synced', handleSynced)
-              }
             }
 
+            yProvider.on('synced', handleSynced)
+            yProvider.on('sync', handleSynced)
+            yProvider.on('status', handleStatus)
+            cleanupSyncListener = () => {
+              yProvider.off('synced', handleSynced)
+              yProvider.off('sync', handleSynced)
+              yProvider.off('status', handleStatus)
+            }
+
+            // Close the race where provider syncs between the initial status check and listener registration.
+            if (yProvider.synced || yProvider.getStatus() !== 'loading') {
+              maybeSeedFromSnapshot()
+            }
+          }
+
+          if (model) {
             yBindingRef.current?.destroy()
             yBindingRef.current = new MonacoBinding(
               yText,
@@ -480,23 +565,23 @@ export const CodeEditor = ({
               new Set([editor]),
               yProvider.awareness as unknown as YjsAwareness
             )
-
-            const awarenessUserState: JsonObject = {
-              id: collaboration.userId,
-              name: collaboration.userName,
-              color: collaboration.userColor,
-            }
-            yProvider.awareness.setLocalStateField('user', awarenessUserState)
-
-            editor.onDidDispose(() => {
-              disposed = true
-              cleanupSyncListener?.()
-              cleanupSyncListener = null
-            })
           }
 
-          editor.updateOptions({
-            readOnly: collaboration.role !== 'editor',
+          const awarenessUserState: JsonObject = {
+            id: collaboration.userId,
+            name: collaboration.userName,
+            color: collaboration.userColor,
+          }
+          yProvider.awareness.setLocalStateField('user', awarenessUserState)
+
+          editor.onDidDispose(() => {
+            disposed = true
+            cleanupSyncListener?.()
+            cleanupSyncListener = null
+            if (hydrationTimeout) {
+              clearTimeout(hydrationTimeout)
+              hydrationTimeout = null
+            }
           })
         }
         onReady?.()
@@ -824,27 +909,35 @@ export const CodeEditor = ({
             window.removeEventListener('mouseup', handlePointerRelease)
           }
         })
-      }}
-      options={{
-         ...editorDefaultOptions,
-         fontFamily: 'SF Mono, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace', // Premium cursor font stack
-         fontSize: 13,
-         lineHeight: 20,
-         cursorBlinking: 'smooth',
-         cursorSmoothCaretAnimation: 'off',
-         renderLineHighlight: 'line', // cleaner than 'all'
-         readOnly: collaboration?.enabled ? collaboration.role !== 'editor' : false,
-         guides: {
+        }}
+        options={{
+          ...editorDefaultOptions,
+          fontFamily: 'SF Mono, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace', // Premium cursor font stack
+          fontSize: 13,
+          lineHeight: 20,
+          cursorBlinking: 'smooth',
+          cursorSmoothCaretAnimation: 'off',
+          renderLineHighlight: 'line', // cleaner than 'all'
+          readOnly: collaboration?.enabled
+            ? isCollaborationHydrating || collaboration.role !== 'editor'
+            : false,
+          guides: {
             indentation: true,
             bracketPairs: true
-         },
-         minimap: {
+          },
+          minimap: {
             enabled: false // Minimalist
-         }
-         
-      }}
-      loading={<EditorLoading />}
-    />
+          }
+        }}
+        loading={<EditorLoading />}
+      />
+      {collaboration?.enabled && isCollaborationHydrating ? (
+        <div className="absolute inset-0 z-20 flex items-center justify-center gap-2 bg-zinc-950/70 backdrop-blur-[1px]">
+          <Loader2 className="h-4 w-4 animate-spin text-zinc-300" />
+          <span className="text-xs text-zinc-300">Syncing collaboration...</span>
+        </div>
+      ) : null}
+    </div>
   )
 }
 

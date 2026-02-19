@@ -392,7 +392,7 @@ const CursorEditorContainer: React.FC<CursorEditorContainerProps> = ({
               onReady={onEditorReady}
               gotoRequest={activeGotoRequest}
               collaboration={collaboration}
-              key={`${theme || systemTheme}-${openFile?.id}`}
+              key={`${theme || systemTheme}-${openFile?.id}-${collaboration?.enabled ? 'collab' : 'solo'}`}
             />
         </div>
       )}

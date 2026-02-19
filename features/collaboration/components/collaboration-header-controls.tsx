@@ -1,9 +1,9 @@
 'use client'
 
-import React, { useCallback, useMemo, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import posthog from 'posthog-js'
 import { stringifyCommentBody } from '@liveblocks/client'
-import { Share2, MessageSquareText, Eye, EyeOff, Link2, Copy, Check } from 'lucide-react'
+import { Share2, MessageSquareText, Eye, EyeOff, Copy, Check } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -39,6 +39,10 @@ import { useCreateComment, useCreateThread, useMarkThreadAsResolved, useMarkThre
 import type { CollaborationRole } from '../types'
 import { useProject } from '@/contexts/ProjectContext'
 import { buildShareGrantRecord } from '../share-grants'
+import {
+  extractShareTokenFromRecord,
+  resolveShareLinkExpiryMs,
+} from '../share-link-records'
 
 interface AnchorSelection {
   startLineNumber: number
@@ -56,7 +60,18 @@ interface CollaborationHeaderControlsProps {
   selection: AnchorSelection | null
   followConnectionId: number | null
   onFollowConnectionIdChange: (connectionId: number | null) => void
+  onRealtimeCollaborationRequested?: () => void
 }
+
+type ShareExpiryPreset = '1h' | '24h' | '7d' | 'never' | 'custom'
+
+interface SavedShareLink {
+  token: string
+  createdAtMs: number
+  expiresAtMs: number | null
+}
+
+const MAX_CUSTOM_EXPIRY_HOURS = 24 * 365
 
 function userDisplayName(user: { info?: { name?: string | null } | null; id?: string | null }): string {
   if (typeof user.info?.name === 'string' && user.info.name.trim()) return user.info.name.trim()
@@ -115,6 +130,24 @@ function StatusIndicator({ status }: { status: string }) {
   )
 }
 
+function resolveExpiryHoursFromPreset(
+  preset: ShareExpiryPreset,
+  customHours: number
+): number | null {
+  if (preset === '1h') return 1
+  if (preset === '24h') return 24
+  if (preset === '7d') return 7 * 24
+  if (preset === 'never') return null
+  return Math.min(MAX_CUSTOM_EXPIRY_HOURS, Math.max(1, Math.round(customHours || 24)))
+}
+
+function formatShareExpiryLabel(expiresAtMs: number | null, isExpired: boolean): string {
+  if (expiresAtMs === null) return 'Never expires'
+  const date = new Date(expiresAtMs)
+  const label = date.toLocaleString()
+  return isExpired ? `Expired on ${label}` : `Expires on ${label}`
+}
+
 export function CollaborationHeaderControls({
   projectId,
   fileId,
@@ -124,6 +157,7 @@ export function CollaborationHeaderControls({
   selection,
   followConnectionId,
   onFollowConnectionIdChange,
+  onRealtimeCollaborationRequested,
 }: CollaborationHeaderControlsProps) {
   const status = useStatus()
   const self = useSelf()
@@ -137,15 +171,30 @@ export function CollaborationHeaderControls({
   const [newThreadBody, setNewThreadBody] = useState('')
   const [replyByThread, setReplyByThread] = useState<Record<string, string>>({})
   const [shareRole, setShareRole] = useState<CollaborationRole>('commenter')
-  const [shareExpiryHours, setShareExpiryHours] = useState(24)
+  const [hasSelectedShareRoleManually, setHasSelectedShareRoleManually] = useState(false)
+  const [shareExpiryPreset, setShareExpiryPreset] = useState<ShareExpiryPreset>('24h')
+  const [customShareExpiryHours, setCustomShareExpiryHours] = useState(24)
   const [shareUrl, setShareUrl] = useState('')
-  const [roomCode, setRoomCode] = useState('')
+  const [shareExpiresAtMs, setShareExpiresAtMs] = useState<number | null>(null)
   const [isCreatingShare, setIsCreatingShare] = useState(false)
   const [hasCopiedUrl, setHasCopiedUrl] = useState(false)
 
   const canComment = role !== 'viewer'
-  const canEdit = role === 'editor'
   // const roleLabel = role === 'editor' ? 'Editor' : role === 'commenter' ? 'Commenter' : 'Viewer'
+  const shouldLoadProjectShareLinks = role === 'editor' && Boolean(projectId)
+  const { data: shareLinksData } = db.useQuery(
+    shouldLoadProjectShareLinks
+      ? {
+          project_share_links: {
+            $: {
+              where: {
+                projectId,
+              },
+            },
+          },
+        }
+      : null
+  )
 
   const participants = useMemo(() => {
     const everyone = []
@@ -202,7 +251,130 @@ export function CollaborationHeaderControls({
 
   const unresolvedCount = threads.filter((thread) => !thread.resolved).length
 
-  const createShareLink = useCallback(async () => {
+  useEffect(() => {
+    if (others.length === 0) return
+    onRealtimeCollaborationRequested?.()
+  }, [onRealtimeCollaborationRequested, others.length])
+
+  const buildShareUrlFromToken = useCallback(
+    (token: string): string => {
+      if (!token) return ''
+      const baseUrl =
+        (typeof window !== 'undefined' && window.location?.origin) ||
+        process.env.NEXT_PUBLIC_APP_URL ||
+        ''
+      if (!baseUrl) return ''
+
+      const nextUrl = new URL(`/project/${projectId}`, baseUrl)
+      nextUrl.searchParams.set('share', token)
+      if (fileId) {
+        nextUrl.searchParams.set('file', fileId)
+      }
+      return nextUrl.toString()
+    },
+    [fileId, projectId]
+  )
+
+  const resolvedShareExpiryHours = useMemo(
+    () => resolveExpiryHoursFromPreset(shareExpiryPreset, customShareExpiryHours),
+    [customShareExpiryHours, shareExpiryPreset]
+  )
+
+  const mostRecentSavedShareRole = useMemo<CollaborationRole | null>(() => {
+    const rows = Array.isArray(shareLinksData?.project_share_links)
+      ? shareLinksData.project_share_links
+      : []
+    let latestRole: CollaborationRole | null = null
+    let latestCreatedAtMs = -1
+
+    rows.forEach((rawRow) => {
+      if (!rawRow || typeof rawRow !== 'object') return
+      const row = rawRow as Record<string, unknown>
+      if (typeof row.revoked_at === 'string' && row.revoked_at.trim()) return
+
+      const candidateRole =
+        row.role === 'viewer' || row.role === 'commenter' || row.role === 'editor'
+          ? row.role
+          : null
+      if (!candidateRole) return
+
+      const createdAtMs = Date.parse(
+        typeof row.created_at === 'string' ? row.created_at : ''
+      )
+      const normalizedCreatedAtMs = Number.isFinite(createdAtMs) ? createdAtMs : 0
+      if (normalizedCreatedAtMs <= latestCreatedAtMs) return
+
+      latestCreatedAtMs = normalizedCreatedAtMs
+      latestRole = candidateRole
+    })
+
+    return latestRole
+  }, [shareLinksData?.project_share_links])
+
+  useEffect(() => {
+    if (hasSelectedShareRoleManually) return
+    if (!mostRecentSavedShareRole) return
+    setShareRole(mostRecentSavedShareRole)
+  }, [hasSelectedShareRoleManually, mostRecentSavedShareRole])
+
+  const latestSavedShareLink = useMemo(() => {
+    const rows = Array.isArray(shareLinksData?.project_share_links)
+      ? shareLinksData.project_share_links
+      : []
+    const byToken = new Map<string, SavedShareLink>()
+
+    rows.forEach((rawRow) => {
+      if (!rawRow || typeof rawRow !== 'object') return
+      const row = rawRow as Record<string, unknown>
+
+      if (typeof row.revoked_at === 'string' && row.revoked_at.trim()) return
+      if (typeof row.role === 'string' && row.role.trim() && row.role !== shareRole) return
+
+      const token = extractShareTokenFromRecord(row)
+      if (!token) return
+
+      const createdAtMs = Date.parse(
+        typeof row.created_at === 'string' ? row.created_at : ''
+      )
+      const normalizedCreatedAtMs = Number.isFinite(createdAtMs) ? createdAtMs : 0
+      const expiresAtMs = resolveShareLinkExpiryMs(row, token)
+
+      const existing = byToken.get(token)
+      if (!existing || normalizedCreatedAtMs > existing.createdAtMs) {
+        byToken.set(token, {
+          token,
+          createdAtMs: normalizedCreatedAtMs,
+          expiresAtMs,
+        })
+      }
+    })
+
+    return Array.from(byToken.values()).sort(
+      (left, right) => right.createdAtMs - left.createdAtMs
+    )[0] || null
+  }, [shareLinksData?.project_share_links, shareRole])
+
+  useEffect(() => {
+    setHasCopiedUrl(false)
+    if (!latestSavedShareLink) {
+      setShareUrl('')
+      setShareExpiresAtMs(null)
+      return
+    }
+    setShareUrl(buildShareUrlFromToken(latestSavedShareLink.token))
+    setShareExpiresAtMs(latestSavedShareLink.expiresAtMs)
+  }, [buildShareUrlFromToken, latestSavedShareLink])
+
+  const isShareLinkExpired =
+    typeof shareExpiresAtMs === 'number' ? shareExpiresAtMs <= Date.now() : false
+  const shareExpiryLabel = formatShareExpiryLabel(shareExpiresAtMs, isShareLinkExpired)
+  const hasPersistedShareLink = Boolean(shareUrl)
+
+  const createShareLink = useCallback(async (forceRegenerate = false) => {
+    if (!forceRegenerate && hasPersistedShareLink && !isShareLinkExpired) {
+      return
+    }
+
     setIsCreatingShare(true)
     try {
       const response = await fetch('/api/collab/share-link', {
@@ -214,7 +386,7 @@ export function CollaborationHeaderControls({
           projectId,
           fileId,
           role: shareRole,
-          expiresInHours: shareExpiryHours,
+          expiresInHours: resolvedShareExpiryHours,
           userId,
         }),
       })
@@ -224,7 +396,7 @@ export function CollaborationHeaderControls({
             shareUrl?: string
             roomId?: string
             token?: string
-            expiresAt?: number
+            expiresAt?: number | null
             error?: string
           }
         | null
@@ -233,7 +405,7 @@ export function CollaborationHeaderControls({
         !payload?.shareUrl ||
         !payload.roomId ||
         !payload.token ||
-        typeof payload.expiresAt !== 'number'
+        (payload.expiresAt !== null && typeof payload.expiresAt !== 'number')
       ) {
         throw new Error(payload?.error || 'Failed to create share link.')
       }
@@ -274,7 +446,7 @@ export function CollaborationHeaderControls({
         )
       })
 
-      await db.transact(operations as any[])
+      await db.transact(operations as Parameters<typeof db.transact>[0])
 
       if (typeof window !== 'undefined') {
         const params = new URLSearchParams(window.location.search)
@@ -293,14 +465,27 @@ export function CollaborationHeaderControls({
       }
 
       setShareUrl(payload.shareUrl)
-      setRoomCode(payload.roomId)
+      setShareExpiresAtMs(
+        typeof payload.expiresAt === 'number' ? payload.expiresAt * 1000 : null
+      )
+      onRealtimeCollaborationRequested?.()
       posthog.capture('collab_share_link_created', {
         role: shareRole,
       })
     } finally {
       setIsCreatingShare(false)
     }
-  }, [fileId, projectId, projectNodes, shareExpiryHours, shareRole, userId])
+  }, [
+    fileId,
+    hasPersistedShareLink,
+    isShareLinkExpired,
+    onRealtimeCollaborationRequested,
+    projectId,
+    projectNodes,
+    resolvedShareExpiryHours,
+    shareRole,
+    userId,
+  ])
 
   const copyShareUrl = useCallback(() => {
     if (!shareUrl) return
@@ -376,8 +561,6 @@ export function CollaborationHeaderControls({
     },
     [canComment, createComment, replyByThread]
   )
-
-  const activeFollowParticipant = others.find(p => p.connectionId === followConnectionId)
 
   return (
     <div className="flex items-center gap-1 pr-1 h-full">
@@ -489,39 +672,69 @@ export function CollaborationHeaderControls({
           <div className="grid gap-4 mt-2">
             <div className="grid gap-2">
               <Label htmlFor="share-role" className="text-xs text-zinc-400">Permissions</Label>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2.5">
                  <select
                   id="share-role"
                   value={shareRole}
-                  onChange={(event) => setShareRole(event.target.value as CollaborationRole)}
+                  onChange={(event) => {
+                    setHasSelectedShareRoleManually(true)
+                    setShareRole(event.target.value as CollaborationRole)
+                  }}
                   className="h-9 flex-1 rounded-md border border-white/10 bg-[#1a1b20] px-3 text-sm text-zinc-100 outline-none focus:border-white/20"
                 >
                   <option value="viewer">Viewer (Read-only)</option>
                   <option value="commenter">Commenter</option>
                   <option value="editor">Editor (Full access)</option>
                 </select>
-                <Input
-                  type="number"
-                  min={1}
-                  max={720}
-                  value={shareExpiryHours}
-                  onChange={(event) => setShareExpiryHours(Number(event.target.value || 24))}
-                   className="w-24 border-white/10 bg-[#1a1b20] text-zinc-100"
-                   title="Expires in (hours)"
-                />
+                <select
+                  id="share-expiration"
+                  value={shareExpiryPreset}
+                  onChange={(event) =>
+                    setShareExpiryPreset(event.target.value as ShareExpiryPreset)
+                  }
+                  className="h-9 w-40 rounded-md border border-white/10 bg-[#1a1b20] px-3 text-sm text-zinc-100 outline-none focus:border-white/20"
+                >
+                  <option value="1h">1 Hour</option>
+                  <option value="24h">24 Hours</option>
+                  <option value="7d">7 Days</option>
+                  <option value="never">Never</option>
+                  <option value="custom">Custom</option>
+                </select>
               </div>
+              {shareExpiryPreset === 'custom' ? (
+                <div className="flex items-center gap-2">
+                  <Input
+                    type="number"
+                    min={1}
+                    max={MAX_CUSTOM_EXPIRY_HOURS}
+                    value={customShareExpiryHours}
+                    onChange={(event) =>
+                      setCustomShareExpiryHours(Number(event.target.value || 24))
+                    }
+                    className="h-8 w-28 border-white/10 bg-[#1a1b20] text-zinc-100 text-sm"
+                    title="Custom expiration (hours)"
+                  />
+                  <span className="text-[11px] text-zinc-500">hours</span>
+                </div>
+              ) : null}
             </div>
 
-            <Button
-              type="button"
-              onClick={createShareLink}
-              disabled={isCreatingShare}
-              className="w-full bg-indigo-600 hover:bg-indigo-700 text-white"
-            >
-              {isCreatingShare ? 'Generating...' : 'Create Invite Link'}
-            </Button>
+            {(!hasPersistedShareLink || isShareLinkExpired) && (
+              <Button
+                type="button"
+                onClick={() => void createShareLink(isShareLinkExpired)}
+                disabled={isCreatingShare}
+                className="w-full bg-indigo-600 hover:bg-indigo-700 text-white"
+              >
+                {isCreatingShare
+                  ? 'Generating...'
+                  : isShareLinkExpired
+                    ? 'Regenerate Invite Link'
+                    : 'Create Invite Link'}
+              </Button>
+            )}
 
-            {shareUrl && (
+            {hasPersistedShareLink && (
               <div className="grid gap-2 p-3 rounded-md bg-white/[0.03] border border-white/5">
                 <Label className="text-xs text-zinc-400">Copy Link</Label>
                 <div className="flex gap-2">
@@ -538,6 +751,30 @@ export function CollaborationHeaderControls({
                   >
                      {hasCopiedUrl ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
                   </Button>
+                </div>
+                <div className="flex items-center justify-between gap-3">
+                  <p
+                    className={cn(
+                      'text-[11px]',
+                      isShareLinkExpired ? 'text-amber-400/90' : 'text-zinc-500'
+                    )}
+                  >
+                    {shareExpiryLabel}
+                  </p>
+                  {isShareLinkExpired ? (
+                    <button
+                      type="button"
+                      onClick={() => void createShareLink(true)}
+                      disabled={isCreatingShare}
+                      className="text-[11px] text-zinc-300 underline underline-offset-2 hover:text-zinc-100 disabled:opacity-50"
+                    >
+                      Regenerate
+                    </button>
+                  ) : (
+                    <span className="text-[11px] text-zinc-500">
+                      Reuse this link until it expires.
+                    </span>
+                  )}
                 </div>
               </div>
             )}
@@ -598,7 +835,6 @@ export function CollaborationHeaderControls({
           <div className="mt-4 space-y-3">
             {threads.map((thread) => {
               const anchor = thread.metadata
-              const starter = thread.comments[0]
               const replyDraft = replyByThread[thread.id] ?? ''
 
               return (

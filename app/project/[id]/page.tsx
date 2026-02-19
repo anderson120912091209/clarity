@@ -38,6 +38,7 @@ import { completeNavJourney, markNavMilestone } from '@/lib/perf/nav-trace'
 import { warmupShikiMonaco } from '@/components/editor/utils/shiki-monaco'
 import { resolveCollaborationColor } from '@/features/collaboration/color'
 import { decodeShareTokenUnsafe } from '@/features/collaboration/share-token'
+import { hasActiveProjectShareLink as hasActiveProjectShareLinkRecord } from '@/features/collaboration/share-link-records'
 import type { CollaborationRole } from '@/features/collaboration/types'
 import { CollaborationRoomProvider } from '@/features/collaboration/components/collaboration-room-provider'
 import { CollaborationHeaderControls } from '@/features/collaboration/components/collaboration-header-controls'
@@ -288,7 +289,31 @@ function EditorLayout() {
     if (projectId && decodedShareToken.projectId !== projectId) return undefined
     return shareToken
   }, [decodedShareToken, projectId, shareToken])
+  const [isRealtimeCollaborationEnabled, setIsRealtimeCollaborationEnabled] = useState<boolean>(
+    () => Boolean(activeShareToken)
+  )
   const shareFileId = activeShareToken ? normalizeFileQueryParam(searchParams.get('file')) : null
+  const shouldLoadProjectShareLinks = Boolean(projectId && user?.id && !activeShareToken)
+  const { data: shareLinksData } = db.useQuery(
+    shouldLoadProjectShareLinks
+      ? {
+          project_share_links: {
+            $: {
+              where: {
+                projectId,
+              },
+            },
+          },
+        }
+      : null
+  )
+  const hasActiveProjectShareLink = useMemo(() => {
+    const rows = Array.isArray(shareLinksData?.project_share_links)
+      ? shareLinksData.project_share_links
+      : []
+
+    return hasActiveProjectShareLinkRecord(rows)
+  }, [shareLinksData?.project_share_links])
   const collaborationRole: CollaborationRole = activeShareToken
     ? decodedShareToken?.role ?? 'viewer'
     : 'editor'
@@ -318,9 +343,23 @@ function EditorLayout() {
   }, [settings.defaultEditorSyntaxTheme])
 
   useEffect(() => {
+    if (!activeShareToken) return
+    setIsRealtimeCollaborationEnabled(true)
+  }, [activeShareToken])
+
+  useEffect(() => {
+    if (!hasActiveProjectShareLink) return
+    setIsRealtimeCollaborationEnabled(true)
+  }, [hasActiveProjectShareLink])
+
+  useEffect(() => {
     setFollowConnectionId(null)
     setActiveSelectionForComments(null)
   }, [currentlyOpen?.id])
+
+  const handleEnableRealtimeCollaboration = useCallback(() => {
+    setIsRealtimeCollaborationEnabled(true)
+  }, [])
 
   useEffect(() => {
     if (editorSyntaxTheme !== 'shiki') return
@@ -596,7 +635,7 @@ function EditorLayout() {
   const collaborationConfig = useMemo(() => {
     if (!user?.id || !currentlyOpen?.id) return null
     return {
-      enabled: true,
+      enabled: isRealtimeCollaborationEnabled,
       role: collaborationRole,
       userId: user.id,
       userName: collaborationUserInfo.name,
@@ -614,6 +653,7 @@ function EditorLayout() {
     collaborationUserInfo.name,
     currentlyOpen?.id,
     followConnectionId,
+    isRealtimeCollaborationEnabled,
     user?.id,
   ])
 
@@ -1179,6 +1219,7 @@ function EditorLayout() {
           selection={activeSelectionForComments}
           followConnectionId={followConnectionId}
           onFollowConnectionIdChange={setFollowConnectionId}
+          onRealtimeCollaborationRequested={handleEnableRealtimeCollaboration}
         />
       ) : null}
     </div>

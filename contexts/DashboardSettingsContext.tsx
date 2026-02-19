@@ -29,6 +29,7 @@ export interface DashboardSettings {
   defaultEditorSyntaxTheme: EditorSyntaxTheme
   defaultPdfBackgroundTheme: PdfBackgroundThemeKey
   defaultPdfCaretNavigation: boolean
+  defaultTypstAutoCompile: boolean
   defaultChatIncludeCurrentDocument: boolean
   defaultChatModel: ChatModelPreference
 }
@@ -49,6 +50,7 @@ export const DEFAULT_DASHBOARD_SETTINGS: DashboardSettings = {
   defaultEditorSyntaxTheme: DEFAULT_EDITOR_SYNTAX_THEME,
   defaultPdfBackgroundTheme: DEFAULT_PDF_BACKGROUND_THEME,
   defaultPdfCaretNavigation: true,
+  defaultTypstAutoCompile: false,
   defaultChatIncludeCurrentDocument: true,
   defaultChatModel: 'auto',
 }
@@ -104,6 +106,8 @@ function parseStoredSettings(raw: string | null): DashboardSettings {
         : DEFAULT_DASHBOARD_SETTINGS.defaultPdfBackgroundTheme,
       defaultPdfCaretNavigation:
         parsed.defaultPdfCaretNavigation ?? DEFAULT_DASHBOARD_SETTINGS.defaultPdfCaretNavigation,
+      defaultTypstAutoCompile:
+        parsed.defaultTypstAutoCompile ?? DEFAULT_DASHBOARD_SETTINGS.defaultTypstAutoCompile,
       defaultChatIncludeCurrentDocument:
         parsed.defaultChatIncludeCurrentDocument ??
         DEFAULT_DASHBOARD_SETTINGS.defaultChatIncludeCurrentDocument,

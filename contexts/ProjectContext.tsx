@@ -6,6 +6,7 @@ import React, {
   ReactNode,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from 'react'
 import { useProjectData, useProjectFiles } from '@/hooks/data'
@@ -13,6 +14,7 @@ import { useFrontend } from '@/contexts/FrontendContext'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { db } from '@/lib/constants'
 import { decodeShareTokenUnsafe } from '@/features/collaboration/share-token'
+import { resolveShareSessionActiveFile } from '@/features/collaboration/share-session-file-selection'
 import type { CollaborationRole } from '@/features/collaboration/types'
 
 const ProjectContext = createContext<any>(undefined)
@@ -137,6 +139,11 @@ export function ProjectProvider({
   )
   const [openFileIds, setOpenFileIds] = useState<string[]>([])
   const [activeFileId, setActiveFileIdState] = useState<string | null>(null)
+  const hasInitializedSharedTargetRef = useRef(false)
+
+  useEffect(() => {
+    hasInitializedSharedTargetRef.current = false
+  }, [isShareSession, projectId, sharedTargetFileId, shareToken])
 
   useEffect(() => {
     if (typeof window === 'undefined') return
@@ -171,12 +178,18 @@ export function ProjectProvider({
     if (!availableFileIds.size) {
       setOpenFileIds([])
       setActiveFileIdState(null)
+      hasInitializedSharedTargetRef.current = false
       return
     }
 
     setOpenFileIds((previous) => {
       const filtered = previous.filter((fileId) => availableFileIds.has(fileId))
-      if (sharedTargetFile?.id && !filtered.includes(sharedTargetFile.id)) {
+      if (
+        isShareSession &&
+        sharedTargetFile?.id &&
+        !hasInitializedSharedTargetRef.current &&
+        !filtered.includes(sharedTargetFile.id)
+      ) {
         filtered.push(sharedTargetFile.id)
       }
       if (!filtered.length && fallbackFileId) {
@@ -186,13 +199,18 @@ export function ProjectProvider({
     })
 
     setActiveFileIdState((previous) => {
-      if (sharedTargetFile?.id && availableFileIds.has(sharedTargetFile.id)) {
-        return sharedTargetFile.id
-      }
-      if (previous && availableFileIds.has(previous)) return previous
-      return fallbackFileId
+      const resolution = resolveShareSessionActiveFile({
+        availableFileIds,
+        fallbackFileId,
+        hasInitializedSharedTarget: hasInitializedSharedTargetRef.current,
+        isShareSession,
+        previousActiveFileId: previous,
+        sharedTargetFileId: sharedTargetFile?.id ?? null,
+      })
+      hasInitializedSharedTargetRef.current = resolution.hasInitializedSharedTarget
+      return resolution.nextActiveFileId
     })
-  }, [fallbackFileId, fileMap, sharedTargetFile?.id])
+  }, [fallbackFileId, fileMap, isShareSession, sharedTargetFile?.id])
 
   useEffect(() => {
     if (typeof window === 'undefined') return
