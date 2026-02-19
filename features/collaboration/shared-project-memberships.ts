@@ -16,6 +16,12 @@ export interface SharedProjectMembershipRecord {
 
 export const SHARED_PROJECT_MEMBERSHIP_FILE_MARKER = '__shared_membership__'
 
+const MEMBERSHIP_ROLE_PRIORITY: Record<'viewer' | 'commenter' | 'editor', number> = {
+  viewer: 0,
+  commenter: 1,
+  editor: 2,
+}
+
 function parseIsoToMs(value: unknown): number {
   if (typeof value !== 'string' || !value.trim()) return 0
   const parsed = new Date(value).getTime()
@@ -62,16 +68,46 @@ export function resolveLatestActiveMembershipToken(
         membership.projectId.trim() === normalizedProjectId
     )
     .filter((membership) => isSharedProjectMembershipActive(membership, nowMs))
+    .map((membership) => {
+      const token = membership.share_token?.trim() ?? ''
+      const claims = decodeShareTokenUnsafe(token)
+      const normalizedRole =
+        claims?.role ??
+        (membership.role === 'viewer' ||
+        membership.role === 'commenter' ||
+        membership.role === 'editor'
+          ? membership.role
+          : null)
+
+      return {
+        token,
+        rolePriority:
+          normalizedRole != null ? MEMBERSHIP_ROLE_PRIORITY[normalizedRole] : -1,
+        timestamp:
+          parseIsoToMs(membership.last_accessed_at) ||
+          parseIsoToMs(membership.added_at),
+        expiryMs:
+          typeof claims?.exp === 'number' && Number.isFinite(claims.exp)
+            ? claims.exp * 1000
+            : 0,
+      }
+    })
+    .filter((candidate) => candidate.token.length > 0)
     .sort((left, right) => {
-      const leftTimestamp =
-        parseIsoToMs(left.last_accessed_at) || parseIsoToMs(left.added_at)
-      const rightTimestamp =
-        parseIsoToMs(right.last_accessed_at) || parseIsoToMs(right.added_at)
-      return rightTimestamp - leftTimestamp
+      if (left.rolePriority !== right.rolePriority) {
+        return right.rolePriority - left.rolePriority
+      }
+      if (left.timestamp !== right.timestamp) {
+        return right.timestamp - left.timestamp
+      }
+      if (left.expiryMs !== right.expiryMs) {
+        return right.expiryMs - left.expiryMs
+      }
+      return left.token.localeCompare(right.token)
     })
 
   if (!candidates.length) return null
-  return candidates[0].share_token ?? null
+  return candidates[0].token
 }
 
 export function toSharedMembershipFromShareLinkRecord(
@@ -84,6 +120,20 @@ export function toSharedMembershipFromShareLinkRecord(
   if (!token) return null
 
   const claims = decodeShareTokenUnsafe(token)
+  const normalizedRecordRole =
+    record.role === 'viewer' || record.role === 'commenter' || record.role === 'editor'
+      ? record.role
+      : undefined
+  const addedAt =
+    typeof record.added_at === 'string' && record.added_at.trim()
+      ? record.added_at
+      : typeof record.created_at === 'string'
+        ? record.created_at
+        : undefined
+  const lastAccessedAt =
+    typeof record.last_accessed_at === 'string' && record.last_accessed_at.trim()
+      ? record.last_accessed_at
+      : addedAt
 
   return {
     id: typeof record.id === 'string' ? record.id : undefined,
@@ -91,16 +141,22 @@ export function toSharedMembershipFromShareLinkRecord(
       typeof record.created_by_user_id === 'string'
         ? record.created_by_user_id
         : undefined,
-    projectId: typeof record.projectId === 'string' ? record.projectId : undefined,
+    projectId:
+      typeof record.projectId === 'string'
+        ? record.projectId
+        : typeof record.project_id === 'string'
+          ? record.project_id
+          : undefined,
     share_token: token,
-    role:
-      record.role === 'viewer' || record.role === 'commenter' || record.role === 'editor'
-        ? record.role
-        : claims?.role,
-    added_at: typeof record.created_at === 'string' ? record.created_at : undefined,
-    last_accessed_at: typeof record.created_at === 'string' ? record.created_at : undefined,
-    title_snapshot: undefined,
-    owner_user_id: claims?.issuedByUserId,
+    role: claims?.role ?? normalizedRecordRole,
+    added_at: addedAt,
+    last_accessed_at: lastAccessedAt,
+    title_snapshot:
+      typeof record.title_snapshot === 'string' ? record.title_snapshot : undefined,
+    owner_user_id:
+      typeof record.owner_user_id === 'string'
+        ? record.owner_user_id
+        : claims?.issuedByUserId,
     revoked_at: typeof record.revoked_at === 'string' ? record.revoked_at : null,
   }
 }

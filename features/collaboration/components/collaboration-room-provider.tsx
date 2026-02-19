@@ -101,6 +101,10 @@ export function CollaborationRoomProvider({
   children,
 }: CollaborationRoomProviderProps) {
   const roomId = useMemo(() => buildCollaborationRoomId(projectId), [projectId])
+  const roomProviderKey = useMemo(
+    () => `${roomId}::${shareToken ?? 'no-share-token'}::${role}`,
+    [roomId, role, shareToken]
+  )
   const authContext = useMemo(
     () => ({
       roomId,
@@ -139,7 +143,7 @@ export function CollaborationRoomProvider({
   }, [authContext, roomId])
 
   return (
-    <RoomProvider id={roomId} initialPresence={initialPresence}>
+    <RoomProvider key={roomProviderKey} id={roomId} initialPresence={initialPresence}>
       <CollaborationRoomLifecycle
         roomId={roomId}
         fileId={fileId}
