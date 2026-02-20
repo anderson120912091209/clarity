@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useMemo, useRef } from 'react'
+import React, { useMemo, useRef, useState } from 'react'
 import { FileSystemNode, useFileSystem } from '@/hooks/useFileSystem'
 import { FileTreeItem } from './file-tree-item'
 import { FilePlus, FolderPlus, Upload } from 'lucide-react'
@@ -74,6 +74,7 @@ export function FileTree({
     renameNode,
     toggleNodeExpansion,
     uploadFile,
+    uploadZip,
   } = useFileSystem(projectId, userId, {
     ownerUserId,
     shareToken,
@@ -81,6 +82,7 @@ export function FileTree({
     role,
   })
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const [zipStatus, setZipStatus] = useState<string | null>(null)
   
   // Convert flat list to tree
   const treeData = useMemo(() => {
@@ -128,11 +130,29 @@ export function FileTree({
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
-    if (file) {
-      await uploadFile(file) // Upload to root by default for toolbar button
-      // Reset input
-      e.target.value = ''
+    if (!file) return
+
+    const isZip =
+      file.type === 'application/zip' ||
+      file.type === 'application/x-zip-compressed' ||
+      file.name.toLowerCase().endsWith('.zip')
+
+    if (isZip) {
+      setZipStatus('Extracting ZIP…')
+      try {
+        await uploadZip(file, null, (message) => setZipStatus(message))
+        setZipStatus(null)
+      } catch (err) {
+        console.error('ZIP extraction failed:', err)
+        setZipStatus('Extraction failed — see console for details')
+        setTimeout(() => setZipStatus(null), 4000)
+      }
+    } else {
+      await uploadFile(file)
     }
+
+    // Reset input
+    e.target.value = ''
   }
 
   return (
@@ -141,8 +161,18 @@ export function FileTree({
         type="file" 
         ref={fileInputRef} 
         onChange={handleFileChange} 
-        className="hidden" 
+        className="hidden"
+        accept=".zip,image/*,.pdf,.tex,.bib,.sty,.cls,.txt,.typ,application/zip,application/x-zip-compressed"
       />
+      {zipStatus && (
+        <div className="mx-1.5 mb-2 rounded border border-[#6D78E7]/30 bg-[#6D78E7]/10 px-2 py-1.5 text-[11px] text-[#a5acf0] flex items-center gap-1.5">
+          <svg className="w-3 h-3 animate-spin shrink-0" viewBox="0 0 24 24" fill="none">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"/>
+          </svg>
+          <span className="truncate">{zipStatus}</span>
+        </div>
+      )}
       <div className="flex items-center justify-between px-1.5 pb-2 text-[12px] text-white/60 font-medium">
         <span>Files</span>
         <div className="flex gap-1.5">
