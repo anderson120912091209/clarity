@@ -162,7 +162,7 @@ export function FileTree({
         ref={fileInputRef} 
         onChange={handleFileChange} 
         className="hidden"
-        accept=".zip,image/*,.pdf,.tex,.bib,.sty,.cls,.txt,.typ,application/zip,application/x-zip-compressed"
+        accept=".zip,image/*,.pdf,.tex,.bib,.sty,.cls,.txt,.typ,.ttf,.otf,.woff,.woff2,.tfm,.vf,.pfb,.enc,application/zip,application/x-zip-compressed,font/ttf,font/otf,font/woff,font/woff2"
       />
       {zipStatus && (
         <div className="mx-1.5 mb-2 rounded border border-[#6D78E7]/30 bg-[#6D78E7]/10 px-2 py-1.5 text-[11px] text-[#a5acf0] flex items-center gap-1.5">

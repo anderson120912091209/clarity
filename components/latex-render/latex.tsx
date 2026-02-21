@@ -730,23 +730,23 @@ export function PDFNavContent({
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [onCompile])
 
+  const iconBtnClass = 'h-7 w-7 rounded-md inline-flex items-center justify-center shrink-0 transition-all text-white/40 hover:text-white/80 hover:bg-white/[0.06]'
+  const iconBtnActiveClass = 'h-7 w-7 rounded-md inline-flex items-center justify-center shrink-0 transition-all bg-[#1C1D21] border border-white/[0.08] text-[#E4E4E7]'
+
   return (
     <>
-      <div className="flex items-center gap-2 flex-1 min-w-0">
-        {/* Spacer for left alignment if needed, or just empty to push right */}
-      </div>
+      <div className="flex items-center flex-1 min-w-0" />
 
-      {/* Right Side Actions - Scrollable if too narrow */}
-      <div className="flex items-center gap-3 shrink-0 overflow-x-auto no-scrollbar max-w-full pl-2">
-        
-        {/* Compile Button */}
-        <Button 
-          variant="default" 
-          size="sm" 
-          onClick={onCompile} 
+      <div className="flex items-center gap-1.5 shrink-0 overflow-x-auto no-scrollbar max-w-full pl-2">
+
+        {/* Compile */}
+        <Button
+          variant="default"
+          size="sm"
+          onClick={onCompile}
           disabled={isLoading}
           className={cn(
-             "h-7 pl-2.5 pr-1 gap-1.5 text-xs font-medium bg-[#6D78E7] hover:bg-[#6D78E7]/90 text-white border border-white/10 transition-all rounded-md shadow-sm group shrink-0",
+             "h-7 pl-2.5 pr-1 gap-1.5 text-xs font-medium bg-[#6D78E7] hover:bg-[#5E6AD4] text-white transition-all rounded-md shadow-sm shrink-0",
              isLoading ? "opacity-90 cursor-wait" : ""
           )}
         >
@@ -756,116 +756,89 @@ export function PDFNavContent({
             <Refresh className="w-3.5 h-3.5" weight={SOLAR_ICON_WEIGHT} />
           )}
           <span>Compile</span>
-          
-          <div className="flex items-center justify-center bg-white/20 rounded px-1.5 py-0.5 ml-1">
-             <span className="text-[9px] font-semibold text-white/90">⌘+S</span>
+          <div className="flex items-center justify-center bg-white/15 rounded px-1.5 py-0.5 ml-0.5">
+             <span className="text-[9px] font-semibold text-white/80">⌘S</span>
           </div>
         </Button>
 
-        {isChatEnabled ? (
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={onChatToggle}
-            className={cn(
-              'h-7 px-2.5 rounded-md gap-1.5 text-xs font-medium border shrink-0 transition-all',
-              isChatVisible
-                ? 'border-[#6D78E7]/70 bg-[#6D78E7]/15 text-[#A9B1FF] hover:bg-[#6D78E7]/25'
-                : 'border-white/10 text-zinc-400 hover:text-white hover:bg-white/5'
-            )}
-            title={isChatVisible ? 'Hide AI Chat' : 'Show AI Chat'}
-          >
-            <ChatRound className="w-3.5 h-3.5" weight={SOLAR_ICON_WEIGHT} />
-            <span>AI Chat</span>
-          </Button>
-        ) : null}
-
-        {onToggleDarkMode && (
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={onToggleDarkMode}
-            className={cn(
-              'h-7 w-7 p-0 rounded-md transition-all shrink-0',
-              pdfDarkMode
-                ? 'bg-[#6D78E7]/15 text-[#A9B1FF] hover:bg-[#6D78E7]/25'
-                : 'text-zinc-400 hover:text-white hover:bg-white/5'
-            )}
-            title={pdfDarkMode ? 'Switch to light PDF' : 'Switch to dark PDF'}
-          >
-            {pdfDarkMode ? <Sun className="w-3.5 h-3.5" /> : <Moon className="w-3.5 h-3.5" />}
-          </Button>
-        )}
-
-        <Button
-           variant={showLogs ? "secondary" : "ghost"}
-           size="sm"
-           onClick={onToggleLogs}
-           title="View Logs"
-           className={cn(
-             "h-7 w-7 p-0 rounded-md transition-all ml-1 shrink-0",
-             showLogs ? "bg-white/10 text-white" : "text-zinc-400 hover:text-white hover:bg-white/5"
-           )}
-         >
-           <ClipboardText className="w-3.5 h-3.5" weight={SOLAR_ICON_WEIGHT} />
-         </Button>
-
-        {/* Floating View Toggle */}
-        {onToggleViewMode && (
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={onToggleViewMode}
-            className={cn(
-              'h-7 w-7 p-0 rounded-md transition-all shrink-0',
-              pdfViewMode === 'floating'
-                ? 'bg-[#6D78E7]/15 text-[#A9B1FF] hover:bg-[#6D78E7]/25'
-                : 'text-zinc-400 hover:text-white hover:bg-white/5'
-            )}
-            title={pdfViewMode === 'floating' ? 'Dock PDF view' : 'Float PDF view'}
-          >
-            <Widget className="w-3.5 h-3.5" weight={SOLAR_ICON_WEIGHT} />
-          </Button>
-        )}
-
-        {/* View Controls */}
+        {/* Toggles */}
         <div className="flex items-center gap-0.5 shrink-0">
-          <Button 
-             variant="ghost" 
-             size="icon" 
-             onClick={onZoomOut} 
-             className="h-7 w-7 rounded-md text-zinc-400 hover:text-[#6D78E7] hover:bg-[#6D78E7]/10 transition-colors"
+          {isChatEnabled ? (
+            <button
+              onClick={onChatToggle}
+              className={cn(
+                isChatVisible
+                  ? 'h-7 px-2 rounded-md inline-flex items-center gap-1.5 text-[12px] font-medium shrink-0 transition-all bg-[#1C1D21] border border-white/[0.08] text-[#E4E4E7]'
+                  : 'h-7 px-2 rounded-md inline-flex items-center gap-1.5 text-[12px] font-medium shrink-0 transition-all text-white/40 hover:text-white/80 hover:bg-white/[0.06] border border-transparent'
+              )}
+              title={isChatVisible ? 'Hide AI Chat' : 'Show AI Chat'}
+            >
+              <ChatRound className="w-3.5 h-3.5" weight={SOLAR_ICON_WEIGHT} />
+              <span>Chat</span>
+            </button>
+          ) : null}
+
+          {onToggleDarkMode && (
+            <button
+              onClick={onToggleDarkMode}
+              className={pdfDarkMode ? iconBtnActiveClass : iconBtnClass}
+              title={pdfDarkMode ? 'Switch to light PDF' : 'Switch to dark PDF'}
+            >
+              {pdfDarkMode ? <Sun className="w-3.5 h-3.5" /> : <Moon className="w-3.5 h-3.5" />}
+            </button>
+          )}
+
+          <button
+            onClick={onToggleLogs}
+            title="View Logs"
+            className={showLogs ? iconBtnActiveClass : iconBtnClass}
           >
-            <MagnifierZoomOut className="h-3.5 w-3.5" weight={SOLAR_ICON_WEIGHT} />
-          </Button>
-          
-          <span 
-            className="w-8 text-center text-[10px] font-medium text-zinc-500 select-none cursor-pointer hover:text-zinc-300 transition-colors shrink-0" 
+            <ClipboardText className="w-3.5 h-3.5" weight={SOLAR_ICON_WEIGHT} />
+          </button>
+
+          {onToggleViewMode && (
+            <button
+              onClick={onToggleViewMode}
+              className={pdfViewMode === 'floating' ? iconBtnActiveClass : iconBtnClass}
+              title={pdfViewMode === 'floating' ? 'Dock PDF view' : 'Float PDF view'}
+            >
+              <Widget className="w-3.5 h-3.5" weight={SOLAR_ICON_WEIGHT} />
+            </button>
+          )}
+        </div>
+
+        {/* Zoom */}
+        <div className="flex items-center gap-0 shrink-0 bg-white/[0.03] rounded-md border border-white/[0.06] px-0.5">
+          <button
+            onClick={onZoomOut}
+            className="h-6 w-6 rounded inline-flex items-center justify-center text-white/40 hover:text-white/80 transition-colors"
+          >
+            <MagnifierZoomOut className="h-3 w-3" weight={SOLAR_ICON_WEIGHT} />
+          </button>
+
+          <span
+            className="w-8 text-center text-[10px] font-medium text-white/50 tabular-nums select-none cursor-pointer hover:text-white/80 transition-colors shrink-0"
             onClick={onResetZoom}
           >
             {Math.round(scale * 100)}%
           </span>
-          
-          <Button 
-             variant="ghost" 
-             size="icon" 
-             onClick={onZoomIn} 
-             className="h-7 w-7 rounded-md text-zinc-400 hover:text-[#6D78E7] hover:bg-[#6D78E7]/10 transition-colors"
-          >
-            <MagnifierZoomIn className="h-3.5 w-3.5" weight={SOLAR_ICON_WEIGHT} />
-          </Button>
-          
-          <div className="w-px h-3.5 bg-white/10 mx-1.5" />
 
-          <Button 
-            size="icon" 
-            variant="ghost" 
-            onClick={onDownload} 
-            className="h-7 w-7 rounded-md text-zinc-400 hover:text-[#6D78E7] hover:bg-[#6D78E7]/10 transition-colors"
+          <button
+            onClick={onZoomIn}
+            className="h-6 w-6 rounded inline-flex items-center justify-center text-white/40 hover:text-white/80 transition-colors"
           >
-            <Download className="h-3.5 w-3.5" weight={SOLAR_ICON_WEIGHT} />
-          </Button>
+            <MagnifierZoomIn className="h-3 w-3" weight={SOLAR_ICON_WEIGHT} />
+          </button>
         </div>
+
+        {/* Download */}
+        <button
+          onClick={onDownload}
+          className={iconBtnClass}
+          title="Download PDF"
+        >
+          <Download className="h-3.5 w-3.5" weight={SOLAR_ICON_WEIGHT} />
+        </button>
       </div>
     </>
   )

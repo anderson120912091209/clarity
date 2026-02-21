@@ -42,7 +42,13 @@ const ICON_MAP: Record<string, React.ElementType> = {
   'gif': FileImage,
   'webp': FileImage,
   'svg': FileImage,
-  
+
+  // Fonts
+  'ttf': File,
+  'otf': File,
+  'woff': File,
+  'woff2': File,
+
   // System
   'gitignore': Terminal,
   'env': Settings,
