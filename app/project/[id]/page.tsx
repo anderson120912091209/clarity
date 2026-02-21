@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@/components/ui/resizable'
+import { type ImperativePanelHandle } from 'react-resizable-panels'
+import { cn } from '@/lib/utils'
 import { AppLayout } from '@/components/layout/app-layout'
 import EditorSidebar from '@/components/layout/editor-sidebar'
 import SidebarToggle from '@/components/layout/sidebar-toggle'
@@ -270,6 +272,7 @@ function shouldEnableCollabDebug(): boolean {
 function EditorLayout() {
   const searchParams = useSearchParams()
   const [isChatVisible, setIsChatVisible] = useState(false)
+  const chatPanelRef = useRef<ImperativePanelHandle>(null)
   const [chatPromptRequest, setChatPromptRequest] = useState<ChatPromptRequest | null>(null)
   const [activeLatexDebugRequestId, setActiveLatexDebugRequestId] = useState<string | null>(null)
   const [followConnectionId, setFollowConnectionId] = useState<number | null>(null)
@@ -827,6 +830,17 @@ function EditorLayout() {
     isRealtimeCollaborationEnabled,
     user?.id,
   ])
+  // Drive smooth open/close of the chat panel via imperative API
+  useEffect(() => {
+    const panel = chatPanelRef.current
+    if (!panel) return
+    if (isChatVisible) {
+      panel.expand()
+    } else {
+      panel.collapse()
+    }
+  }, [isChatVisible])
+
   const isLatexAutoDebugRunning = Boolean(activeLatexDebugRequestId)
 
   const handleLatexAutoDebug = useCallback(() => {
@@ -1555,13 +1569,28 @@ function EditorLayout() {
               isAiDebugEnabled={isAiChatEnabled}
             />
           </ResizablePanel>
-          {isAiChatEnabled && isChatVisible && (
+          {isAiChatEnabled && (
             <>
-              <ResizableHandle className="w-2 bg-transparent flex items-center justify-center group outline-none">
+              <ResizableHandle
+                className={cn(
+                  'w-2 bg-transparent flex items-center justify-center group outline-none transition-opacity duration-200',
+                  !isChatVisible && 'opacity-0 pointer-events-none'
+                )}
+              >
                 <div className="h-8 w-1 bg-zinc-700 rounded-full opacity-0 group-hover:opacity-100 transition-all" />
               </ResizableHandle>
-              <ResizablePanel defaultSize={20} minSize={20} maxSize={45} collapsible={true}>
-                <ChatPanel 
+              <ResizablePanel
+                ref={chatPanelRef}
+                defaultSize={0}
+                minSize={18}
+                maxSize={45}
+                collapsible
+                collapsedSize={0}
+                onCollapse={() => setIsChatVisible(false)}
+                onExpand={() => setIsChatVisible(true)}
+                style={{ transition: 'flex-basis 0.2s ease' }}
+              >
+                <ChatPanel
                   projectId={projectId}
                   userId={user?.id ?? ''}
                   initialActiveThreadId={project?.activeChatThreadId ?? null}
@@ -1585,6 +1614,7 @@ function EditorLayout() {
                   externalPromptRequest={chatPromptRequest}
                   onExternalPromptConsumed={handleChatExternalPromptConsumed}
                   onExternalPromptSettled={handleChatExternalPromptSettled}
+                  onOpenWorkspaceFile={setActiveFile}
                 />
               </ResizablePanel>
             </>

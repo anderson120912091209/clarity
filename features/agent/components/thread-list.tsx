@@ -51,26 +51,23 @@ export function ThreadList({
   if (sortedThreads.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center gap-2 px-4 py-8 text-center">
-        <MessageSquare className="h-8 w-8 text-zinc-600" />
-        <p className="text-sm text-zinc-500">No conversations yet</p>
-        <p className="text-xs text-zinc-600">
-          Start a new chat to begin
-        </p>
+        <MessageSquare className="h-6 w-6 text-zinc-700" />
+        <p className="text-xs text-zinc-500">No conversations yet</p>
       </div>
     )
   }
 
   return (
     <ScrollArea className="h-full">
-      <div className="flex flex-col gap-0.5 p-1.5">
+      <div className="flex flex-col p-1.5">
         {sortedThreads.map((thread) => (
           <div
             key={thread.id}
             className={cn(
-              'group flex items-center gap-2 rounded-md px-2.5 py-2 text-left transition-colors cursor-pointer',
+              'group flex items-center gap-2 rounded-lg px-2.5 py-1.5 cursor-pointer transition-colors',
               thread.isActive
-                ? 'bg-white/10 text-zinc-200'
-                : 'text-zinc-400 hover:bg-white/5 hover:text-zinc-300'
+                ? 'bg-[#6d78e7]/10 text-zinc-200'
+                : 'text-zinc-500 hover:bg-white/[0.04] hover:text-zinc-300'
             )}
             role="button"
             tabIndex={0}
@@ -82,12 +79,17 @@ export function ThreadList({
               }
             }}
           >
-            <MessageSquare className="h-3.5 w-3.5 shrink-0 text-zinc-500" />
+            <MessageSquare
+              className={cn(
+                'h-3.5 w-3.5 shrink-0',
+                thread.isActive ? 'text-[#8b95f0]' : 'text-zinc-600'
+              )}
+            />
             <div className="min-w-0 flex-1">
-              <div className="truncate text-xs font-medium">
+              <div className="truncate text-[12px] font-medium leading-tight">
                 {thread.title}
               </div>
-              <div className="text-[10px] text-zinc-500">
+              <div className={cn('text-[10px] mt-0.5', thread.isActive ? 'text-zinc-500' : 'text-zinc-700')}>
                 {formatRelativeTime(thread.lastModified)}
               </div>
             </div>
@@ -97,7 +99,7 @@ export function ThreadList({
                 e.stopPropagation()
                 onDeleteThread(thread.id)
               }}
-              className="shrink-0 rounded p-1 text-zinc-600 opacity-0 transition-opacity hover:bg-white/10 hover:text-rose-400 group-hover:opacity-100"
+              className="shrink-0 rounded-md p-1 text-zinc-700 opacity-0 transition-all hover:bg-white/5 hover:text-rose-400 group-hover:opacity-100"
               title="Delete thread"
             >
               <Trash2 className="h-3 w-3" />

@@ -1,16 +1,14 @@
 'use client'
 
-import { useCallback, useMemo, useState, useEffect } from 'react'
+import { useCallback, useMemo, useState, useEffect, useRef } from 'react'
 import {
-  ChevronsRight,
-  Clock3,
-  SquarePen,
   FileText,
   X,
   Check,
   ArrowDownToLine,
+  Plus,
+  Search,
 } from 'lucide-react'
-import { Button } from '@/components/ui/button'
 import { QUICK_EDIT_GEMINI_MODEL_OPTIONS } from '@/lib/constants/gemini-models'
 import {
   useDashboardSettings,
@@ -74,6 +72,7 @@ interface ChatPanelProps {
   externalPromptRequest?: ChatPanelExternalPromptRequest | null
   onExternalPromptConsumed?: (requestId: string) => void
   onExternalPromptSettled?: (result: ExternalPromptResult) => void
+  onOpenWorkspaceFile?: (fileId: string) => void
 }
 
 function isChatModelPreference(value: string): value is ChatModelPreference {
@@ -104,6 +103,7 @@ export function ChatPanel({
   externalPromptRequest = null,
   onExternalPromptConsumed,
   onExternalPromptSettled,
+  onOpenWorkspaceFile,
 }: ChatPanelProps) {
   // ── Local UI state ──
 
@@ -112,21 +112,47 @@ export function ChatPanel({
   const [selectedModel, setSelectedModel] = useState<ChatModelPreference>(
     settings.defaultChatModel
   )
-  const [showCurrentDocument, setShowCurrentDocument] = useState(
-    settings.defaultChatIncludeCurrentDocument
-  )
+  const [attachedFileIds, setAttachedFileIds] = useState<Set<string>>(() => {
+    const initial = new Set<string>()
+    if (settings.defaultChatIncludeCurrentDocument && activeFileId) {
+      initial.add(activeFileId)
+    }
+    return initial
+  })
   const [showThreadList, setShowThreadList] = useState(false)
-  const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null)
+  const [showFilePicker, setShowFilePicker] = useState(false)
+  const [filePickerSearch, setFilePickerSearch] = useState('')
   const [insertingMessageId, setInsertingMessageId] = useState<string | null>(null)
   const [runningStagedAction, setRunningStagedAction] = useState<string | null>(null)
+  const filePickerRef = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
     setSelectedModel(settings.defaultChatModel)
   }, [settings.defaultChatModel])
 
+  // Sync active file when it changes externally (tab switch)
   useEffect(() => {
-    setShowCurrentDocument(settings.defaultChatIncludeCurrentDocument)
-  }, [settings.defaultChatIncludeCurrentDocument])
+    if (!activeFileId) return
+    setAttachedFileIds((prev) => {
+      // If the previous active file was the only thing in the set, swap to new active file
+      if (prev.size === 1 && activeFileId && !prev.has(activeFileId)) {
+        return new Set([activeFileId])
+      }
+      return prev
+    })
+  }, [activeFileId])
+
+  // Close file picker when clicking outside
+  useEffect(() => {
+    if (!showFilePicker) return
+    const handleClickOutside = (e: MouseEvent) => {
+      if (filePickerRef.current && !filePickerRef.current.contains(e.target as Node)) {
+        setShowFilePicker(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [showFilePicker])
 
   // ── Derived ──
 
@@ -135,10 +161,22 @@ export function ChatPanel({
     return workspaceFiles.some((file) => file.path?.toLowerCase().endsWith('.typ'))
   }, [activeFilePath, workspaceFiles])
 
-  const currentDocumentLabel = useMemo(() => {
-    if (!activeFileName) return 'Current document'
-    return activeFileName.length > 30 ? `${activeFileName.slice(0, 27)}...` : activeFileName
-  }, [activeFileName])
+  const includeCurrentDocument = Boolean(activeFileId && attachedFileIds.has(activeFileId))
+
+  const attachedFileContexts = useMemo(
+    () => workspaceFiles.filter((f) => attachedFileIds.has(f.fileId)),
+    [workspaceFiles, attachedFileIds]
+  )
+
+  const attachedFileIdsArray = useMemo(() => Array.from(attachedFileIds), [attachedFileIds])
+
+  const filteredWorkspaceFiles = useMemo(() => {
+    if (!filePickerSearch.trim()) return workspaceFiles
+    const q = filePickerSearch.toLowerCase()
+    return workspaceFiles.filter(
+      (f) => f.path.toLowerCase().includes(q)
+    )
+  }, [workspaceFiles, filePickerSearch])
 
   // ── Chat session hook ──
 
@@ -154,7 +192,8 @@ export function ChatPanel({
     compileLogs,
     compileError,
     selectedModel,
-    includeCurrentDocument: showCurrentDocument,
+    includeCurrentDocument,
+    attachedFileIds: attachedFileIdsArray,
     libraryEnabled,
     onInsertIntoEditor,
     stagedChanges,
@@ -219,10 +258,7 @@ export function ChatPanel({
   }, [messageInput, session])
 
   const handleCopy = useCallback((content: string) => {
-    void navigator.clipboard.writeText(content).then(() => {
-      setCopiedMessageId(content)
-      window.setTimeout(() => setCopiedMessageId(null), 1400)
-    }).catch(() => {})
+    void navigator.clipboard.writeText(content).catch(() => {})
   }, [])
 
   const handleRetry = useCallback(
@@ -298,7 +334,7 @@ export function ChatPanel({
   return (
     <div
       className={cn(
-        'flex h-full w-full flex-col bg-[#101011]',
+        'flex h-full w-full flex-col bg-[#121212]',
         !isVisible && 'pointer-events-none'
       )}
     >
@@ -313,9 +349,9 @@ export function ChatPanel({
 
       {/* ── Thread List ── */}
       {showThreadList && (
-        <div className="border-b border-white/10 bg-[#111216] max-h-56 overflow-hidden">
+        <div className="border-b border-white/[0.07] bg-[#0f0f11] max-h-56 overflow-hidden">
           {session.isThreadsLoading ? (
-            <div className="px-3 py-2 text-xs text-zinc-500">Loading chats...</div>
+            <div className="px-3 py-2 text-[11px] text-zinc-600">Loading chats…</div>
           ) : (
             <ThreadList
               threads={threadListItems}
@@ -341,13 +377,27 @@ export function ChatPanel({
         {/* Message list */}
         <ChatMessageList autoScroll>
           {session.messages.length === 0 ? (
-            <div className="mx-auto mt-6 max-w-xs text-center text-sm leading-6 text-zinc-500">
-              {session.isThreadsLoading
-                ? 'Loading chat history...'
-                : 'Ask for edits, debugging help, or explanations for the current document.'}
+            <div className="flex h-full flex-col items-center justify-center gap-3 px-4 py-8 text-center">
+              {session.isThreadsLoading ? (
+                <p className="text-[12px] text-zinc-600">Loading chat history…</p>
+              ) : (
+                <>
+                  <div className="h-8 w-8 rounded-xl bg-[#6d78e7]/10 border border-[#6d78e7]/15 flex items-center justify-center">
+                    <svg className="h-4 w-4 text-[#8b95f0]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8.625 12a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H8.25m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H12m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0h-.375M21 12c0 4.556-4.03 8.25-9 8.25a9.764 9.764 0 0 1-2.555-.337A5.972 5.972 0 0 1 5.41 20.97a5.969 5.969 0 0 1-.474-.065 4.48 4.48 0 0 0 .978-2.025c.09-.457-.133-.901-.467-1.226C3.93 16.178 3 14.189 3 12c0-4.556 4.03-8.25 9-8.25s9 3.694 9 8.25Z" />
+                    </svg>
+                  </div>
+                  <div>
+                    <p className="text-[13px] font-medium text-zinc-300">Ask the AI assistant</p>
+                    <p className="mt-1 text-[11px] text-zinc-600 max-w-[200px] leading-relaxed">
+                      Get help with edits, debugging, and explanations.
+                    </p>
+                  </div>
+                </>
+              )}
             </div>
           ) : (
-            <div className="space-y-6">
+            <div className="space-y-4">
               {session.messages.map((message) => {
                 if (message.role === 'user') {
                   return (
@@ -364,7 +414,7 @@ export function ChatPanel({
                 const hasAgentActivity = toolCalls.length > 0 || messageFileEdits.length > 0
 
                 return (
-                  <div key={message.id} className="w-full space-y-2">
+                  <div key={message.id} className="w-full space-y-1.5 px-1">
                     {/* Thinking / Reasoning block */}
                     {message.thinking && message.thinking.trim().length > 0 && (
                       <ThinkingBlock
@@ -391,16 +441,31 @@ export function ChatPanel({
                     {/* Main content */}
                     <div
                       className={cn(
-                        'text-[15px] leading-7',
-                        message.isError ? 'text-rose-200' : 'text-zinc-200'
+                        message.isError ? 'text-rose-300' : 'text-zinc-300'
                       )}
                     >
                       <ChatMarkdown
                         content={message.content}
                         hideFencedCodeBlocks={linkedChanges.length > 0}
+                        onFileClick={(filename) => {
+                          // Try staged changes first
+                          const stagedMatch = stagedChanges.find(
+                            (c) => c.fileName === filename || c.filePath?.endsWith(`/${filename}`) || c.filePath === filename
+                          )
+                          if (stagedMatch) {
+                            void onJumpToStagedFile?.(stagedMatch.fileId)
+                            return
+                          }
+                          // Try workspace files
+                          const wsMatch = workspaceFiles.find(
+                            (f) => f.path === filename || f.path.endsWith(`/${filename}`)
+                          )
+                          if (wsMatch) {
+                            onOpenWorkspaceFile?.(wsMatch.fileId)
+                          }
+                        }}
                         className={cn(
-                          'text-[15px] leading-8',
-                          message.isError ? 'text-rose-200' : 'text-zinc-200'
+                          message.isError ? 'text-rose-300' : 'text-zinc-300'
                         )}
                       />
                     </div>
@@ -471,12 +536,12 @@ export function ChatPanel({
                             type="button"
                             onClick={() => void handleApply(message)}
                             disabled={insertingMessageId === message.id}
-                            className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs text-zinc-400 transition-colors hover:bg-white/5 hover:text-zinc-100 disabled:cursor-not-allowed disabled:opacity-50"
+                            className="inline-flex h-6 items-center gap-1.5 rounded-md px-2 text-[11px] font-medium text-zinc-600 transition-colors hover:bg-white/5 hover:text-zinc-300 disabled:cursor-not-allowed disabled:opacity-40"
                             title="Apply code to editor"
                           >
-                            <ArrowDownToLine className="h-3.5 w-3.5" />
+                            <ArrowDownToLine className="h-3 w-3" />
                             <span>
-                              {insertingMessageId === message.id ? 'Applying...' : 'Apply Code'}
+                              {insertingMessageId === message.id ? 'Applying…' : 'Apply'}
                             </span>
                           </button>
                         )}
@@ -490,45 +555,115 @@ export function ChatPanel({
         </ChatMessageList>
 
         {/* ── Input Area ── */}
-        <div className="p-3">
-          <div className="mb-3 flex flex-wrap items-center gap-2">
-            {showCurrentDocument ? (
-              <button
-                type="button"
-                className="inline-flex h-8 items-center gap-2 rounded-xl border border-[#343542] bg-[#1b1c22] px-3 text-sm font-medium text-zinc-200 hover:bg-[#20212a] transition-colors"
-              >
-                <FileText className="h-4 w-4 text-zinc-400" />
-                <span>{currentDocumentLabel}</span>
-                <span
-                  role="button"
-                  tabIndex={0}
-                  className="ml-1 text-zinc-400 hover:text-zinc-200"
-                  onClick={(event) => {
-                    event.stopPropagation()
-                    setShowCurrentDocument(false)
-                  }}
-                  onKeyDown={(event) => {
-                    if (event.key === 'Enter' || event.key === ' ') {
-                      event.preventDefault()
-                      event.stopPropagation()
-                      setShowCurrentDocument(false)
-                    }
-                  }}
+        <div className="pt-2 relative" ref={filePickerRef}>
+          {/* File picker popover */}
+          {showFilePicker && (
+            <div className="absolute bottom-full left-3 right-3 mb-1.5 z-50 rounded-xl border border-white/[0.09] bg-[#16171e] shadow-xl shadow-black/40 overflow-hidden">
+              <div className="flex items-center gap-2 border-b border-white/[0.06] px-3 py-2">
+                <Search className="h-3.5 w-3.5 text-zinc-600 shrink-0" />
+                <input
+                  type="text"
+                  value={filePickerSearch}
+                  onChange={(e) => setFilePickerSearch(e.target.value)}
+                  placeholder="Search files…"
+                  className="flex-1 bg-transparent text-[12px] text-zinc-300 placeholder:text-zinc-600 focus:outline-none"
+                  autoFocus
+                />
+                <button
+                  type="button"
+                  onClick={() => { setShowFilePicker(false); setFilePickerSearch('') }}
+                  className="text-zinc-600 hover:text-zinc-400 transition-colors"
                 >
                   <X className="h-3.5 w-3.5" />
-                </span>
-              </button>
-            ) : (
-              <button
-                type="button"
-                onClick={() => setShowCurrentDocument(true)}
-                className="inline-flex h-8 items-center gap-2 rounded-xl border border-[#343542] bg-[#1b1c22] px-3 text-sm font-medium text-zinc-300 transition-colors hover:bg-[#20212a] hover:text-zinc-100"
-              >
-                <FileText className="h-4 w-4 text-zinc-400" />
-                <span>Attach current document</span>
-              </button>
-            )}
-          </div>
+                </button>
+              </div>
+              <div className="max-h-52 overflow-y-auto py-1">
+                {filteredWorkspaceFiles.length === 0 ? (
+                  <p className="px-3 py-3 text-[11px] text-zinc-600 text-center">No files found</p>
+                ) : (
+                  filteredWorkspaceFiles.map((file) => {
+                    const isAttached = attachedFileIds.has(file.fileId)
+                    const filename = file.path.split('/').pop() ?? file.path
+                    const dir = file.path.includes('/') ? file.path.split('/').slice(0, -1).join('/') : ''
+                    return (
+                      <button
+                        key={file.fileId}
+                        type="button"
+                        onClick={() => {
+                          setAttachedFileIds((prev) => {
+                            const next = new Set(prev)
+                            if (next.has(file.fileId)) next.delete(file.fileId)
+                            else next.add(file.fileId)
+                            return next
+                          })
+                        }}
+                        className={cn(
+                          'flex w-full items-center gap-2.5 px-3 py-1.5 text-left transition-colors',
+                          isAttached
+                            ? 'bg-[#6d78e7]/8 text-zinc-200'
+                            : 'text-zinc-400 hover:bg-white/[0.04] hover:text-zinc-200'
+                        )}
+                      >
+                        <FileText className={cn('h-3.5 w-3.5 shrink-0', isAttached ? 'text-[#8b95f0]' : 'text-zinc-600')} />
+                        <div className="min-w-0 flex-1">
+                          <span className="text-[12px] font-medium">{filename}</span>
+                          {dir && <span className="ml-1.5 text-[10px] text-zinc-600">{dir}</span>}
+                        </div>
+                        {isAttached && <Check className="h-3 w-3 text-[#8b95f0] shrink-0" />}
+                      </button>
+                    )
+                  })
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Attached file pills */}
+          {(attachedFileContexts.length > 0 || workspaceFiles.length > 0) && (
+            <div className="mb-2 px-3 flex flex-wrap items-center gap-1.5">
+              {attachedFileContexts.map((file) => {
+                const filename = file.path.split('/').pop() ?? file.path
+                return (
+                  <div
+                    key={file.fileId}
+                    className="inline-flex h-6 items-center gap-1.5 rounded-lg border border-white/[0.08] bg-white/[0.04] pl-2 pr-1 text-[11px] font-medium text-zinc-400"
+                  >
+                    <FileText className="h-3 w-3 text-zinc-600 shrink-0" />
+                    <span className="max-w-[130px] truncate">{filename}</span>
+                    <button
+                      type="button"
+                      className="ml-0.5 rounded p-0.5 text-zinc-700 hover:text-zinc-300 transition-colors"
+                      onClick={() =>
+                        setAttachedFileIds((prev) => {
+                          const next = new Set(prev)
+                          next.delete(file.fileId)
+                          return next
+                        })
+                      }
+                      title="Remove"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </div>
+                )
+              })}
+              {workspaceFiles.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => { setShowFilePicker((v) => !v); setFilePickerSearch('') }}
+                  className={cn(
+                    'inline-flex h-6 items-center gap-1 rounded-lg border px-2 text-[11px] font-medium transition-colors',
+                    showFilePicker
+                      ? 'border-[#6d78e7]/30 bg-[#6d78e7]/10 text-[#8b95f0]'
+                      : 'border-white/[0.06] bg-white/[0.03] text-zinc-600 hover:border-white/10 hover:bg-white/[0.05] hover:text-zinc-400'
+                  )}
+                >
+                  <Plus className="h-3 w-3" />
+                  <span>Add file</span>
+                </button>
+              )}
+            </div>
+          )}
 
           <ChatInputArea
             value={messageInput}
@@ -536,7 +671,7 @@ export function ChatPanel({
             onSubmit={handleSubmit}
             onStop={session.stopStreaming}
             isSubmitting={session.isSubmitting}
-            disabled={!canSubmit && !session.isSubmitting}
+            disabled={session.isSubmitting}
             modelOptions={QUICK_EDIT_GEMINI_MODEL_OPTIONS}
             selectedModel={selectedModel}
             onModelChange={handleModelChange}

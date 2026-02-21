@@ -1,6 +1,6 @@
 'use client'
 
-import { Check, Copy } from 'lucide-react'
+import { Check, Copy, FileText } from 'lucide-react'
 import { isValidElement, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import ReactMarkdown, { type Components } from 'react-markdown'
 import remarkGfm from 'remark-gfm'
@@ -13,15 +13,66 @@ interface ChatMarkdownProps {
   content: string
   className?: string
   hideFencedCodeBlocks?: boolean
+  onFileClick?: (filename: string) => void
 }
 
 const HAS_MATH_PATTERN =
   /\$\$[\s\S]+?\$\$|\\\([\s\S]+?\\\)|\\\[[\s\S]+?\\\]|(^|[^\\$])\$[^$\n]+?\$(?!\$)/
 
+// Filename detection: inline code that looks like a file (has extension, no spaces)
+const FILE_EXTENSION_PATTERN = /\.(tex|pdf|typ|bib|sty|cls|png|jpg|jpeg|eps|svg|json|yaml|yml|toml|md|txt|py|js|ts|tsx|jsx|css|html|sh|bash)$/i
+
+function isFilenameText(text: string): boolean {
+  const trimmed = text.trim()
+  return FILE_EXTENSION_PATTERN.test(trimmed) && !trimmed.includes(' ') && trimmed.length < 120
+}
+
+function getFileChipStyle(filename: string): string {
+  const ext = filename.split('.').pop()?.toLowerCase() ?? ''
+
+  if (['tex', 'sty', 'cls', 'bib'].includes(ext)) {
+    return 'text-emerald-400 bg-emerald-500/8 border-emerald-500/15 hover:bg-emerald-500/14'
+  }
+  if (ext === 'pdf') {
+    return 'text-rose-400 bg-rose-500/8 border-rose-500/15 hover:bg-rose-500/14'
+  }
+  if (ext === 'typ') {
+    return 'text-sky-400 bg-sky-500/8 border-sky-500/15 hover:bg-sky-500/14'
+  }
+  if (['py', 'js', 'ts', 'tsx', 'jsx'].includes(ext)) {
+    return 'text-amber-400 bg-amber-500/8 border-amber-500/15 hover:bg-amber-500/14'
+  }
+  return 'text-[#8b95f0] bg-[#6d78e7]/8 border-[#6d78e7]/15 hover:bg-[#6d78e7]/14'
+}
+
+function FileChip({
+  filename,
+  onClick,
+}: {
+  filename: string
+  onClick?: () => void
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      title={onClick ? `Open ${filename}` : filename}
+      className={cn(
+        'inline-flex items-center gap-1 rounded-md border px-1.5 py-[1px] align-middle',
+        'font-mono text-[11.5px] font-medium transition-colors',
+        getFileChipStyle(filename),
+        onClick ? 'cursor-pointer' : 'cursor-default pointer-events-none'
+      )}
+    >
+      <FileText className="h-3 w-3 shrink-0 opacity-70" />
+      {filename}
+    </button>
+  )
+}
+
 function normalizeMathMarkdown(content: string): string {
   let normalized = content
 
-  // Inline symbols are sometimes emitted as display math (e.g. "$$S$$"), which causes hard line breaks.
   normalized = normalized.replace(/\$\$\s*([\s\S]*?)\s*\$\$/g, (fullMatch, rawExpression) => {
     const expression = String(rawExpression).trim()
     if (!expression) return fullMatch
@@ -40,7 +91,6 @@ function normalizeMathMarkdown(content: string): string {
     return `\\(${expression}\\)`
   })
 
-  // Collapse inline-math tokens split across lines inside parenthesis.
   normalized = normalized.replace(/\(\s*\n+\s*(\$(?:\\.|[^$\n])+\$)\s*\n+\s*\)/g, '($1)')
   normalized = normalized.replace(/\(\s*\n+\s*(\\\((?:\\.|[^)])+\\\))\s*\n+\s*\)/g, '($1)')
   normalized = normalized.replace(/\(\s*\n+\s*(\\\[(?:\\.|[\s\S])*?\\\])\s*\n+\s*\)/g, '($1)')
@@ -84,7 +134,6 @@ function CodeBlock({
 
   const handleCopy = useCallback(async () => {
     if (!plainText) return
-
     try {
       await navigator.clipboard.writeText(plainText)
       setCopied(true)
@@ -95,27 +144,27 @@ function CodeBlock({
   }, [plainText])
 
   return (
-    <div className="my-2 overflow-hidden rounded-lg border border-[#2f3342] bg-[#1b1d26]">
-      <div className="flex items-center justify-between border-b border-[#2f3342] bg-[#171922] px-3 py-1.5 text-[11px] uppercase tracking-[0.06em] text-zinc-400">
-        <span>{language}</span>
+    <div className="my-3 overflow-hidden rounded-xl border border-white/[0.07] bg-[#141519]">
+      <div className="flex items-center justify-between border-b border-white/[0.06] bg-[#0f1013] px-3 py-1.5">
+        <span className="text-[10px] font-medium uppercase tracking-[0.08em] text-zinc-600">{language}</span>
         <button
           type="button"
           onClick={() => void handleCopy()}
-          className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-[11px] normal-case tracking-normal text-zinc-300 transition-colors hover:bg-white/5 hover:text-zinc-100"
+          className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-[10px] normal-case tracking-normal text-zinc-500 transition-colors hover:bg-white/5 hover:text-zinc-300"
           title="Copy code"
         >
-          {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
-          <span>{copied ? 'Copied' : 'Copy'}</span>
+          {copied ? <Check className="h-3 w-3 text-emerald-400" /> : <Copy className="h-3 w-3" />}
+          <span className={copied ? 'text-emerald-400' : ''}>{copied ? 'Copied' : 'Copy'}</span>
         </button>
       </div>
-      <pre className="m-0 overflow-x-auto bg-[#1f212b] px-3 py-3 text-[12px] leading-6 text-zinc-100">
+      <pre className="m-0 overflow-x-auto bg-[#0f1013]/60 px-4 py-3 text-[12px] leading-[1.7] text-zinc-200">
         <code className={cn('font-mono', className)}>{children}</code>
       </pre>
     </div>
   )
 }
 
-export function ChatMarkdown({ content, className, hideFencedCodeBlocks = false }: ChatMarkdownProps) {
+export function ChatMarkdown({ content, className, hideFencedCodeBlocks = false, onFileClick }: ChatMarkdownProps) {
   const normalizedContent = useMemo(() => {
     let normalized = stripEditMetadataLines(content)
     normalized = normalizeMathMarkdown(normalized)
@@ -168,8 +217,8 @@ export function ChatMarkdown({ content, className, hideFencedCodeBlocks = false 
       )
     },
     code({ className, children, ...props }) {
-      const inline = !(className && className.includes('language-'))
-      if (!inline) {
+      const isBlock = className && className.includes('language-')
+      if (isBlock) {
         return (
           <code className={className} {...props}>
             {children}
@@ -177,10 +226,24 @@ export function ChatMarkdown({ content, className, hideFencedCodeBlocks = false 
         )
       }
 
+      // Detect file references in inline code
+      const text = typeof children === 'string'
+        ? children
+        : extractTextContent(children as ReactNode)
+
+      if (isFilenameText(text)) {
+        return (
+          <FileChip
+            filename={text.trim()}
+            onClick={onFileClick ? () => onFileClick(text.trim()) : undefined}
+          />
+        )
+      }
+
       return (
         <code
           className={cn(
-            'rounded bg-zinc-900/80 px-1.5 py-0.5 font-mono text-[12px] text-zinc-200',
+            'rounded-md border border-white/[0.07] bg-white/[0.06] px-1.5 py-[2px] font-mono text-[12px] text-zinc-200',
             className
           )}
           {...props}
@@ -189,23 +252,35 @@ export function ChatMarkdown({ content, className, hideFencedCodeBlocks = false 
         </code>
       )
     },
+    h1({ children }) {
+      return <h1 className="mb-2 mt-4 text-base font-semibold text-zinc-100 first:mt-0">{children}</h1>
+    },
+    h2({ children }) {
+      return <h2 className="mb-1.5 mt-3 text-[13.5px] font-semibold text-zinc-100 first:mt-0">{children}</h2>
+    },
+    h3({ children }) {
+      return <h3 className="mb-1 mt-2.5 text-[13px] font-semibold text-zinc-200 first:mt-0">{children}</h3>
+    },
+    strong({ children }) {
+      return <strong className="font-semibold text-zinc-100">{children}</strong>
+    },
   }
 
   return (
     <div
       ref={containerRef}
       className={cn(
-        'chat-markdown text-sm leading-6 text-zinc-200',
-        '[&_a]:text-[#92a0ff] [&_a]:underline-offset-2 [&_a:hover]:underline',
+        'chat-markdown text-[13.5px] leading-relaxed text-zinc-300',
+        '[&_a]:text-[#8b95f0] [&_a]:underline-offset-2 [&_a:hover]:underline',
         '[&_p]:my-0 [&_p+p]:mt-2',
-        '[&_ul]:my-2 [&_ul]:list-disc [&_ul]:pl-5',
-        '[&_ol]:my-2 [&_ol]:list-decimal [&_ol]:pl-5',
-        '[&_li]:my-0.5',
-        '[&_blockquote]:my-2 [&_blockquote]:border-l-2 [&_blockquote]:border-zinc-600 [&_blockquote]:pl-3 [&_blockquote]:text-zinc-300',
-        '[&_hr]:my-3 [&_hr]:border-zinc-700',
-        '[&_table]:my-3 [&_table]:w-full [&_table]:border-collapse',
-        '[&_th]:border [&_th]:border-zinc-700 [&_th]:bg-zinc-900/70 [&_th]:px-2 [&_th]:py-1 [&_th]:text-left [&_th]:font-medium',
-        '[&_td]:border [&_td]:border-zinc-700 [&_td]:px-2 [&_td]:py-1',
+        '[&_ul]:my-2 [&_ul]:list-disc [&_ul]:pl-5 [&_ul]:space-y-0.5',
+        '[&_ol]:my-2 [&_ol]:list-decimal [&_ol]:pl-5 [&_ol]:space-y-0.5',
+        '[&_li]:leading-relaxed',
+        '[&_blockquote]:my-2 [&_blockquote]:border-l-2 [&_blockquote]:border-white/10 [&_blockquote]:pl-3 [&_blockquote]:text-zinc-400',
+        '[&_hr]:my-3 [&_hr]:border-white/[0.07]',
+        '[&_table]:my-3 [&_table]:w-full [&_table]:border-collapse [&_table]:text-[12px]',
+        '[&_th]:border [&_th]:border-white/[0.08] [&_th]:bg-white/[0.04] [&_th]:px-2.5 [&_th]:py-1.5 [&_th]:text-left [&_th]:font-medium [&_th]:text-zinc-300',
+        '[&_td]:border [&_td]:border-white/[0.07] [&_td]:px-2.5 [&_td]:py-1.5 [&_td]:text-zinc-400',
         className
       )}
     >

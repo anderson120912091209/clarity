@@ -177,6 +177,7 @@ export interface UseChatSessionOptions {
   compileError?: string | null
   selectedModel: string
   includeCurrentDocument: boolean
+  attachedFileIds?: string[]
   libraryEnabled: boolean
   onInsertIntoEditor?: (
     content: string,
@@ -210,6 +211,7 @@ export function useChatSession(opts: UseChatSessionOptions) {
     compileError = null,
     selectedModel,
     includeCurrentDocument,
+    attachedFileIds = [],
     libraryEnabled,
     onInsertIntoEditor,
     stagedChanges = [],
@@ -464,8 +466,10 @@ export function useChatSession(opts: UseChatSessionOptions) {
             compilePath.endsWith(`/${normalizedPath}`)
         )
         const isTexFamily = /\.(tex|typ|sty|cls|bib|bst)$/i.test(file.path)
+        const isAttached = attachedFileIds.includes(file.fileId)
         const priorityScore =
           (isActiveFile ? 120 : 0) +
+          (isAttached ? 110 : 0) +
           (isCompileReferenced ? 90 : 0) +
           (isTexFamily ? 40 : 0)
 
@@ -517,6 +521,7 @@ export function useChatSession(opts: UseChatSessionOptions) {
     activeFileId,
     activeFileName,
     activeFilePath,
+    attachedFileIds,
     compileError,
     compileLogs,
     currentDocumentContext,

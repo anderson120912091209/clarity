@@ -18,6 +18,12 @@ export function Navbar({ minimal = false }: { minimal?: boolean }) {
         {!minimal && (
           <>
             <div className="flex items-center gap-3">
+              <Link
+                href="/blogs"
+                className="text-sm font-medium text-zinc-400 transition-colors hover:text-white"
+              >
+                Blogs
+              </Link>
               <a 
                 href="https://discord.gg/JHQhC8VstM" 
                 target="_blank"

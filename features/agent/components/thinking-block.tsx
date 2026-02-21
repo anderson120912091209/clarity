@@ -36,23 +36,23 @@ export function ThinkingBlock({
   if (!thinking) return null
 
   return (
-    <div className="my-2 overflow-hidden rounded-lg border border-white/5 bg-[#18181b]/50">
+    <div className="my-1.5 overflow-hidden rounded-lg border border-white/[0.06] bg-white/[0.02]">
       <button
         type="button"
         onClick={handleToggle}
-        className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-zinc-400 transition-colors hover:bg-white/5 hover:text-zinc-300"
+        className="flex w-full items-center gap-2 px-3 py-2 text-left transition-colors hover:bg-white/[0.03]"
       >
         <Brain
           className={cn(
-            'h-3.5 w-3.5 shrink-0',
-            isStreaming && 'animate-pulse text-violet-400'
+            'h-3.5 w-3.5 shrink-0 text-zinc-600',
+            isStreaming && 'animate-pulse text-[#8b95f0]'
           )}
         />
-        <span className="font-medium">Reasoning</span>
-        <span className="text-zinc-500">{lineCount} lines</span>
+        <span className="text-[11px] font-medium text-zinc-500">Reasoning</span>
+        <span className="text-[10px] text-zinc-700">{lineCount} lines</span>
         <ChevronDown
           className={cn(
-            'ml-auto h-3.5 w-3.5 shrink-0 transition-transform duration-200',
+            'ml-auto h-3 w-3 shrink-0 text-zinc-700 transition-transform duration-200',
             isOpen && 'rotate-180'
           )}
         />
@@ -65,8 +65,8 @@ export function ThinkingBlock({
         )}
       >
         <div className="overflow-hidden">
-          <div className="border-t border-white/5 px-3 py-2">
-            <pre className="max-h-64 overflow-auto whitespace-pre-wrap font-mono text-xs leading-5 text-zinc-400">
+          <div className="border-t border-white/[0.05] px-3 py-2">
+            <pre className="max-h-48 overflow-auto whitespace-pre-wrap font-mono text-[11px] leading-[1.6] text-zinc-600">
               {thinking}
             </pre>
           </div>
