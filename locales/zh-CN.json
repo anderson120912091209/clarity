@@ -12,13 +12,19 @@
   "hero.product_hunt_alt": "{clarity} - AI 驱动的 Overleaf 替代方案 | Product Hunt",
   "hero.bg_alt": "主视觉背景",
   "hero.screenshot_alt": "Clarity 编辑器界面",
+  "hero.section_label": "[00] 编辑器 / 总览",
 
+  "features.label": "[01] 功能",
+  "features.label_suffix": "专为心流而设计",
   "features.section_title": "专为心流而设计。",
   "features.section_subtitle": "撰写高品质文档所需的一切，不再有繁琐的困扰。",
+  "features.ai_label": "AI 助手",
   "features.ai_copilot_title": "Clarity AI 助手",
   "features.ai_copilot_desc": "您的个人研究助手。即时生成复杂表格、修复编译错误或重写段落——一切都在编辑器内完成。",
+  "features.compilation_label": "引擎",
   "features.compilation_title": "即时编译",
   "features.compilation_desc": "无需担心包更新。我们的云端引擎自动处理包并在数毫秒内完成 PDF 编译。",
+  "features.sync_label": "协作",
   "features.sync_title": "实时同步",
   "features.sync_desc": "与团队协作如同身处同一房间。实时光标、即时更新、零冲突。",
   "features.preview_title": "智能预览",
@@ -47,6 +53,11 @@
   "pricing.pro_cta": "升级",
   "pricing.pro_loading": "跳转中...",
   "pricing.pro_loading_short": "...",
+
+  "cta.headline": "用 Clarity 开始写作。",
+  "cta.subtext": "加入全球研究人员的行列，用 AI 工具更快地写作和协作。",
+  "cta.button": "免费开始",
+  "cta.discord": "加入 Discord",
 
   "footer.copyright": "\u00a9 2026 Clarity Research. 保留所有权利。",
 

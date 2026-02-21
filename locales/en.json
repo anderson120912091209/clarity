@@ -12,13 +12,19 @@
   "hero.product_hunt_alt": "{clarity} - AI powered overleaf alternative | Product Hunt",
   "hero.bg_alt": "Hero background",
   "hero.screenshot_alt": "Clarity Editor Interface",
+  "hero.section_label": "[00] EDITOR / OVERVIEW",
 
+  "features.label": "[01] FEATURES",
+  "features.label_suffix": "DESIGNED FOR FLOW",
   "features.section_title": "Designed for flow.",
   "features.section_subtitle": "Everything you need to write standard-setting documents, without the standard headaches.",
+  "features.ai_label": "AI ASSISTANT",
   "features.ai_copilot_title": "Clarity AI Copilot",
   "features.ai_copilot_desc": "Your personal research assistant. Generate complex tables, fix compilation errors instantly, or rewrite sections for clarity\u2014all without leaving the editor.",
+  "features.compilation_label": "ENGINE",
   "features.compilation_title": "Instant Compilation",
   "features.compilation_desc": "Forget Pkg updates. Our cloud engine handles packages automatically and compiles your PDF in milliseconds.",
+  "features.sync_label": "COLLABORATION",
   "features.sync_title": "Real-time Sync",
   "features.sync_desc": "Collaborate with your team as if you\u2019re in the same room. Live cursors, instant updates, zero conflicts.",
   "features.preview_title": "Smart Preview",
@@ -47,6 +53,11 @@
   "pricing.pro_cta": "Upgrade",
   "pricing.pro_loading": "Redirecting...",
   "pricing.pro_loading_short": "...",
+
+  "cta.headline": "Start writing with clarity.",
+  "cta.subtext": "Join researchers worldwide who write faster and collaborate better with AI-powered tools.",
+  "cta.button": "Get Started Free",
+  "cta.discord": "Join Discord",
 
   "footer.copyright": "\u00a9 2026 Clarity Research. All rights reserved.",
 

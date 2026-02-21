@@ -12,13 +12,19 @@
   "hero.product_hunt_alt": "{clarity} - Alternative \u00e0 Overleaf propuls\u00e9e par l'IA | Product Hunt",
   "hero.bg_alt": "Arri\u00e8re-plan principal",
   "hero.screenshot_alt": "Interface de l'\u00e9diteur Clarity",
+  "hero.section_label": "[00] \u00c9DITEUR / APERCU",
 
+  "features.label": "[01] FONCTIONNALIT\u00c9S",
+  "features.label_suffix": "CON\u00c7U POUR LA FLUIDIT\u00c9",
   "features.section_title": "Con\u00e7u pour la fluidit\u00e9.",
   "features.section_subtitle": "Tout ce dont vous avez besoin pour r\u00e9diger des documents de r\u00e9f\u00e9rence, sans les tracas habituels.",
+  "features.ai_label": "ASSISTANT IA",
   "features.ai_copilot_title": "Clarity AI Copilote",
   "features.ai_copilot_desc": "Votre assistant de recherche personnel. G\u00e9n\u00e9rez des tableaux complexes, corrigez les erreurs de compilation instantan\u00e9ment ou r\u00e9\u00e9crivez des sections \u2014 le tout sans quitter l'\u00e9diteur.",
+  "features.compilation_label": "MOTEUR",
   "features.compilation_title": "Compilation instantan\u00e9e",
   "features.compilation_desc": "Oubliez les mises \u00e0 jour de paquets. Notre moteur cloud g\u00e8re automatiquement les paquets et compile votre PDF en millisecondes.",
+  "features.sync_label": "COLLABORATION",
   "features.sync_title": "Synchronisation en temps r\u00e9el",
   "features.sync_desc": "Collaborez avec votre \u00e9quipe comme si vous \u00e9tiez dans la m\u00eame pi\u00e8ce. Curseurs en direct, mises \u00e0 jour instantan\u00e9es, z\u00e9ro conflit.",
   "features.preview_title": "Aper\u00e7u intelligent",
@@ -47,6 +53,11 @@
   "pricing.pro_cta": "Passer au sup\u00e9rieur",
   "pricing.pro_loading": "Redirection...",
   "pricing.pro_loading_short": "...",
+
+  "cta.headline": "Commencez \u00e0 \u00e9crire avec clart\u00e9.",
+  "cta.subtext": "Rejoignez les chercheurs du monde entier qui \u00e9crivent plus vite et collaborent mieux gr\u00e2ce aux outils IA.",
+  "cta.button": "Commencer gratuitement",
+  "cta.discord": "Rejoindre Discord",
 
   "footer.copyright": "\u00a9 2026 Clarity Research. Tous droits r\u00e9serv\u00e9s.",
 

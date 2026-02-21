@@ -12,13 +12,19 @@
   "hero.product_hunt_alt": "{clarity} - AI搭載のOverleaf代替ツール | Product Hunt",
   "hero.bg_alt": "ヒーロー背景",
   "hero.screenshot_alt": "Clarityエディターの画面",
+  "hero.section_label": "[00] エディター / 概要",
 
+  "features.label": "[01] 機能",
+  "features.label_suffix": "フローのために設計",
   "features.section_title": "フローのために設計。",
   "features.section_subtitle": "高品質な文書を書くために必要なすべてが揃っています。煩わしさはありません。",
+  "features.ai_label": "AIアシスタント",
   "features.ai_copilot_title": "Clarity AIコパイロット",
   "features.ai_copilot_desc": "あなた専用の研究アシスタント。複雑な表の生成、コンパイルエラーの即時修正、セクションの書き直し——すべてエディター内で完結します。",
+  "features.compilation_label": "エンジン",
   "features.compilation_title": "即時コンパイル",
   "features.compilation_desc": "パッケージの更新を気にする必要はありません。クラウドエンジンが自動でパッケージを処理し、ミリ秒単位でPDFをコンパイルします。",
+  "features.sync_label": "コラボレーション",
   "features.sync_title": "リアルタイム同期",
   "features.sync_desc": "同じ部屋にいるかのようにチームと共同作業。ライブカーソル、即時更新、コンフリクトゼロ。",
   "features.preview_title": "スマートプレビュー",
@@ -47,6 +53,11 @@
   "pricing.pro_cta": "アップグレード",
   "pricing.pro_loading": "リダイレクト中...",
   "pricing.pro_loading_short": "...",
+
+  "cta.headline": "Clarityで執筆を始めよう。",
+  "cta.subtext": "AIツールでより速く執筆し、より良く共同作業する世界中の研究者に参加しましょう。",
+  "cta.button": "無料で始める",
+  "cta.discord": "Discordに参加",
 
   "footer.copyright": "\u00a9 2026 Clarity Research. All rights reserved.",
 

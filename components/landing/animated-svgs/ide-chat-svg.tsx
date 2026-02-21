@@ -3,7 +3,7 @@
 import { motion } from 'framer-motion'
 
 interface IdeChatSvgProps {
-  /** Controls external Tailwind styling, e.g. for nudging the SVG using -translate-y-4 */
+  /** Controls external Tailwind styling */
   className?: string;
   /** Internal scaling of the vector graphic */
   scale?: number;
@@ -13,160 +13,124 @@ interface IdeChatSvgProps {
   translateY?: number;
 }
 
-export function IdeChatSvg({ 
+export function IdeChatSvg({
   className = "-translate-y-4 translate-x-4",
   scale = 1.1,
-  translateX = 300,
+  translateX = 280,
   translateY = 240
 }: IdeChatSvgProps = {}) {
-
-  // A sleek 6-second orchestrated loop for the magic reconstruction
-  const duration = 6
-  
   return (
-    <motion.div 
+    <motion.div
       initial={{ opacity: 0, scale: 0.98 }}
       whileInView={{ opacity: 1, scale: 1 }}
       viewport={{ once: true, amount: 0.3 }}
       transition={{ duration: 1, ease: [0.16, 1, 0.3, 1] }}
       className="absolute inset-0 w-full h-full pointer-events-none"
     >
-      <svg
-        viewBox="0 0 600 500"
-        className={`w-full h-full ${className}`}
-      >
-        <defs>
-          <linearGradient id="scanBeam" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#34d399" stopOpacity="0" />
-            <stop offset="100%" stopColor="#34d399" stopOpacity="0.4" />
-          </linearGradient>
-          <filter id="glowRed" x="-20%" y="-20%" width="140%" height="140%">
-            <feGaussianBlur stdDeviation="4" result="blur" />
-            <feComposite in="SourceGraphic" in2="blur" operator="over" />
-          </filter>
-          <filter id="glowGreen" x="-20%" y="-20%" width="140%" height="140%">
-            <feGaussianBlur stdDeviation="8" result="blur" />
-            <feComposite in="SourceGraphic" in2="blur" operator="over" />
-          </filter>
-        </defs>
-
+      <svg viewBox="0 0 600 500" className={`w-full h-full ${className}`}>
         <g transform={`translate(${translateX}, ${translateY}) scale(${scale})`}>
-          
-          {/* Base Window Frame */}
+
+          {/* === CODE EDITOR WINDOW === */}
           <motion.g
-            initial={{ y: 15, opacity: 0 }}
+            initial={{ y: 12, opacity: 0 }}
             whileInView={{ y: 0, opacity: 1 }}
             viewport={{ once: true }}
-            transition={{ duration: 0.8, ease: 'easeOut' }}
+            transition={{ duration: 0.9, ease: 'easeOut' }}
           >
-            {/* Dark minimalist canvas background */}
-            <rect x="-240" y="-140" width="480" height="280" rx="8" fill="#121214" stroke="rgba(255,255,255,0.06)" strokeWidth="1" />
-            <path d="M -240 -115 L 240 -115" stroke="rgba(255,255,255,0.04)" strokeWidth="1" />
-            <circle cx="-220" cy="-127.5" r="3.5" fill="#ef4444" opacity="0.6" />
-            <circle cx="-208" cy="-127.5" r="3.5" fill="#eab308" opacity="0.6" />
-            <circle cx="-196" cy="-127.5" r="3.5" fill="#22c55e" opacity="0.6" />
+            {/* Window frame */}
+            <rect x="-155" y="-100" width="275" height="210" rx="8"
+              fill="#121214" stroke="rgba(255,255,255,0.08)" strokeWidth="1" />
+
+            {/* Title bar */}
+            <path d="M -155 -78 L 120 -78" stroke="rgba(255,255,255,0.05)" strokeWidth="1" />
+            <circle cx="-137" cy="-89" r="2.5" fill="rgba(255,255,255,0.12)" />
+            <circle cx="-126" cy="-89" r="2.5" fill="rgba(255,255,255,0.12)" />
+            <circle cx="-115" cy="-89" r="2.5" fill="rgba(255,255,255,0.12)" />
+
+            {/* Existing code lines */}
+            <rect x="-135" y="-62" width="40" height="3" rx="1.5" fill="rgba(109,120,231,0.22)" />
+            <rect x="-90" y="-62" width="115" height="3" rx="1.5" fill="rgba(255,255,255,0.14)" />
+
+            <rect x="-135" y="-48" width="205" height="3" rx="1.5" fill="rgba(255,255,255,0.09)" />
+
+            <rect x="-135" y="-34" width="30" height="3" rx="1.5" fill="rgba(109,120,231,0.22)" />
+            <rect x="-100" y="-34" width="90" height="3" rx="1.5" fill="rgba(255,255,255,0.14)" />
+
+            <rect x="-135" y="-20" width="175" height="3" rx="1.5" fill="rgba(255,255,255,0.09)" />
+
+            {/* Cursor (blinking at insertion point) */}
+            <rect x="43" y="-23" width="1.5" height="10" rx="0.75" fill="#6d78e7">
+              <animate attributeName="opacity" values="1;1;0;0" keyTimes="0;0.49;0.5;1" dur="1.2s" repeatCount="indefinite" />
+            </rect>
+
+            {/* Subtle highlight band behind AI lines */}
+            <rect x="-140" y="-6" width="240" height="40" rx="3" fill="rgba(109,120,231,0.025)" />
+
+            {/* AI-written lines (purple tint) */}
+            <rect x="-135" y="-2"  width="175" height="3" rx="1.5" fill="rgba(109,120,231,0.32)" />
+            <rect x="-135" y="12"  width="225" height="3" rx="1.5" fill="rgba(109,120,231,0.24)" />
+            <rect x="-135" y="26"  width="145" height="3" rx="1.5" fill="rgba(109,120,231,0.28)" />
+
+            {/* Dim trailing lines */}
+            <rect x="-135" y="48"  width="100" height="3" rx="1.5" fill="rgba(255,255,255,0.04)" />
+            <rect x="-135" y="62"  width="155" height="3" rx="1.5" fill="rgba(255,255,255,0.04)" />
+            <rect x="-135" y="76"  width="70"  height="3" rx="1.5" fill="rgba(255,255,255,0.04)" />
+            <rect x="-135" y="90"  width="120" height="3" rx="1.5" fill="rgba(255,255,255,0.04)" />
           </motion.g>
 
-          {/* BACKGROUND LAYER 1: The Chaos (Messy, broken code lines and errors) */}
+          {/* === FLOATING AI SUGGESTION CARD === */}
           <motion.g
-            animate={{ 
-              opacity: [0, 1, 1, 0, 0, 0],
-              y: [5, 0, 0, -5, -5, 5]
-            }}
-            transition={{ duration, repeat: Infinity, ease: 'easeInOut' }}
+            initial={{ y: -10, opacity: 0 }}
+            whileInView={{ y: 0, opacity: 1 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.8, ease: 'easeOut', delay: 0.3 }}
           >
-            <rect x="-180" y="-80" width="140" height="4" rx="2" fill="rgba(239,68,68,0.4)" stroke="rgba(239,68,68,0.2)" strokeDasharray="4 4" style={{ filter: 'url(#glowRed)' }} />
-            <rect x="-120" y="-62" width="220" height="4" rx="2" fill="rgba(255,255,255,0.1)" transform="rotate(2, -120, -62)" />
-            <rect x="-180" y="-44" width="80" height="4" rx="2" fill="rgba(255,255,255,0.08)" transform="rotate(-3, -180, -44)" />
-            <rect x="-90" y="-44" width="200" height="4" rx="2" fill="rgba(239,68,68,0.5)" strokeDasharray="2 6" stroke="rgba(239,68,68,0.8)" style={{ filter: 'url(#glowRed)' }} />
-            <rect x="-160" y="-26" width="300" height="4" rx="2" fill="rgba(255,255,255,0.12)" transform="rotate(1, -160, -26)" />
-            <rect x="-180" y="-8" width="120" height="4" rx="2" fill="rgba(255,255,255,0.06)" />
-            <rect x="-40" y="-8" width="180" height="4" rx="2" fill="rgba(239,68,68,0.4)" stroke="rgba(239,68,68,0.3)" strokeDasharray="6 2" style={{ filter: 'url(#glowRed)' }} />
-            
-            <rect x="-170" y="20" width="160" height="4" rx="2" fill="rgba(255,255,255,0.1)" transform="rotate(-2, -170, 20)" />
-            <rect x="-180" y="38" width="280" height="4" rx="2" fill="rgba(239,68,68,0.5)" style={{ filter: 'url(#glowRed)' }} />
-            <rect x="-180" y="56" width="200" height="4" rx="2" fill="rgba(255,255,255,0.08)" />
-            <rect x="-180" y="74" width="130" height="4" rx="2" fill="rgba(255,255,255,0.12)" transform="rotate(3, -180, 74)" />
+            {/* Card body */}
+            <rect x="90" y="-125" width="115" height="75" rx="8"
+              fill="#161618" stroke="rgba(109,120,231,0.20)" strokeWidth="1" />
 
-            <circle cx="120" cy="-60" r="3" fill="#ef4444" opacity="0.8" style={{ filter: 'url(#glowRed)' }} />
-            <circle cx="140" cy="-8" r="4" fill="#ef4444" opacity="0.5" />
-            <circle cx="80" cy="38" r="3" fill="#ef4444" opacity="0.8" style={{ filter: 'url(#glowRed)' }} />
+            {/* Card header area */}
+            <path d="M 90 -105 L 205 -105" stroke="rgba(255,255,255,0.04)" strokeWidth="1" />
+
+            {/* AI status indicator */}
+            <circle cx="107" cy="-115" r="3.5" fill="#6d78e7" />
+            {/* Pulse ring */}
+            <circle cx="107" cy="-115" r="4" fill="none" stroke="rgba(109,120,231,0.4)" strokeWidth="0.8">
+              <animate attributeName="r" values="4;12" dur="2.5s" repeatCount="indefinite" />
+              <animate attributeName="opacity" values="0.5;0" dur="2.5s" repeatCount="indefinite" />
+            </circle>
+
+            {/* Header label */}
+            <rect x="117" y="-117" width="45" height="3" rx="1.5" fill="rgba(109,120,231,0.45)" />
+
+            {/* Suggestion content lines */}
+            <rect x="103" y="-93" width="85" height="2.5" rx="1.25" fill="rgba(255,255,255,0.14)" />
+            <rect x="103" y="-83" width="70" height="2.5" rx="1.25" fill="rgba(255,255,255,0.09)" />
+            <rect x="103" y="-73" width="78" height="2.5" rx="1.25" fill="rgba(255,255,255,0.09)" />
+
+            {/* Small accept indicator */}
+            <rect x="103" y="-60" width="35" height="7" rx="3.5" fill="rgba(109,120,231,0.12)" stroke="rgba(109,120,231,0.25)" strokeWidth="0.5" />
+            <rect x="109" y="-58" width="22" height="3" rx="1.5" fill="rgba(109,120,231,0.4)" />
           </motion.g>
 
-          {/* LAYER 2: The Scanner Beam (Sweeping over the chaos) */}
-          <motion.g
-             animate={{
-                y: [-120, -120, -120, 100, 100, 100],
-                opacity: [0, 0, 1, 1, 0, 0],
-             }}
-             transition={{ duration, repeat: Infinity, ease: 'easeInOut' }}
-          >
-             {/* Wide sweeping green gradient rect */}
-             <rect x="-240" y="-60" width="480" height="60" fill="url(#scanBeam)" />
-             {/* The glowing solid line leading the beam */}
-             <path d="M -240 0 L 240 0" stroke="#34d399" strokeWidth="2" style={{ filter: 'url(#glowGreen)' }} />
-             
-             {/* The 'Scanner Eye' Orb sliding along the line */}
-             <motion.circle 
-               cx="0" cy="0" r="6" fill="#fff" 
-               stroke="#34d399" strokeWidth="3"
-               style={{ filter: 'url(#glowGreen)' }}
-               animate={{ cx: [-150, 150, -100, 50] }}
-               transition={{ duration: 4, repeat: Infinity, repeatType: 'reverse', ease: 'easeInOut' }}
-             />
-          </motion.g>
+          {/* === CONNECTION PATH === */}
+          <path
+            d="M 148 -50 C 115 -35, 75 -15, 44 -5"
+            fill="none"
+            stroke="rgba(109,120,231,0.18)"
+            strokeWidth="1"
+            strokeDasharray="4 4"
+          />
 
-          {/* LAYER 3: The Perfection (Snap-to-Grid Structure, glowing green/white out from the beam) */}
-          <motion.g
-            animate={{ 
-              opacity: [0, 0, 0, 1, 1, 0],
-              y: [10, 10, 10, 0, 0, 10],
-              scale: [0.95, 0.95, 0.95, 1, 1, 0.95]
-            }}
-            transition={{ duration, repeat: Infinity, ease: 'easeOut' }}
-          >
-             {/* Beautiful structure replacing chaos */}
-             
-             {/* A perfect clean paragraph summary */}
-             <rect x="-180" y="-75" width="280" height="4" rx="2" fill="rgba(255,255,255,0.3)" />
-             <rect x="-180" y="-60" width="340" height="4" rx="2" fill="rgba(255,255,255,0.2)" />
-             <rect x="-180" y="-45" width="220" height="4" rx="2" fill="rgba(255,255,255,0.2)" />
+          {/* Flowing particles */}
+          <circle r="2.5" fill="#6d78e7" style={{ filter: 'drop-shadow(0 0 4px #6d78e7)' }}>
+            <animateMotion dur="2.5s" repeatCount="indefinite" path="M 148 -50 C 115 -35, 75 -15, 44 -5" />
+          </circle>
 
-             {/* A highly structured Data Table / Grid */}
-             <rect x="-180" y="-10" width="360" height="24" rx="4" fill="rgba(52, 211, 153, 0.15)" stroke="#34d399" strokeWidth="1" strokeOpacity="0.5" style={{ filter: 'url(#glowGreen)' }} />
-             <rect x="-160" y="-2" width="60" height="8" rx="2" fill="#34d399" opacity="0.8" />
-             <rect x="-70" y="-2" width="100" height="8" rx="2" fill="rgba(255,255,255,0.5)" />
-             <rect x="60" y="-2" width="80" height="8" rx="2" fill="rgba(255,255,255,0.3)" />
+          <circle r="2" fill="#8b95f0" style={{ filter: 'drop-shadow(0 0 3px #8b95f0)' }}>
+            <animateMotion dur="3.2s" repeatCount="indefinite" path="M 148 -50 C 115 -35, 75 -15, 44 -5" />
+          </circle>
 
-             <rect x="-180" y="20" width="360" height="24" rx="4" fill="rgba(255, 255, 255, 0.03)" stroke="rgba(255,255,255,0.1)" strokeWidth="1" />
-             <rect x="-160" y="28" width="50" height="8" rx="2" fill="#34d399" opacity="0.4" />
-             <rect x="-70" y="28" width="120" height="8" rx="2" fill="rgba(255,255,255,0.3)" />
-             <rect x="80" y="28" width="60" height="8" rx="2" fill="rgba(255,255,255,0.2)" />
-
-             <rect x="-180" y="50" width="360" height="24" rx="4" fill="rgba(255, 255, 255, 0.03)" stroke="rgba(255,255,255,0.1)" strokeWidth="1" />
-             <rect x="-160" y="58" width="70" height="8" rx="2" fill="#34d399" opacity="0.4" />
-             <rect x="-70" y="58" width="90" height="8" rx="2" fill="rgba(255,255,255,0.3)" />
-             <rect x="50" y="58" width="90" height="8" rx="2" fill="rgba(255,255,255,0.2)" />
-             
-             {/* Floating structured connection UI (like a verified tag) */}
-             <rect x="80" y="-120" width="100" height="20" rx="10" fill="rgba(52, 211, 153, 0.1)" stroke="#34d399" strokeOpacity="0.5" style={{ filter: 'url(#glowGreen)' }} />
-             <circle cx="95" cy="-110" r="4" fill="#34d399" />
-             <rect x="110" cy="-113" y="-112" width="50" height="4" rx="2" fill="#34d399" opacity="0.8" />
-          </motion.g>
-
-          {/* SPARKLES (Fire off when conversion is complete) */}
-          <motion.g
-            animate={{ 
-              opacity: [0, 0, 0, 1, 0, 0],
-              scale: [0, 0, 0, 1.5, 2, 0]
-            }}
-            transition={{ duration, repeat: Infinity, ease: 'easeOut' }}
-          >
-             <circle cx="-190" cy="-20" r="2" fill="#fff" style={{ filter: 'url(#glowGreen)' }} />
-             <circle cx="190" cy="30" r="1.5" fill="#34d399" style={{ filter: 'url(#glowGreen)' }} />
-             <circle cx="-20" cy="80" r="2.5" fill="#fff" style={{ filter: 'url(#glowGreen)' }} />
-          </motion.g>
-          
         </g>
       </svg>
     </motion.div>
