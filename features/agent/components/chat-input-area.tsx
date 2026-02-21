@@ -1,7 +1,7 @@
 'use client'
 
 import { ArrowUp, Square, Zap } from 'lucide-react'
-import { useCallback, useEffect, useRef, type KeyboardEvent } from 'react'
+import { memo, useCallback, useLayoutEffect, useRef, type KeyboardEvent } from 'react'
 import {
   Select,
   SelectContent,
@@ -24,7 +24,10 @@ interface ChatInputAreaProps {
   placeholder?: string
 }
 
-export function ChatInputArea({
+const MIN_HEIGHT = 24
+const MAX_HEIGHT = 24 * 6
+
+export const ChatInputArea = memo(function ChatInputArea({
   value,
   onChange,
   onSubmit,
@@ -37,18 +40,24 @@ export function ChatInputArea({
   placeholder = 'Ask anything...',
 }: ChatInputAreaProps) {
   const textareaRef = useRef<HTMLTextAreaElement | null>(null)
+  const prevHeightRef = useRef<number>(MIN_HEIGHT)
 
-  const resizeTextarea = useCallback(() => {
+  // useLayoutEffect avoids the flicker: measure + apply before paint
+  useLayoutEffect(() => {
     const textarea = textareaRef.current
     if (!textarea) return
-    textarea.style.height = 'auto'
-    const maxHeight = 24 * 6
-    textarea.style.height = `${Math.min(textarea.scrollHeight, maxHeight)}px`
-  }, [])
 
-  useEffect(() => {
-    resizeTextarea()
-  }, [value, resizeTextarea])
+    // Temporarily set to min-height to get accurate scrollHeight
+    // without collapsing to 0 (avoids layout thrash)
+    textarea.style.height = `${MIN_HEIGHT}px`
+    const next = Math.min(Math.max(textarea.scrollHeight, MIN_HEIGHT), MAX_HEIGHT)
+
+    // Only update if height actually changed
+    if (next !== prevHeightRef.current) {
+      prevHeightRef.current = next
+    }
+    textarea.style.height = `${next}px`
+  }, [value])
 
   const handleKeyDown = useCallback(
     (e: KeyboardEvent<HTMLTextAreaElement>) => {
@@ -75,7 +84,9 @@ export function ChatInputArea({
     <div className="shrink-0 px-3 pb-3">
       <div
         className={cn(
-          'relative rounded-xl border bg-[#141519] transition-all duration-150',
+          'relative rounded-xl border bg-[#141519]',
+          // Only transition border/shadow on focus — never height
+          'transition-[border-color,box-shadow] duration-150 ease-out',
           'border-white/[0.08]',
           'focus-within:border-[#6d78e7]/50 focus-within:shadow-[0_0_0_1px_rgba(109,120,231,0.18),0_0_12px_rgba(109,120,231,0.06)]',
           disabled && 'opacity-40 pointer-events-none'
@@ -96,6 +107,7 @@ export function ChatInputArea({
             'focus:outline-none',
             'disabled:cursor-not-allowed'
           )}
+          style={{ minHeight: MIN_HEIGHT, maxHeight: MAX_HEIGHT }}
         />
 
         <div className="flex items-center justify-between px-2.5 pb-2.5 pt-1">
@@ -152,4 +164,4 @@ export function ChatInputArea({
       </div>
     </div>
   )
-}
+})

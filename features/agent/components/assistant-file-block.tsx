@@ -1,6 +1,6 @@
 'use client'
 
-import { Check, FileCode, Loader2, X, Eye } from 'lucide-react'
+import { Check, FileCode, Loader2, X, Eye, GitBranch } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { StagedFileChange } from '@/features/agent/services/change-manager'
 
@@ -44,6 +44,33 @@ function computeLineStats(change: StagedFileChange): { linesAdded: number; lines
   return fallback
 }
 
+function getFileExtension(filename: string): string {
+  const ext = filename.split('.').pop()?.toLowerCase() ?? ''
+  return ext
+}
+
+function getFileIconColor(filename: string): string {
+  const ext = getFileExtension(filename)
+  switch (ext) {
+    case 'ts':
+    case 'tsx':
+      return 'text-blue-400'
+    case 'js':
+    case 'jsx':
+      return 'text-yellow-400'
+    case 'css':
+    case 'scss':
+      return 'text-pink-400'
+    case 'py':
+      return 'text-green-400'
+    case 'typ':
+    case 'tex':
+      return 'text-teal-400'
+    default:
+      return 'text-zinc-400'
+  }
+}
+
 export function AssistantFileBlock({
   change,
   disabled = false,
@@ -56,78 +83,111 @@ export function AssistantFileBlock({
 }: AssistantFileBlockProps) {
   const { linesAdded, linesDeleted } = computeLineStats(change)
   const actionDisabled = disabled || change.isStreaming
+  const totalChanges = linesAdded + linesDeleted
+  const addedPercent = totalChanges > 0 ? (linesAdded / totalChanges) * 100 : 50
 
   return (
-    <div className="group relative flex flex-col gap-2 rounded-lg border border-white/5 bg-[#18181b]/50 p-3 transition-colors hover:border-white/10 hover:bg-[#18181b]">
-      {/* Header: File Info & Stats */}
-      <div className="flex items-start justify-between gap-4">
-        <div className="flex min-w-0 flex-1 items-center gap-3">
-          <div className="flex h-8 w-8 items-center justify-center rounded-md bg-white/5 text-zinc-400">
+    <div className="group relative overflow-hidden rounded-xl border border-white/[0.06] bg-gradient-to-b from-[#16171c] to-[#131418] transition-all duration-200 hover:border-white/[0.1] hover:shadow-lg hover:shadow-black/20">
+      {/* Top accent line */}
+      <div className="h-px w-full bg-gradient-to-r from-transparent via-[#6d78e7]/30 to-transparent" />
+
+      <div className="p-3">
+        {/* Header row */}
+        <div className="flex items-center gap-3">
+          <div className={cn(
+            "flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white/[0.04] border border-white/[0.06]",
+            getFileIconColor(change.fileName)
+          )}>
             <FileCode className="h-4 w-4" />
           </div>
-          <div className="flex min-w-0 flex-col">
-            <div className="truncate text-sm font-medium text-zinc-200">{change.fileName}</div>
-            <div className="truncate text-xs text-zinc-500">{change.filePath}</div>
+
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2">
+              <span className="truncate text-[13px] font-semibold text-zinc-200">{change.fileName}</span>
+              {change.isStreaming && (
+                <span className="shrink-0 inline-flex items-center gap-1 rounded-full bg-amber-500/10 border border-amber-500/20 px-1.5 py-0.5 text-[9px] font-medium text-amber-400">
+                  <span className="h-1 w-1 rounded-full bg-amber-400 animate-pulse" />
+                  Writing
+                </span>
+              )}
+            </div>
+            <div className="truncate text-[11px] text-zinc-600 mt-0.5">{change.filePath}</div>
           </div>
         </div>
 
-        {/* Stats Badge */}
-        <div className="flex items-center gap-3 rounded-md bg-black/20 px-2 py-1 text-xs font-medium border border-white/5">
-          <span className="text-emerald-400">+{linesAdded}</span>
-          <span className="text-rose-400">-{linesDeleted}</span>
-          <span className="h-3 w-px bg-white/10" />
-          <span className="text-zinc-500">
-            {change.summary.totalChangedBlocks} chunk{change.summary.totalChangedBlocks !== 1 && 's'}
-          </span>
+        {/* Stats bar */}
+        <div className="mt-2.5 flex items-center gap-2.5">
+          <div className="flex items-center gap-1.5">
+            <GitBranch className="h-3 w-3 text-zinc-600" />
+            <span className="text-[11px] text-zinc-500">
+              {change.summary.totalChangedBlocks} chunk{change.summary.totalChangedBlocks !== 1 ? 's' : ''}
+            </span>
+          </div>
+          <span className="h-3 w-px bg-white/[0.06]" />
+          <div className="flex items-center gap-2 text-[11px] font-medium">
+            <span className="text-emerald-400">+{linesAdded}</span>
+            <span className="text-rose-400">-{linesDeleted}</span>
+          </div>
+          {/* Mini diff bar */}
+          <div className="flex-1 h-1.5 rounded-full bg-white/[0.04] overflow-hidden max-w-[80px]">
+            <div
+              className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-emerald-400"
+              style={{ width: `${addedPercent}%` }}
+            />
+          </div>
         </div>
-      </div>
 
-      {/* Footer: Actions */}
-      <div className="flex items-center justify-between pt-1">
-        <button
-          onClick={onOpen}
-          disabled={actionDisabled || !onOpen}
-          className={cn(
-            "flex items-center gap-1.5 text-xs font-medium transition-colors",
-            actionDisabled || !onOpen
-              ? "text-zinc-600 cursor-not-allowed"
-              : "text-zinc-400 hover:text-zinc-200"
-          )}
-        >
-          {isOpening ? (
-            <Loader2 className="h-3.5 w-3.5 animate-spin" />
-          ) : (
-            <Eye className="h-3.5 w-3.5" />
-          )}
-          <span>{isOpening ? 'Opening...' : 'View Diff'}</span>
-        </button>
+        {/* Divider */}
+        <div className="mt-2.5 h-px w-full bg-white/[0.04]" />
 
-        <div className="flex items-center gap-2">
+        {/* Actions row */}
+        <div className="mt-2.5 flex items-center justify-between">
           <button
-            onClick={onReject}
-            disabled={actionDisabled || !onReject}
+            onClick={onOpen}
+            disabled={actionDisabled || !onOpen}
             className={cn(
-              "flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-all",
-              "border border-white/5 bg-white/5 text-zinc-400 hover:bg-white/10 hover:text-zinc-200",
-              (actionDisabled || !onReject) && "opacity-50 cursor-not-allowed hover:bg-white/5 hover:text-zinc-400"
+              "inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[11px] font-medium transition-all duration-150",
+              "text-zinc-500 hover:text-[#8b95f0] hover:bg-[#6d78e7]/8",
+              (actionDisabled || !onOpen) && "opacity-40 cursor-not-allowed hover:text-zinc-500 hover:bg-transparent"
             )}
           >
-            {isRejecting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <X className="h-3.5 w-3.5" />}
-            <span>Reject</span>
-          </button>
-          
-          <button
-            onClick={onAccept}
-            disabled={actionDisabled || !onAccept}
-            className={cn(
-              "flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-all shadow-sm border border-white/10",
-              "bg-[#6D78E7] text-white hover:bg-[#6D78E7]/90 hover:shadow-md hover:shadow-[#6D78E7]/20",
-              (actionDisabled || !onAccept) && "opacity-50 cursor-not-allowed hover:bg-[#6D78E7] hover:shadow-none"
+            {isOpening ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <Eye className="h-3.5 w-3.5" />
             )}
-          >
-            {isAccepting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
-            <span>Apply Edit</span>
+            <span>{isOpening ? 'Opening…' : 'View Diff'}</span>
           </button>
+
+          <div className="flex items-center gap-1.5">
+            <button
+              onClick={onReject}
+              disabled={actionDisabled || !onReject}
+              className={cn(
+                "inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[11px] font-medium transition-all duration-150",
+                "border border-white/[0.06] bg-white/[0.03] text-zinc-400",
+                "hover:bg-rose-500/10 hover:text-rose-400 hover:border-rose-500/20",
+                (actionDisabled || !onReject) && "opacity-40 cursor-not-allowed hover:bg-white/[0.03] hover:text-zinc-400 hover:border-white/[0.06]"
+              )}
+            >
+              {isRejecting ? <Loader2 className="h-3 w-3 animate-spin" /> : <X className="h-3 w-3" />}
+              <span>Reject</span>
+            </button>
+
+            <button
+              onClick={onAccept}
+              disabled={actionDisabled || !onAccept}
+              className={cn(
+                "inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[11px] font-medium transition-all duration-150",
+                "bg-emerald-500/15 text-emerald-400 border border-emerald-500/20",
+                "hover:bg-emerald-500/25 hover:border-emerald-500/30 hover:shadow-sm hover:shadow-emerald-500/10",
+                (actionDisabled || !onAccept) && "opacity-40 cursor-not-allowed hover:bg-emerald-500/15 hover:border-emerald-500/20 hover:shadow-none"
+              )}
+            >
+              {isAccepting ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3" />}
+              <span>Accept</span>
+            </button>
+          </div>
         </div>
       </div>
     </div>
