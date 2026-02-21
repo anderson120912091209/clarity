@@ -118,14 +118,20 @@ export async function GET(req: Request) {
 
 export async function POST(req: Request) {
   const authError = authorizeAgentRequest(req)
-  if (authError) return authError
+  if (authError) {
+    console.warn('[Agent QuickEdit] auth rejected')
+    return authError
+  }
 
   const requestId =
     typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
       ? crypto.randomUUID()
       : `qe-${Date.now()}`
 
+  console.info(`[Agent QuickEdit ${requestId}] incoming request`)
+
   const userCtx = await resolveUserContext(req)
+  console.info(`[Agent QuickEdit ${requestId}] user=${userCtx.userId} plan=${userCtx.plan} source=${userCtx.planSource}`)
   const quota = await checkTokenBudget(userCtx.userId, userCtx.entitlements.aiTokenLimit)
 
   if (!quota.allowed) {

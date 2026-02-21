@@ -26,6 +26,7 @@ import {
   DEFAULT_FIM_TAGS,
   generateId,
 } from '../../../services/agent/browser/quick-edit'
+import { qeDebug } from '../../../services/agent/browser/quick-edit/debug'
 
 // Import React for rendering
 import React from 'react'
@@ -180,6 +181,7 @@ export function useAIAssist(onChange?: (value: string) => void): UseAIAssistRetu
       
       // Handle submit - stream AI response
       const handleSubmit = async (instructions: string, modelId: string) => {
+        qeDebug.log('submit', { instructions, modelId, selection: { start: selection.lineNumbers.start, end: selection.lineNumbers.end, textLen: selection.text.length } })
         setIsStreaming(true)
 
         let suspendUri: string | null = null
@@ -189,10 +191,11 @@ export function useAIAssist(onChange?: (value: string) => void): UseAIAssistRetu
           if (!model) throw new Error('No editor model')
           suspendUri = model.uri.toString()
           historyService.suspend(suspendUri)
-          
+
           const fullFileText = model.getValue()
           const language = getLanguageFromFile(model.uri.path) || 'latex'
-          
+          qeDebug.log('context', { language, fileLen: fullFileText.length, filePath: model.uri.path })
+
           // Get prefix and suffix for FIM
           const { prefix, suffix, secondaryContext } = extractPrefixAndSuffix({
             fullFileStr: fullFileText,
@@ -200,7 +203,7 @@ export function useAIAssist(onChange?: (value: string) => void): UseAIAssistRetu
             endLine: selection.lineNumbers.end,
             language,
           })
-          
+
           // Build FIM messages
           const userMessage = ctrlKStream_userMessage({
             selection: selection.text,
@@ -211,7 +214,8 @@ export function useAIAssist(onChange?: (value: string) => void): UseAIAssistRetu
             fimTags: DEFAULT_FIM_TAGS,
             language,
           })
-          
+          qeDebug.log('userMessage (first 500 chars)', userMessage.slice(0, 500))
+
           // Start streaming
           const { output } = await chatService.generate({
             messages: [{ role: 'user', content: userMessage }],
@@ -229,18 +233,26 @@ export function useAIAssist(onChange?: (value: string) => void): UseAIAssistRetu
           
           
           // Stream loop
+          let deltaCount = 0
           for await (const delta of output) {
             if (abortController.signal.aborted) break
-            if (delta.error) throw new Error(delta.error)
+            if (delta.error) {
+              qeDebug.error('stream delta error', delta.error)
+              throw new Error(delta.error)
+            }
             if (!delta.content) continue
-            
+
+            deltaCount++
             fullResponse += delta.content
-            
+
             // Extract code from FIM response
             const { code, isComplete } = extractCodeFromFIM({
               text: fullResponse,
               recentlyAddedTextLen: delta.content.length,
             })
+            if (deltaCount <= 3) {
+              qeDebug.log(`FIM extract #${deltaCount}`, { codeLen: code.length, isComplete, fullResponseLen: fullResponse.length })
+            }
             
               // Write new content to editor
               if (code && code !== lastExtractedCode) {
@@ -315,16 +327,34 @@ export function useAIAssist(onChange?: (value: string) => void): UseAIAssistRetu
           }
           
           // Streaming complete - show diff
+          qeDebug.log('stream done', { deltaCount, fullResponseLen: fullResponse.length, extractedCodeLen: lastExtractedCode.length })
+          qeDebug.log('fullResponse (first 800)', fullResponse.slice(0, 800))
+          qeDebug.log('extractedCode (first 400)', lastExtractedCode.slice(0, 400))
+
+          // Store for inspection via window.__QE_LAST_STREAM
+          qeDebug.storeStreamData({
+            fullResponse,
+            extractedCode: lastExtractedCode,
+            selection: { text: selection.text, start: selection.lineNumbers.start, end: selection.lineNumbers.end },
+            instructions,
+            timestamp: Date.now(),
+          })
+
+          if (!lastExtractedCode) {
+            qeDebug.error('NO CODE EXTRACTED from response. Expected <SELECTION>...</SELECTION> tags.', { fullResponse: fullResponse.slice(0, 2000) })
+          }
+
           removeDecorations(editor, decorationIds)
           setIsStreaming(false)
           
           // Compute and show diffs
           const diffs = computeDiffs(
-            selection.text, 
-            lastExtractedCode, 
+            selection.text,
+            lastExtractedCode,
             selection.lineNumbers.start
           )
-          
+          qeDebug.log('diffs computed', { count: diffs.length, types: diffs.map(d => d.type) })
+
           // Apply diff decorations
           const newDecorationIds: string[] = []
           const deletedViewZoneIds: string[] = []
@@ -487,7 +517,7 @@ export function useAIAssist(onChange?: (value: string) => void): UseAIAssistRetu
           onChangeCallback(editor.getValue())
           
         } catch (error) {
-          console.error('[useAIAssist] Error:', error)
+          qeDebug.error('handleSubmit failed', error)
           setIsStreaming(false)
           
           // Cleanup on error
@@ -548,31 +578,36 @@ export function useAIAssist(onChange?: (value: string) => void): UseAIAssistRetu
         })
       )
       
-      // Auto-cancel on cursor change (user clicked away)
-      const selectionListener = editor.onDidChangeCursorSelection((e) => {
-          // If the change came from user interaction (mouse/keyboard), cancel the input
-          if (e.source === 'mouse' || e.source === 'keyboard') {
-             handleCancel()
-          }
-      })
-
-      activeZoneRef.current?.listeners?.push(selectionListener)
-
       // Add ViewZone to editor
       editor.changeViewZones(accessor => {
         const zone: editor.IViewZone = {
           afterLineNumber: selection.lineNumbers.start - 1,
           heightInPx: 80, // Initial height, will be adjusted
           domNode,
-          suppressMouseDown: false,
+          // Must be true so clicks inside the textarea/buttons don't propagate
+          // to Monaco's mouse handler (which would change cursor and auto-cancel).
+          suppressMouseDown: true,
         }
         viewZoneId = accessor.addZone(zone)
         viewZone = zone // Capture ref
-        
+
         if (activeZoneRef.current) {
           activeZoneRef.current.viewZoneId = viewZoneId
         }
       })
+
+      // Auto-cancel when the user clicks outside the ViewZone in the editor.
+      // We use onDidChangeCursorSelection, but only cancel for mouse events
+      // that originate outside our ViewZone DOM node.
+      const selectionListener = editor.onDidChangeCursorSelection((e) => {
+          if (e.source !== 'mouse') return
+          // If the click target was inside our ViewZone, don't cancel.
+          const activeEl = document.activeElement
+          if (activeEl && domNode.contains(activeEl)) return
+          handleCancel()
+      })
+
+      activeZoneRef.current?.listeners?.push(selectionListener)
       
       // Focus the input
       setTimeout(() => {

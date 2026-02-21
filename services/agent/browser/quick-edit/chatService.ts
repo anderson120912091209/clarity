@@ -6,6 +6,7 @@
  * structured tool/event parsing used by chat.
  */
 import { readRuntimeUserHeaders } from '@/lib/client/runtime-user-context'
+import { qeDebug } from './debug'
 
 export interface StreamDelta {
   content?: string
@@ -48,11 +49,14 @@ class QuickEditChatService implements IChatService {
     }
 
     try {
+      const userHeaders = readRuntimeUserHeaders()
+      qeDebug.log('fetch', { requestId, model: opts.model, messageCount: opts.messages.length, userHeaders })
+
       const response = await fetch('/api/agent/quick-edit', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          ...readRuntimeUserHeaders(),
+          ...userHeaders,
         },
         body: JSON.stringify({
           messages: opts.messages,
@@ -61,8 +65,18 @@ class QuickEditChatService implements IChatService {
         signal: controller.signal,
       })
 
+      qeDebug.log('response', {
+        status: response.status,
+        statusText: response.statusText,
+        quotaLimit: response.headers.get('X-AI-Quota-Limit'),
+        quotaUsed: response.headers.get('X-AI-Quota-Used'),
+        quotaRemaining: response.headers.get('X-AI-Quota-Remaining'),
+      })
+
       if (!response.ok) {
-        throw new Error(`API request failed: ${response.statusText}`)
+        const body = await response.text().catch(() => '')
+        qeDebug.error('API error', { status: response.status, body })
+        throw new Error(`API request failed (${response.status}): ${body || response.statusText}`)
       }
 
       if (!response.body) {
@@ -74,6 +88,8 @@ class QuickEditChatService implements IChatService {
       const abortControllers = this.abortControllers
 
       async function* streamIterator(): AsyncIterable<StreamDelta> {
+        let totalChunks = 0
+        let totalChars = 0
         try {
           while (true) {
             if (controller.signal.aborted) break
@@ -83,17 +99,28 @@ class QuickEditChatService implements IChatService {
 
             const chunk = decoder.decode(value, { stream: true })
             if (chunk) {
+              totalChunks++
+              totalChars += chunk.length
+              if (totalChunks <= 3) {
+                qeDebug.log(`stream chunk #${totalChunks}`, JSON.stringify(chunk.slice(0, 200)))
+              }
               yield { content: chunk }
             }
           }
 
           const finalChunk = decoder.decode()
           if (finalChunk) {
+            totalChars += finalChunk.length
             yield { content: finalChunk }
           }
+          qeDebug.success('stream complete', { totalChunks, totalChars })
         } catch (err: unknown) {
-          if (err instanceof DOMException && err.name === 'AbortError') return
+          if (err instanceof DOMException && err.name === 'AbortError') {
+            qeDebug.warn('stream aborted')
+            return
+          }
           const message = err instanceof Error ? err.message : 'Streaming error'
+          qeDebug.error('stream error', message)
           yield { error: message }
         } finally {
           reader.releaseLock()

@@ -236,32 +236,40 @@ export function extractCodeFromFIM(opts: {
 }): { code: string; isComplete: boolean } {
   const midTag = opts.midTag ?? DEFAULT_FIM_TAGS.midTag
   const { text } = opts
-  
-  // Look for opening tag
+
+  // Primary: look for <SELECTION>...</SELECTION> tags
   const openTag = `<${midTag}>`
   const closeTag = `</${midTag}>`
-  
+
   const openIdx = text.indexOf(openTag)
-  if (openIdx === -1) {
-    return { code: '', isComplete: false }
+  if (openIdx !== -1) {
+    const contentStart = openIdx + openTag.length
+    const closeIdx = text.indexOf(closeTag, contentStart)
+
+    if (closeIdx === -1) {
+      // Tag opened but not closed yet - return partial content
+      return { code: text.substring(contentStart), isComplete: false }
+    }
+
+    // Full content extracted
+    return { code: text.substring(contentStart, closeIdx), isComplete: true }
   }
-  
-  const contentStart = openIdx + openTag.length
-  const closeIdx = text.indexOf(closeTag, contentStart)
-  
-  if (closeIdx === -1) {
-    // Tag opened but not closed yet - return partial content
-    return { 
-      code: text.substring(contentStart), 
-      isComplete: false 
+
+  // Fallback: if the model wrapped output in markdown code fences instead
+  const fenceStart = text.indexOf('```')
+  if (fenceStart !== -1) {
+    const afterFence = text.indexOf('\n', fenceStart)
+    if (afterFence !== -1) {
+      const fenceEnd = text.indexOf('```', afterFence + 1)
+      if (fenceEnd !== -1) {
+        return { code: text.substring(afterFence + 1, fenceEnd), isComplete: true }
+      }
+      // Fence opened but not closed — return partial
+      return { code: text.substring(afterFence + 1), isComplete: false }
     }
   }
-  
-  // Full content extracted
-  return { 
-    code: text.substring(contentStart, closeIdx), 
-    isComplete: true 
-  }
+
+  return { code: '', isComplete: false }
 }
 
 /**
