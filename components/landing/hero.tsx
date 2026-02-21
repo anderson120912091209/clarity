@@ -73,7 +73,7 @@ export function Hero() {
                  <div className="relative z-10 shadow-2xl rounded-t-xl
                  overflow-hidden border border-black/70 mx-auto max-w-[1100px] bg-white translate-y-1">
                      <img
-                        src="/landing/screenshot2.png"
+                        src="/landing/hero-light.png"
                         alt={t('hero.screenshot_alt')}
                         className="w-full h-auto block"
                      />

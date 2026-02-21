@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import { Navbar } from '@/components/landing/navbar'
 import { Hero } from '@/components/landing/hero'
+import { Features } from '@/components/landing/features'
 import { FooterContent } from '@/components/landing/footer-content'
 import { getLocale } from '@/lib/i18n/get-locale'
 import { getDictionary } from '@/lib/i18n/dictionaries'
@@ -36,6 +37,7 @@ export default function Home() {
 
       <main className="relative z-10 w-full">
         <Hero />
+        <Features />
       </main>
 
       <footer className="py-12 border-t border-white/5 relative z-10 bg-[#050505]">
