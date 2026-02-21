@@ -22,7 +22,7 @@ export function Features() {
                     <div className="w-12 h-12 rounded-lg bg-white/5 flex items-center justify-center mb-6 text-zinc-200">
                         <Brain className="w-6 h-6" />
                     </div>
-                    <h3 className="text-2xl font-bold text-white mb-3">Jules AI Copilot</h3>
+                    <h3 className="text-2xl font-bold text-white mb-3">Clarity AI Copilot</h3>
                     <p className="text-zinc-400 leading-relaxed max-w-md text-base">
                         Your personal research assistant. Generate complex tables, fix compilation errors instantly, or rewrite sections for clarity—all without leaving the editor.
                     </p>

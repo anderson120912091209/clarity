@@ -1,6 +1,6 @@
 # Agent Development Guide
 
-This guide covers common development tasks for the Jules AI chat agent: adding tools,
+This guide covers common development tasks for the Clarity AI chat agent: adding tools,
 modifying prompts, writing evals, and debugging issues.
 
 

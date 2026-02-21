@@ -3,7 +3,7 @@
 ## Overview
 
 The agent is an AI-powered assistant for LaTeX and Typst document editing, built into
-the Jules collaborative editor. It can read workspace files, diagnose compile errors,
+the Clarity collaborative editor. It can read workspace files, diagnose compile errors,
 apply targeted code edits, and look up Typst library documentation -- all driven by a
 multi-step tool-use loop on top of Google Gemini.
 

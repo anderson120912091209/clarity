@@ -73,6 +73,8 @@ interface ChatPanelProps {
   onExternalPromptConsumed?: (requestId: string) => void
   onExternalPromptSettled?: (result: ExternalPromptResult) => void
   onOpenWorkspaceFile?: (fileId: string) => void
+  isFloating?: boolean
+  onToggleFloat?: () => void
 }
 
 function isChatModelPreference(value: string): value is ChatModelPreference {
@@ -104,6 +106,8 @@ export function ChatPanel({
   onExternalPromptConsumed,
   onExternalPromptSettled,
   onOpenWorkspaceFile,
+  isFloating = false,
+  onToggleFloat,
 }: ChatPanelProps) {
   // ── Local UI state ──
 
@@ -334,8 +338,8 @@ export function ChatPanel({
   return (
     <div
       className={cn(
-        'flex h-full w-full flex-col bg-[#121212]',
-        !isVisible && 'pointer-events-none'
+        'flex h-full w-full flex-col bg-[#121212] transition-opacity duration-300 ease-out',
+        isVisible ? 'opacity-100' : 'opacity-0 pointer-events-none'
       )}
     >
       {/* ── Header ── */}
@@ -345,6 +349,8 @@ export function ChatPanel({
         onToggleThreadList={() => setShowThreadList((v) => !v)}
         showThreadListToggle
         onHide={onToggle}
+        isFloating={isFloating}
+        onToggleFloat={onToggleFloat}
       />
 
       {/* ── Thread List ── */}
@@ -388,7 +394,7 @@ export function ChatPanel({
                     </svg>
                   </div>
                   <div>
-                    <p className="text-[13px] font-medium text-zinc-300">Ask the AI assistant</p>
+                    <p className="text-[13px] font-medium text-zinc-300">Ask Clarity</p>
                     <p className="mt-1 text-[11px] text-zinc-600 max-w-[200px] leading-relaxed">
                       Get help with edits, debugging, and explanations.
                     </p>
@@ -507,7 +513,7 @@ export function ChatPanel({
                       </div>
                     )}
 
-                    {/* Streaming indicator */}
+                    {/* Streaming indicator with interrupt */}
                     {message.isStreaming && (
                       <StreamingIndicator
                         state={
@@ -520,6 +526,7 @@ export function ChatPanel({
                         toolName={
                           message.toolCalls?.find((t) => t.status === 'running')?.toolName
                         }
+                        onStop={session.stopStreaming}
                       />
                     )}
 

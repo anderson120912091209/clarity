@@ -14,6 +14,7 @@ import {
   MagnifierZoomIn,
   MagnifierZoomOut,
   Refresh,
+  Widget,
 } from '@solar-icons/react'
 import { savePdfToStorage, savePreviewToStorage } from '@/lib/utils/db-utils'
 import { useProject } from '@/contexts/ProjectContext'
@@ -641,6 +642,9 @@ function LatexRenderer({
 }
 
 
+export type PdfViewMode = 'docked' | 'floating'
+export type ChatViewMode = 'docked' | 'floating'
+
 export function PDFNavContent({
   isLoading,
   autoFetch,
@@ -655,7 +659,9 @@ export function PDFNavContent({
   onResetZoom,
   onDownload,
   onToggleLogs,
-  showLogs
+  showLogs,
+  pdfViewMode = 'docked',
+  onToggleViewMode,
 }: {
   isLoading: boolean
   autoFetch: boolean
@@ -671,6 +677,8 @@ export function PDFNavContent({
   onDownload: () => void
   onToggleLogs: () => void
   showLogs: boolean
+  pdfViewMode?: PdfViewMode
+  onToggleViewMode?: () => void
 }) {
   // Keyboard shortcut for compilation (Cmd+S)
   useEffect(() => {
@@ -747,6 +755,24 @@ export function PDFNavContent({
          >
            <ClipboardText className="w-3.5 h-3.5" weight={SOLAR_ICON_WEIGHT} />
          </Button>
+
+        {/* Floating View Toggle */}
+        {onToggleViewMode && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onToggleViewMode}
+            className={cn(
+              'h-7 w-7 p-0 rounded-md transition-all shrink-0',
+              pdfViewMode === 'floating'
+                ? 'bg-[#6D78E7]/15 text-[#A9B1FF] hover:bg-[#6D78E7]/25'
+                : 'text-zinc-400 hover:text-white hover:bg-white/5'
+            )}
+            title={pdfViewMode === 'floating' ? 'Dock PDF view' : 'Float PDF view'}
+          >
+            <Widget className="w-3.5 h-3.5" weight={SOLAR_ICON_WEIGHT} />
+          </Button>
+        )}
 
         {/* View Controls */}
         <div className="flex items-center gap-0.5 shrink-0">
