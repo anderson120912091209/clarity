@@ -16,9 +16,9 @@ import { buildAgentSystemPrompt } from '@/lib/server/chat-system-prompt'
 import { shouldRetry, getRetryDelay, sleep, DEFAULT_RETRY_POLICY } from '@/lib/agent/retry-policy'
 import { getPostHogClient } from '@/lib/posthog-server'
 import { authorizeAgentRequest } from '@/lib/server/agent-auth'
-import { buildChatQuotaKey, CHAT_CLIENT_QUOTA } from '@/lib/server/chat-quota'
 import { evaluatePromptSecurity } from '@/lib/server/prompt-security'
-import { checkFixedQuota } from '@/lib/server/rate-limit'
+import { resolveUserContext } from '@/lib/server/resolve-user-plan'
+import { checkTokenBudget, recordTokenUsage } from '@/lib/server/token-quota'
 
 export const runtime = 'nodejs'
 
@@ -71,14 +71,18 @@ export async function POST(req: Request) {
   const authError = authorizeAgentRequest(req)
   if (authError) return authError
 
-  const quota = await checkFixedQuota({
-    key: buildChatQuotaKey(req),
-    limit: CHAT_CLIENT_QUOTA,
-  })
-  if (!quota.allowed) {
+  const userCtx = await resolveUserContext(req)
+  const tokenBudget = await checkTokenBudget(userCtx.userId, userCtx.entitlements.aiTokenLimit)
+  if (!tokenBudget.allowed) {
     return new Response(
-      `AI chat quota reached for this client (${CHAT_CLIENT_QUOTA} total requests).`,
-      { status: 429 }
+      JSON.stringify({
+        error: 'AI token quota exceeded for this billing period.',
+        used: tokenBudget.used,
+        limit: tokenBudget.limit,
+        period: tokenBudget.period,
+        plan: userCtx.plan,
+      }),
+      { status: 429, headers: { 'Content-Type': 'application/json' } }
     )
   }
 
@@ -164,16 +168,19 @@ export async function POST(req: Request) {
   // ── Analytics ──
   const posthog = getPostHogClient()
   posthog?.capture({
-    distinctId: context.userId ?? requestId,
+    distinctId: userCtx.userId !== 'anonymous' ? userCtx.userId : (context.userId ?? requestId),
     event: 'ai_chat_message_sent',
     properties: {
-      user_id: context.userId,
+      user_id: userCtx.userId,
+      plan: userCtx.plan,
       model: selectedModel,
       workspace_files_count: context.workspaceFiles.length,
       typst_library_enabled: typstLibraryEnabled,
       force_structured_edits: forceStructuredEdits,
       has_compile_error: Boolean(context.compileError),
       message_length: latestUserMessage.length,
+      token_budget_used: tokenBudget.used,
+      token_budget_limit: tokenBudget.limit,
     },
   })
 
@@ -256,6 +263,31 @@ export async function POST(req: Request) {
         throw error
       }
     }
+
+    // Record token usage asynchronously after the stream completes.
+    // We don't block the response on this — the stream starts immediately.
+    void result.usage.then((usage) => {
+      const totalTokens = (usage.promptTokens ?? 0) + (usage.completionTokens ?? 0)
+      if (totalTokens > 0) {
+        void recordTokenUsage(
+          userCtx.userId,
+          userCtx.entitlements.aiTokenLimit,
+          totalTokens
+        ).then((updated) => {
+          console.info(`[Agent Chat ${requestId}] token usage recorded`, {
+            prompt: usage.promptTokens,
+            completion: usage.completionTokens,
+            total: totalTokens,
+            periodUsed: updated.used,
+            periodLimit: updated.limit,
+          })
+        }).catch((err) => {
+          console.error(`[Agent Chat ${requestId}] failed to record token usage`, err)
+        })
+      }
+    }).catch((err) => {
+      console.error(`[Agent Chat ${requestId}] failed to read usage`, err)
+    })
 
     return result.toDataStreamResponse()
   } catch (error) {

@@ -104,6 +104,17 @@ const rules = {
     bind: ["isOwner", "auth.id != null && auth.id == data.user_id"],
   },
 
+  // AI token usage is user-owned and server-managed.
+  ai_token_usage: {
+    allow: {
+      view: "isOwner",
+      create: "isOwner",
+      update: "isOwner",
+      delete: "false",
+    },
+    bind: ["isOwner", "auth.id != null && auth.id == data.user_id"],
+  },
+
   // AI threads are user-owned and project-scoped.
   ai_threads: {
     allow: {

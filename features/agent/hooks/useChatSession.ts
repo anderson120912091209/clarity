@@ -906,16 +906,18 @@ export function useChatSession(opts: UseChatSessionOptions) {
                 const fileList = Array.from(
                   new Set(collectedFileEdits.map((edit) => edit.filePath))
                 )
-                return [
-                  `I applied edits to ${fileList.length} file${fileList.length === 1 ? '' : 's'}: ${fileList.join(', ')}.`,
-                  'Review the staged diff blocks below and accept or reject each change.',
-                ].join('\n')
+                const descriptions = collectedFileEdits
+                  .map((edit) => edit.description)
+                  .filter((d) => d && d.trim() && !d.startsWith('Edit '))
+                if (descriptions.length > 0) {
+                  return `${descriptions.join('. ')}. Review the changes above and accept when you're ready.`
+                }
+                return fileList.length === 1
+                  ? `Made changes to **${fileList[0]}** — review above and accept when you're ready.`
+                  : `Made changes to ${fileList.length} files — review above and accept when you're ready.`
               }
               if (toolCallsList.length > 0) {
-                return [
-                  `Completed ${toolCallsList.length} tool call${toolCallsList.length === 1 ? '' : 's'}.`,
-                  'See the agent activity section below for details.',
-                ].join('\n')
+                return 'Done! Check the activity section above for details.'
               }
               return 'No response received from model stream. Try again or switch model.'
             })()
@@ -933,23 +935,24 @@ export function useChatSession(opts: UseChatSessionOptions) {
                 const uniqueFiles = Array.from(
                   new Set(collectedFileEdits.map((edit) => edit.filePath))
                 )
-                const searchReplaceCount = collectedFileEdits.filter(
-                  (edit) => edit.editType === 'search_replace'
-                ).length
-                const replaceFileCount = collectedFileEdits.filter(
-                  (edit) => edit.editType === 'replace_file'
-                ).length
-                return [
-                  '## Edit Summary',
-                  `- Files changed: ${uniqueFiles.join(', ')}`,
-                  `- search_replace edits: ${searchReplaceCount}`,
-                  `- replace_file edits: ${replaceFileCount}`,
-                  '- Next step: review staged diffs and run compile.',
-                ].join('\n')
+                const descriptions = collectedFileEdits
+                  .map((edit) => edit.description)
+                  .filter((d) => d && d.trim() && !d.startsWith('Edit '))
+                const descriptionText =
+                  descriptions.length > 0
+                    ? descriptions.map((d) => `- ${d}`).join('\n')
+                    : null
+                const fileText =
+                  uniqueFiles.length === 1
+                    ? `Updated **${uniqueFiles[0]}**`
+                    : `Updated ${uniqueFiles.length} files: ${uniqueFiles.map((f) => `**${f}**`).join(', ')}`
+                return descriptionText
+                  ? `${fileText}\n${descriptionText}\n\nReview the changes above and hit accept when you're ready.`
+                  : `${fileText} — review the changes above and hit accept when you're ready.`
               })()
             : ''
         const finalContentWithSummary =
-          generatedEditSummary && !finalContent.includes('## Edit Summary')
+          generatedEditSummary && !finalContent.includes('Updated **')
             ? `${finalContent.trim()}\n\n${generatedEditSummary}`
             : finalContent
 

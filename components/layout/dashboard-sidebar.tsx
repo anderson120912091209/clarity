@@ -16,7 +16,7 @@ import { startNavJourney } from '@/lib/perf/nav-trace'
 import { NewProjectDialog } from '@/components/features/projects/new-project-dialog'
 import { getAllProjects } from '@/hooks/data'
 import { useDashboardSettings } from '@/contexts/DashboardSettingsContext'
-import { useQuickEditQuota } from '@/hooks/useQuickEditQuota'
+import { useAiQuota } from '@/hooks/useAiQuota'
 import { AiQuotaDisplay } from '@/components/ai-quota-display'
 import { UpgradeModal } from '@/components/upgrade-modal'
 import { useFrontend } from '@/contexts/FrontendContext'
@@ -34,7 +34,7 @@ export default function DashboardSidebar() {
     isLoading: isQuickEditQuotaLoading,
     error: quickEditQuotaError,
     refresh: refreshQuickEditQuota,
-  } = useQuickEditQuota({ autoRefreshMs: 30_000 })
+  } = useAiQuota({ autoRefreshMs: 30_000 })
   const { data: projectsData } = getAllProjects(user?.id)
   const projects = projectsData?.projects as Array<{ trashed_at?: string | null }> | undefined
   

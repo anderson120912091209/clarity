@@ -1,5 +1,5 @@
 'use client'
-import React, { createContext, useContext, ReactNode, useEffect } from 'react'
+import React, { createContext, useContext, ReactNode, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { usePathname } from 'next/navigation'
 import { db } from '@/lib/constants'
@@ -14,6 +14,7 @@ import {
 import {
   clearRuntimeUserContext,
   writeRuntimeUserContext,
+  CLARITY_RUNTIME_USER_PLAN_KEY,
 } from '@/lib/client/runtime-user-context'
 
 type FrontendAuthState = ReturnType<(typeof db)['useAuth']>
@@ -64,9 +65,25 @@ export function FrontendProvider({ children }: { children: ReactNode }) {
         }
       : null
   )
+  // db.useQuery starts with data=undefined while loading.  Without this
+  // guard the plan would momentarily resolve to "free" and overwrite a
+  // valid "pro" that's already in localStorage, causing the quota endpoint
+  // to flicker between 50 K and 10 M tokens.
+  const planQueryLoaded = Boolean(accountPlanQuery.data)
   const accountPlanRecord = accountPlanQuery.data?.account_plans?.[0]
   const legacyUserRecord = accountPlanQuery.data?.users?.[0]
-  const plan = normalizeSubscriptionPlan(accountPlanRecord?.plan ?? legacyUserRecord?.type)
+
+  // While the query is still loading, preserve whatever localStorage has
+  // from the last successful resolution so API calls don't regress to "free".
+  const cachedPlanRef = useRef<SubscriptionPlan | null>(null)
+  if (cachedPlanRef.current === null && typeof window !== 'undefined') {
+    const stored = window.localStorage.getItem(CLARITY_RUNTIME_USER_PLAN_KEY)
+    cachedPlanRef.current = stored ? normalizeSubscriptionPlan(stored) : null
+  }
+
+  const plan: SubscriptionPlan = planQueryLoaded
+    ? normalizeSubscriptionPlan(accountPlanRecord?.plan ?? legacyUserRecord?.type)
+    : (cachedPlanRef.current ?? 'free')
   const isPro = isProSubscription(plan)
   const entitlements = getSubscriptionEntitlements(plan)
 
@@ -97,8 +114,13 @@ export function FrontendProvider({ children }: { children: ReactNode }) {
       return
     }
 
+    // Only persist to localStorage once the plan query has actually resolved.
+    // Otherwise we'd write "free" on every page load before the query returns.
+    if (!planQueryLoaded) return
+
     writeRuntimeUserContext(user.id, plan)
-  }, [plan, user])
+    cachedPlanRef.current = plan
+  }, [plan, planQueryLoaded, user])
 
   if (isLoading && !isPublicRoute) {
     return null

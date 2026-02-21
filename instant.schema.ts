@@ -78,6 +78,19 @@ const _schema = i.schema({
       user_id: i.string().unique().indexed().optional(),
       plan: i.string().optional(),
     }),
+    ai_token_usage: i.entity({
+      /** The user this usage belongs to */
+      user_id: i.string().unique().indexed(),
+      /** "YYYY-MM" bucket so usage resets each calendar month */
+      period: i.string().indexed(),
+      /** Cumulative input tokens consumed this period */
+      input_tokens: i.number(),
+      /** Cumulative output tokens consumed this period */
+      output_tokens: i.number(),
+      /** input_tokens + output_tokens (denormalised for fast reads) */
+      total_tokens: i.number(),
+      updated_at: i.string(),
+    }),
     files: i.entity({
       content: i.string().optional(),
       created_at: i.string().optional(),

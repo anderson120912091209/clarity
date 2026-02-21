@@ -14,6 +14,7 @@
  */
 
 import type { AgentChatContext } from '@/features/agent/types/chat-context'
+import { readRuntimeUserHeaders } from '@/lib/client/runtime-user-context'
 
 // --- Types ---
 
@@ -496,7 +497,10 @@ class DataStreamChatService implements IChatService {
     try {
       const response = await fetch('/api/agent/chat', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...readRuntimeUserHeaders(),
+        },
         body: JSON.stringify({
           messages: opts.messages,
           model: opts.model,

@@ -24,6 +24,7 @@ export default function LatexCanvas({
   onPdfPointSelect,
   isPdfNavigationEnabled = true,
   onPdfReady,
+  darkMode = false,
 }: {
   pdfUrl: string;
   onDocumentLoadSuccess: (result: { numPages: number }) => void;
@@ -48,6 +49,7 @@ export default function LatexCanvas({
   onPdfPointSelect?: (point: { page: number; h: number; v: number }) => void;
   isPdfNavigationEnabled?: boolean;
   onPdfReady?: () => void;
+  darkMode?: boolean;
 }) {
   const [workerReady, setWorkerReady] = useState(false)
   const [documentError, setDocumentError] = useState<string | null>(null)
@@ -216,7 +218,11 @@ export default function LatexCanvas({
                   pageContainerRefs.current[pageNumber] = node
                 }}
                 onClick={handlePageClick(pageNumber)}
-                className={`relative mb-4 shadow-lg ${isPdfNavigationEnabled ? 'cursor-pointer' : 'cursor-default'}`}
+                className={`relative mb-4 ${darkMode ? 'shadow-none' : 'shadow-lg'} ${isPdfNavigationEnabled ? 'cursor-pointer' : 'cursor-default'}`}
+                style={{
+                  filter: darkMode ? 'invert(0.88) hue-rotate(180deg)' : 'none',
+                  transition: 'filter 0.35s ease',
+                }}
               >
                 <Page
                   key={`page_${pageNumber}`}

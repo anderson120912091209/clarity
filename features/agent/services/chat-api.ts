@@ -93,7 +93,10 @@ export async function chat(messages: PanelMessage[], context: string): Promise<s
 
   const response = await fetch(resolveApiUrl('/api/agent/chat'), {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      ...readRuntimeUserHeaders(),
+    },
     body: JSON.stringify({ messages: normalizedMessages }),
   })
 

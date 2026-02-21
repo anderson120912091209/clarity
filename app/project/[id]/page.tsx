@@ -707,6 +707,8 @@ function EditorLayout() {
     logs,
     synctexContext,
     setPrivateScale,
+    pdfDarkMode,
+    togglePdfDarkMode,
   } = useLatex(liveFileContentOverrides)
   
   const [showLogs, setShowLogs] = useState(false)
@@ -842,12 +844,17 @@ function EditorLayout() {
       const next = prev === 'docked' ? 'floating' : 'docked'
       if (next === 'floating') {
         pdfPanelRef.current?.collapse()
+        // Keep chat panel collapsed if it was collapsed — the space redistribution
+        // from collapsing PDF can accidentally push the chat panel past its minSize
+        if (!isChatVisible || chatViewMode === 'floating') {
+          requestAnimationFrame(() => chatPanelRef.current?.collapse())
+        }
       } else {
         pdfPanelRef.current?.expand()
       }
       return next
     })
-  }, [])
+  }, [isChatVisible, chatViewMode])
 
   // Toggle between docked and floating AI Chat view
   const handleToggleChatViewMode = useCallback(() => {
@@ -881,7 +888,7 @@ function EditorLayout() {
     } else {
       panel.collapse()
     }
-  }, [isChatVisible, chatViewMode])
+  }, [isChatVisible, chatViewMode, pdfViewMode])
 
   const isLatexAutoDebugRunning = Boolean(activeLatexDebugRequestId)
 
@@ -969,7 +976,9 @@ function EditorLayout() {
         block,
         targetFileId: null,
       }))
-      const machineBlocks = parsedBlocks.length > 0 ? parsedBlocks : structuredBlocks
+      // Structured tool edits (from apply_file_edit) are authoritative —
+      // always prefer them over heuristic markdown-block parsing.
+      const machineBlocks = structuredBlocks.length > 0 ? structuredBlocks : parsedBlocks
 
       if (options?.auto && machineBlocks.length === 0) {
         return
@@ -1544,6 +1553,8 @@ function EditorLayout() {
             showLogs={showLogs}
             pdfViewMode={pdfViewMode}
             onToggleViewMode={handleTogglePdfViewMode}
+            pdfDarkMode={pdfDarkMode}
+            onToggleDarkMode={togglePdfDarkMode}
           />
         </div>
     </div>
@@ -1593,7 +1604,14 @@ function EditorLayout() {
           <ResizableHandle className="w-2 bg-transparent flex items-center justify-center group outline-none">
             <div className="h-8 w-1 bg-zinc-700 rounded-full opacity-0 group-hover:opacity-100 transition-all" />
           </ResizableHandle>
-          <ResizablePanel ref={pdfPanelRef} defaultSize={50} minSize={20} collapsible={true}>
+          <ResizablePanel
+            ref={pdfPanelRef}
+            defaultSize={50}
+            minSize={20}
+            collapsible={true}
+            collapsedSize={0}
+            style={{ transition: 'flex-basis 0.3s cubic-bezier(0.4, 0, 0.2, 1)' }}
+          >
             <LatexRenderer
               pdfUrl={pdfUrl}
               isLoading={isLoading}
@@ -1611,6 +1629,7 @@ function EditorLayout() {
               onAiDebug={isAiChatEnabled ? handleLatexAutoDebug : undefined}
               isAiDebugging={isLatexAutoDebugRunning}
               isAiDebugEnabled={isAiChatEnabled}
+              pdfDarkMode={pdfDarkMode}
             />
           </ResizablePanel>
           {isAiChatEnabled && (
@@ -1630,8 +1649,15 @@ function EditorLayout() {
                 maxSize={45}
                 collapsible
                 collapsedSize={0}
-                onCollapse={() => { if (chatViewMode === 'docked') setIsChatVisible(false) }}
-                onExpand={() => { if (chatViewMode === 'docked') setIsChatVisible(true) }}
+                onCollapse={() => {
+                  if (chatViewMode === 'docked') setIsChatVisible(false)
+                }}
+                onExpand={() => {
+                  // Only mark visible when docked AND not expanding due to sibling collapse
+                  if (chatViewMode === 'docked' && pdfViewMode === 'docked') {
+                    setIsChatVisible(true)
+                  }
+                }}
                 style={{ transition: 'flex-basis 0.3s cubic-bezier(0.4, 0, 0.2, 1)' }}
               >
                 <ChatPanel
@@ -1685,6 +1711,7 @@ function EditorLayout() {
             onAiDebug={isAiChatEnabled ? handleLatexAutoDebug : undefined}
             isAiDebugging={isLatexAutoDebugRunning}
             isAiDebugEnabled={isAiChatEnabled}
+            pdfDarkMode={pdfDarkMode}
             onClose={handleTogglePdfViewMode}
           />
         )}

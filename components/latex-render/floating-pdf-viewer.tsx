@@ -29,6 +29,7 @@ interface FloatingPdfViewerProps {
   onAiDebug?: () => void
   isAiDebugging?: boolean
   isAiDebugEnabled?: boolean
+  pdfDarkMode?: boolean
   onClose: () => void
 }
 

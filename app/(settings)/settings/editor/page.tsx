@@ -84,6 +84,16 @@ export default function EditorDefaultsSettingsPage() {
           </SettingsRow>
 
           <SettingsRow
+            label="Enable PDF dark mode by default"
+            description="Invert PDF colors for comfortable reading in dark environments."
+          >
+            <Switch
+              checked={settings.defaultPdfDarkMode}
+              onCheckedChange={(checked) => updateSetting('defaultPdfDarkMode', checked)}
+            />
+          </SettingsRow>
+
+          <SettingsRow
             label="Enable PDF click-to-source by default"
             description="Use SyncTeX/ratio mapping navigation when available."
           >

@@ -27,7 +27,7 @@ import {
   resolvePdfBackgroundTheme,
   type PdfBackgroundThemeKey,
 } from '@/lib/constants/pdf-background-themes'
-import { useQuickEditQuota } from '@/hooks/useQuickEditQuota'
+import { useAiQuota } from '@/hooks/useAiQuota'
 import { AiQuotaDisplay } from '@/components/ai-quota-display'
 import { UpgradeModal } from '@/components/upgrade-modal'
 
@@ -55,7 +55,7 @@ export default function EditorSidebar({
     isLoading: isQuickEditQuotaLoading,
     error: quickEditQuotaError,
     refresh: refreshQuickEditQuota,
-  } = useQuickEditQuota({ autoRefreshMs: 30_000 })
+  } = useAiQuota({ autoRefreshMs: 30_000 })
   const { isCollapsed } = useSidebar()
   const {
     projectId,

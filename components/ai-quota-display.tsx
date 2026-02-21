@@ -9,6 +9,18 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip"
 
+function formatTokenCount(tokens: number): string {
+  if (tokens >= 1_000_000) {
+    const millions = tokens / 1_000_000
+    return millions % 1 === 0 ? `${millions}M` : `${millions.toFixed(1)}M`
+  }
+  if (tokens >= 1_000) {
+    const thousands = tokens / 1_000
+    return thousands % 1 === 0 ? `${thousands}K` : `${thousands.toFixed(1)}K`
+  }
+  return String(tokens)
+}
+
 interface AiQuotaDisplayProps {
   used: number
   limit: number
@@ -34,7 +46,7 @@ export function AiQuotaDisplay({
 }: AiQuotaDisplayProps) {
   const percent = limit > 0 ? Math.min((used / limit) * 100, 100) : 0
   const remaining = Math.max(0, limit - used)
-  const isLow = remaining <= 5
+  const isLow = remaining <= limit * 0.1
   const isExceeded = used >= limit
 
   return (
@@ -52,7 +64,7 @@ export function AiQuotaDisplay({
                {loading ? (
                  <Loader2 className="h-3 w-3 animate-spin" />
                ) : (
-                 `${used} / ${limit}`
+                 `${formatTokenCount(used)} / ${formatTokenCount(limit)} tokens`
                )}
             </span>
             {onRefresh && (
@@ -104,16 +116,18 @@ export function AiQuotaDisplay({
                <div
                   className={cn(
                      "h-full rounded-full transition-all duration-500 ease-out",
-                     isExceeded 
-                        ? "bg-gradient-to-r from-rose-500 to-rose-600" 
-                        : "bg-gradient-to-r from-[#6D78E7] via-[#858FE9] to-[#6D78E7]"
+                     isExceeded
+                        ? "bg-gradient-to-r from-rose-500 to-rose-600"
+                        : isLow
+                          ? "bg-gradient-to-r from-amber-500 to-amber-600"
+                          : "bg-gradient-to-r from-[#6D78E7] via-[#858FE9] to-[#6D78E7]"
                   )}
                   style={{ width: `${percent}%` }}
                />
             </div>
           </TooltipTrigger>
           <TooltipContent side="bottom" className="text-xs bg-[#1C1D1F] border-white/10 text-zinc-300">
-            {loading ? "Syncing..." : isExceeded ? "Quota exceeded" : `${remaining} requests remaining`}
+            {loading ? "Syncing..." : isExceeded ? "Token quota exceeded — resets next month" : `${formatTokenCount(remaining)} tokens remaining this month`}
           </TooltipContent>
         </Tooltip>
       </TooltipProvider>
@@ -130,7 +144,7 @@ export function AiQuotaDisplay({
           onClick={onUpgrade}
           className="mt-2 w-full text-[11px] font-medium text-[#6D78E7] hover:text-[#858FE9] transition-colors text-center"
         >
-          Upgrade for more quota
+          Upgrade for more tokens
         </button>
       )}
     </div>

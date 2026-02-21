@@ -20,7 +20,7 @@ import {
   type ChatModelPreference,
 } from '@/contexts/DashboardSettingsContext'
 import { QUICK_EDIT_GEMINI_MODEL_OPTIONS } from '@/lib/constants/gemini-models'
-import { useQuickEditQuota } from '@/hooks/useQuickEditQuota'
+import { useAiQuota } from '@/hooks/useAiQuota'
 import { AiQuotaDisplay } from '@/components/ai-quota-display'
 
 export default function AssistantSettingsPage() {
@@ -30,7 +30,7 @@ export default function AssistantSettingsPage() {
     isLoading: isQuickEditQuotaLoading,
     error: quickEditQuotaError,
     refresh: refreshQuickEditQuota,
-  } = useQuickEditQuota({ autoRefreshMs: 30_000 })
+  } = useAiQuota({ autoRefreshMs: 30_000 })
   const quickEditQuotaUsagePercent =
     quickEditQuota.limit > 0 ? Math.min((quickEditQuota.used / quickEditQuota.limit) * 100, 100) : 0
 

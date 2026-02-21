@@ -28,6 +28,7 @@ export interface DashboardSettings {
   confirmBeforePermanentDelete: boolean
   defaultEditorSyntaxTheme: EditorSyntaxTheme
   defaultPdfBackgroundTheme: PdfBackgroundThemeKey
+  defaultPdfDarkMode: boolean
   defaultPdfCaretNavigation: boolean
   defaultTypstAutoCompile: boolean
   defaultChatIncludeCurrentDocument: boolean
@@ -49,6 +50,7 @@ export const DEFAULT_DASHBOARD_SETTINGS: DashboardSettings = {
   confirmBeforePermanentDelete: true,
   defaultEditorSyntaxTheme: DEFAULT_EDITOR_SYNTAX_THEME,
   defaultPdfBackgroundTheme: DEFAULT_PDF_BACKGROUND_THEME,
+  defaultPdfDarkMode: false,
   defaultPdfCaretNavigation: true,
   defaultTypstAutoCompile: false,
   defaultChatIncludeCurrentDocument: true,
@@ -104,6 +106,8 @@ function parseStoredSettings(raw: string | null): DashboardSettings {
       defaultPdfBackgroundTheme: isPdfBackgroundThemeKey(parsed.defaultPdfBackgroundTheme)
         ? parsed.defaultPdfBackgroundTheme
         : DEFAULT_DASHBOARD_SETTINGS.defaultPdfBackgroundTheme,
+      defaultPdfDarkMode:
+        parsed.defaultPdfDarkMode ?? DEFAULT_DASHBOARD_SETTINGS.defaultPdfDarkMode,
       defaultPdfCaretNavigation:
         parsed.defaultPdfCaretNavigation ?? DEFAULT_DASHBOARD_SETTINGS.defaultPdfCaretNavigation,
       defaultTypstAutoCompile:

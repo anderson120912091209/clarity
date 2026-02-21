@@ -39,6 +39,7 @@ import {
   getPdfScaleStorageKey,
   normalizePdfScale,
 } from '@/lib/constants/pdf-scale-preferences'
+import { Moon, Sun } from 'lucide-react'
 
 if (typeof window !== 'undefined') {
   pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.mjs`
@@ -71,6 +72,7 @@ export function useLatex(liveFileContentOverrides: Record<string, string> = {}) 
   const isPersistingRef = useRef(false)
   
   const [scale, setScale] = useState(DEFAULT_PDF_SCALE)
+  const [pdfDarkMode, setPdfDarkMode] = useState(false)
   const autoFetch = data?.isAutoFetching ?? false
   const effectiveFiles = useMemo(() => {
     if (!Array.isArray(files)) return files
@@ -136,6 +138,32 @@ export function useLatex(liveFileContentOverrides: Record<string, string> = {}) 
     setScale(fallbackScale)
     window.localStorage.setItem(storageKey, String(fallbackScale))
   }, [projectId, user?.id])
+
+  // Hydrate PDF dark mode preference per project
+  useEffect(() => {
+    if (!projectId) return
+    if (typeof window === 'undefined') {
+      setPdfDarkMode(settings.defaultPdfDarkMode)
+      return
+    }
+    const storageKey = `pdfDarkMode:${projectId}`
+    const stored = window.localStorage.getItem(storageKey)
+    if (stored !== null) {
+      setPdfDarkMode(stored === 'true')
+      return
+    }
+    setPdfDarkMode(settings.defaultPdfDarkMode)
+  }, [projectId, settings.defaultPdfDarkMode])
+
+  const togglePdfDarkMode = useCallback(() => {
+    setPdfDarkMode((prev) => {
+      const next = !prev
+      if (typeof window !== 'undefined' && projectId) {
+        window.localStorage.setItem(`pdfDarkMode:${projectId}`, String(next))
+      }
+      return next
+    })
+  }, [projectId])
 
   const setPrivateScale = useCallback(
     (nextScale: number) => {
@@ -370,6 +398,8 @@ export function useLatex(liveFileContentOverrides: Record<string, string> = {}) 
     logs,
     synctexContext,
     setPrivateScale,
+    pdfDarkMode,
+    togglePdfDarkMode,
   }
 }
 
@@ -445,6 +475,7 @@ interface LatexRendererProps {
   onAiDebug?: () => void
   isAiDebugging?: boolean
   isAiDebugEnabled?: boolean
+  pdfDarkMode?: boolean
 }
 
 
@@ -465,6 +496,7 @@ function LatexRenderer({
   onAiDebug,
   isAiDebugging = false,
   isAiDebugEnabled = true,
+  pdfDarkMode = false,
 }: LatexRendererProps) {
   const { project: data, projectId } = useProject();
   const { settings } = useDashboardSettings()
@@ -626,6 +658,7 @@ function LatexRenderer({
                  onPdfPointSelect={onPdfPointSelect}
                  isPdfNavigationEnabled={isPdfNavigationEnabled}
                  onPdfReady={onPdfReady}
+                 darkMode={pdfDarkMode}
              />
         </div>
       ) : (
@@ -662,6 +695,8 @@ export function PDFNavContent({
   showLogs,
   pdfViewMode = 'docked',
   onToggleViewMode,
+  pdfDarkMode = false,
+  onToggleDarkMode,
 }: {
   isLoading: boolean
   autoFetch: boolean
@@ -679,6 +714,8 @@ export function PDFNavContent({
   showLogs: boolean
   pdfViewMode?: PdfViewMode
   onToggleViewMode?: () => void
+  pdfDarkMode?: boolean
+  onToggleDarkMode?: () => void
 }) {
   // Keyboard shortcut for compilation (Cmd+S)
   useEffect(() => {
@@ -743,7 +780,24 @@ export function PDFNavContent({
           </Button>
         ) : null}
 
-        <Button 
+        {onToggleDarkMode && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onToggleDarkMode}
+            className={cn(
+              'h-7 w-7 p-0 rounded-md transition-all shrink-0',
+              pdfDarkMode
+                ? 'bg-[#6D78E7]/15 text-[#A9B1FF] hover:bg-[#6D78E7]/25'
+                : 'text-zinc-400 hover:text-white hover:bg-white/5'
+            )}
+            title={pdfDarkMode ? 'Switch to light PDF' : 'Switch to dark PDF'}
+          >
+            {pdfDarkMode ? <Sun className="w-3.5 h-3.5" /> : <Moon className="w-3.5 h-3.5" />}
+          </Button>
+        )}
+
+        <Button
            variant={showLogs ? "secondary" : "ghost"}
            size="sm"
            onClick={onToggleLogs}

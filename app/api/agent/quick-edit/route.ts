@@ -4,13 +4,8 @@ import { GEMINI_DEFAULT_MODEL, resolveGeminiModel } from '@/lib/constants/gemini
 import { authorizeAgentRequest } from '@/lib/server/agent-auth'
 import { evaluatePromptSecurity } from '@/lib/server/prompt-security'
 import { buildQuickEditSystemPrompt } from '@/lib/server/quick-edit-system-prompt'
-import {
-  checkFixedQuota,
-  getFixedQuotaSnapshot,
-  type FixedQuotaResult,
-} from '@/lib/server/rate-limit'
-import { buildQuickEditQuotaKey } from '@/lib/server/quick-edit-quota'
-import { getSubscriptionEntitlements } from '@/lib/subscription/entitlements'
+import { resolveUserContext } from '@/lib/server/resolve-user-plan'
+import { checkTokenBudget, recordTokenUsage, type TokenQuotaSnapshot } from '@/lib/server/token-quota'
 
 export const runtime = 'nodejs'
 
@@ -88,47 +83,27 @@ function shouldRetryWithDefaultModel(error: unknown): boolean {
   return /not found|not supported/i.test(message)
 }
 
-function attachQuotaHeaders(headers: Headers, quota: FixedQuotaResult) {
-  headers.set('X-QuickEdit-Quota-Limit', String(quota.limit))
-  headers.set('X-QuickEdit-Quota-Used', String(quota.used))
-  headers.set('X-QuickEdit-Quota-Remaining', String(quota.remaining))
-  headers.set('X-QuickEdit-Quota-Store', quota.store)
+function attachQuotaHeaders(headers: Headers, quota: TokenQuotaSnapshot) {
+  headers.set('X-AI-Quota-Limit', String(quota.limit))
+  headers.set('X-AI-Quota-Used', String(quota.used))
+  headers.set('X-AI-Quota-Remaining', String(quota.remaining))
+  headers.set('X-AI-Quota-Period', quota.period)
+  headers.set('X-AI-Quota-Store', quota.store)
 }
 
 function createQuotaResponse(
   body: BodyInit | null,
   init: ResponseInit,
-  quota: FixedQuotaResult
+  quota: TokenQuotaSnapshot
 ): Response {
   const headers = new Headers(init.headers)
   attachQuotaHeaders(headers, quota)
   return new Response(body, { ...init, headers })
 }
 
-function sanitizeHeaderValue(value: string | null): string | null {
-  if (typeof value !== 'string') return null
-  const normalized = value.trim()
-  if (!normalized || normalized.length > 200) return null
-  return normalized
-}
-
-function resolveQuickEditQuotaContext(req: Request): {
-  userId: string | null
-  quotaLimit: number
-} {
-  const userId = sanitizeHeaderValue(req.headers.get('x-clarity-user-id'))
-  const plan = sanitizeHeaderValue(req.headers.get('x-clarity-user-plan'))
-  const quotaLimit = getSubscriptionEntitlements(plan).quickEditQuotaLimit
-
-  return { userId, quotaLimit }
-}
-
 export async function GET(req: Request) {
-  const quotaContext = resolveQuickEditQuotaContext(req)
-  const quota = await getFixedQuotaSnapshot({
-    key: buildQuickEditQuotaKey(req, { userId: quotaContext.userId }),
-    limit: quotaContext.quotaLimit,
-  })
+  const userCtx = await resolveUserContext(req)
+  const quota = await checkTokenBudget(userCtx.userId, userCtx.entitlements.aiTokenLimit)
 
   return Response.json({
     limit: quota.limit,
@@ -136,6 +111,8 @@ export async function GET(req: Request) {
     remaining: quota.remaining,
     allowed: quota.allowed,
     store: quota.store,
+    period: quota.period,
+    plan: userCtx.plan,
   })
 }
 
@@ -147,16 +124,20 @@ export async function POST(req: Request) {
     typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
       ? crypto.randomUUID()
       : `qe-${Date.now()}`
-  const quotaContext = resolveQuickEditQuotaContext(req)
-  const quota = await checkFixedQuota({
-    key: buildQuickEditQuotaKey(req, { userId: quotaContext.userId }),
-    limit: quotaContext.quotaLimit,
-  })
+
+  const userCtx = await resolveUserContext(req)
+  const quota = await checkTokenBudget(userCtx.userId, userCtx.entitlements.aiTokenLimit)
 
   if (!quota.allowed) {
     return createQuotaResponse(
-      'Quick edit quota reached for this client (20 total requests).',
-      { status: 429 },
+      JSON.stringify({
+        error: 'AI token quota exceeded for this billing period.',
+        used: quota.used,
+        limit: quota.limit,
+        period: quota.period,
+        plan: userCtx.plan,
+      }),
+      { status: 429, headers: { 'Content-Type': 'application/json' } },
       quota
     )
   }
@@ -238,6 +219,30 @@ export async function POST(req: Request) {
       )
       result = await runWithModel(GEMINI_DEFAULT_MODEL)
     }
+
+    // Record token usage asynchronously after stream completes
+    void result.usage.then((usage) => {
+      const totalTokens = (usage.promptTokens ?? 0) + (usage.completionTokens ?? 0)
+      if (totalTokens > 0) {
+        void recordTokenUsage(
+          userCtx.userId,
+          userCtx.entitlements.aiTokenLimit,
+          totalTokens
+        ).then((updated) => {
+          console.info(`[Agent QuickEdit ${requestId}] token usage recorded`, {
+            prompt: usage.promptTokens,
+            completion: usage.completionTokens,
+            total: totalTokens,
+            periodUsed: updated.used,
+            periodLimit: updated.limit,
+          })
+        }).catch((err) => {
+          console.error(`[Agent QuickEdit ${requestId}] failed to record token usage`, err)
+        })
+      }
+    }).catch((err) => {
+      console.error(`[Agent QuickEdit ${requestId}] failed to read usage`, err)
+    })
 
     const streamResponse = result.toTextStreamResponse()
     return createQuotaResponse(

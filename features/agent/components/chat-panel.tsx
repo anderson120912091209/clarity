@@ -34,7 +34,7 @@ import { ChatHeader } from './chat-header'
 import { ThreadList } from './thread-list'
 import { StagedChangesBar } from './staged-changes-bar'
 import { ChatMessageList } from './chat-message-list'
-import { ChatInputArea } from './chat-input-area'
+import { ChatInputArea, type ChatInputAreaHandle } from './chat-input-area'
 import { ChatMarkdown } from './chat-markdown'
 import { AssistantFileBlock } from './assistant-file-block'
 
@@ -112,7 +112,7 @@ export function ChatPanel({
   // ── Local UI state ──
 
   const { settings } = useDashboardSettings()
-  const [messageInput, setMessageInput] = useState('')
+  const chatInputRef = useRef<ChatInputAreaHandle>(null)
   const [selectedModel, setSelectedModel] = useState<ChatModelPreference>(
     settings.defaultChatModel
   )
@@ -246,20 +246,13 @@ export function ChatPanel({
     setSelectedModel(nextModel)
   }, [])
 
-  const canSubmit =
-    messageInput.trim().length > 0 &&
-    !session.isSubmitting &&
-    Boolean(projectId) &&
-    Boolean(userId)
-
-  const handleSubmit = useCallback(() => {
-    const prompt = messageInput.trim()
-    if (!prompt) return
-    setMessageInput('')
-    void session.sendPrompt(prompt).catch((error) => {
+  const handleSubmit = useCallback((text: string) => {
+    if (!text) return
+    chatInputRef.current?.clear()
+    void session.sendPrompt(text).catch((error) => {
       console.warn('Failed to send chat prompt:', error)
     })
-  }, [messageInput, session])
+  }, [session])
 
   const handleCopy = useCallback((content: string) => {
     void navigator.clipboard.writeText(content).catch(() => {})
@@ -306,7 +299,7 @@ export function ChatPanel({
 
   const handleNewChat = useCallback(() => {
     void session.createNewChat()
-    setMessageInput('')
+    chatInputRef.current?.clear()
     setShowThreadList(false)
   }, [session])
 
@@ -336,14 +329,10 @@ export function ChatPanel({
   // ── Render ──
 
   return (
-    <div
-      className={cn(
-        'flex h-full w-full flex-col bg-[#121212] transition-opacity duration-300 ease-out',
-        isVisible ? 'opacity-100' : 'opacity-0 pointer-events-none'
-      )}
-    >
-      {/* ── Header ── */}
-      <ChatHeader
+    <div className="relative h-full w-full overflow-hidden bg-[#121212]">
+      <div className="flex h-full w-[max(100%,320px)] min-w-[320px] flex-col">
+        {/* ── Header ── */}
+        <ChatHeader
         threadTitle={session.activeThread?.title?.trim() || undefined}
         onNewChat={handleNewChat}
         onToggleThreadList={() => setShowThreadList((v) => !v)}
@@ -673,12 +662,10 @@ export function ChatPanel({
           )}
 
           <ChatInputArea
-            value={messageInput}
-            onChange={setMessageInput}
+            ref={chatInputRef}
             onSubmit={handleSubmit}
             onStop={session.stopStreaming}
             isSubmitting={session.isSubmitting}
-            disabled={session.isSubmitting}
             modelOptions={QUICK_EDIT_GEMINI_MODEL_OPTIONS}
             selectedModel={selectedModel}
             onModelChange={handleModelChange}
@@ -692,6 +679,7 @@ export function ChatPanel({
           </p>
         )}
       </div>
+    </div>
     </div>
   )
 }
