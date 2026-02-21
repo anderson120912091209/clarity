@@ -18,6 +18,7 @@ import type { AgentChatContext } from '@/features/agent/types/chat-context'
 // --- Types ---
 
 export interface FileEditDelta {
+  fileId?: string
   filePath: string
   editType: 'search_replace' | 'replace_file'
   searchContent: string | null
@@ -39,11 +40,18 @@ export interface ToolResultDelta {
 
 export interface StreamDelta {
   content?: string
+  thinking?: string
   error?: string
   done?: boolean
   fileEdit?: FileEditDelta
   toolCall?: ToolCallDelta
   toolResult?: ToolResultDelta
+  stateTransition?: string
+  stepMetadata?: {
+    stepIndex: number
+    finishReason: string
+    toolCallsInStep: number
+  }
 }
 
 export interface ChatMessage {
@@ -72,10 +80,30 @@ export interface IChatService {
 // --- AI SDK Data Stream Line Parser ---
 
 const TOOL_CALL_NAMES_IN_FLIGHT = new Map<string, string>()
+let CURRENT_STEP_INDEX = 0
+let TOOL_CALLS_IN_CURRENT_STEP = 0
+
+function normalizeStreamLine(rawLine: string): string | null {
+  const trimmed = rawLine.trim()
+  if (!trimmed) return null
+
+  if (trimmed.startsWith(':')) return null
+  if (trimmed.startsWith('event:')) return null
+  if (trimmed.startsWith('id:')) return null
+  if (trimmed.startsWith('retry:')) return null
+
+  if (trimmed.startsWith('data:')) {
+    const dataValue = trimmed.slice(5).trimStart()
+    return dataValue || null
+  }
+
+  return trimmed
+}
 
 function isStructuredFileEditResult(
   value: unknown
 ): value is {
+  fileId?: string
   applied?: unknown
   filePath: string
   editType: 'search_replace' | 'replace_file'
@@ -97,14 +125,157 @@ function isStructuredFileEditResult(
   )
 }
 
-function parseDataStreamLine(line: string): StreamDelta | null {
-  if (!line || line.length < 2) return null
+function extractStructuredFileEditResult(value: unknown): {
+  fileId?: string
+  applied?: unknown
+  filePath: string
+  editType: 'search_replace' | 'replace_file'
+  searchContent?: string | null
+  replaceContent: string
+  description?: string
+} | null {
+  if (isStructuredFileEditResult(value)) return value
+  if (typeof value === 'string') {
+    try {
+      const parsed = JSON.parse(value)
+      return extractStructuredFileEditResult(parsed)
+    } catch {
+      return null
+    }
+  }
+  if (!value || typeof value !== 'object') return null
 
-  const prefix = line[0]
-  const colonIndex = line.indexOf(':')
+  const candidate = value as Record<string, unknown>
+  const nestedKeys = ['result', 'output', 'data', 'value']
+  for (const key of nestedKeys) {
+    if (!(key in candidate)) continue
+    const nested = extractStructuredFileEditResult(candidate[key])
+    if (nested) return nested
+  }
+
+  return null
+}
+
+function parseDataStreamLine(line: string): StreamDelta | null {
+  const normalizedLine = normalizeStreamLine(line)
+  if (!normalizedLine || normalizedLine.length < 2) return null
+  if (normalizedLine === '[DONE]') return { done: true }
+
+  if (normalizedLine.startsWith('{')) {
+    try {
+      const payload = JSON.parse(normalizedLine) as Record<string, unknown>
+      const type = typeof payload.type === 'string' ? payload.type : null
+
+      if (type === 'text-delta') {
+        const text =
+          typeof payload.textDelta === 'string'
+            ? payload.textDelta
+            : typeof payload.delta === 'string'
+              ? payload.delta
+              : typeof payload.text === 'string'
+                ? payload.text
+                : null
+        if (text) return { content: text }
+      }
+
+      if (type === 'tool-call') {
+        const toolCallId = typeof payload.toolCallId === 'string' ? payload.toolCallId : null
+        const toolName = typeof payload.toolName === 'string' ? payload.toolName : null
+        if (toolCallId && toolName) {
+          TOOL_CALL_NAMES_IN_FLIGHT.set(toolCallId, toolName)
+          return {
+            toolCall: {
+              toolCallId,
+              toolName,
+              args:
+                payload.args && typeof payload.args === 'object'
+                  ? (payload.args as Record<string, unknown>)
+                  : {},
+            },
+          }
+        }
+      }
+
+      if (type === 'tool-result') {
+        const toolCallId = typeof payload.toolCallId === 'string' ? payload.toolCallId : null
+        if (!toolCallId) return null
+
+        const toolName =
+          (typeof payload.toolName === 'string' ? payload.toolName : null) ??
+          TOOL_CALL_NAMES_IN_FLIGHT.get(toolCallId) ??
+          'unknown'
+        TOOL_CALL_NAMES_IN_FLIGHT.delete(toolCallId)
+
+        const resultValue =
+          payload.result && typeof payload.result === 'object'
+            ? (payload.result as Record<string, unknown>)
+            : {}
+
+        const result: StreamDelta = {
+          toolResult: {
+            toolCallId,
+            toolName,
+            result: resultValue,
+          },
+        }
+
+        const extractedEditResult = extractStructuredFileEditResult(resultValue)
+        if (
+          (toolName === 'apply_file_edit' || Boolean(extractedEditResult)) &&
+          extractedEditResult &&
+          (extractedEditResult.applied === undefined || extractedEditResult.applied === true)
+        ) {
+          result.fileEdit = {
+            fileId: typeof extractedEditResult.fileId === 'string' ? extractedEditResult.fileId : undefined,
+            filePath: extractedEditResult.filePath,
+            editType: extractedEditResult.editType,
+            searchContent:
+              typeof extractedEditResult.searchContent === 'string'
+                ? extractedEditResult.searchContent
+                : null,
+            replaceContent: extractedEditResult.replaceContent,
+            description: extractedEditResult.description ?? `Edit ${extractedEditResult.filePath}`,
+          }
+        }
+
+        return result
+      }
+
+      if (type === 'reasoning' || type === 'thinking') {
+        const text =
+          typeof payload.text === 'string'
+            ? payload.text
+            : typeof payload.textDelta === 'string'
+              ? payload.textDelta
+              : typeof payload.delta === 'string'
+                ? payload.delta
+                : null
+        if (text) return { thinking: text }
+      }
+
+      if (type === 'error') {
+        const errorMessage =
+          typeof payload.error === 'string'
+            ? payload.error
+            : typeof payload.message === 'string'
+              ? payload.message
+              : 'Unknown error during generation'
+        return { error: errorMessage }
+      }
+
+      if (type === 'finish') {
+        return { done: true }
+      }
+    } catch {
+      // fall through to prefixed parser
+    }
+  }
+
+  const prefix = normalizedLine[0]
+  const colonIndex = normalizedLine.indexOf(':')
   if (colonIndex < 0) return null
 
-  const payload = line.slice(colonIndex + 1)
+  const payload = normalizedLine.slice(colonIndex + 1)
 
   switch (prefix) {
     // 0: text delta
@@ -131,6 +302,7 @@ function parseDataStreamLine(line: string): StreamDelta | null {
 
         // Track tool name for result correlation
         TOOL_CALL_NAMES_IN_FLIGHT.set(data.toolCallId, data.toolName)
+        TOOL_CALLS_IN_CURRENT_STEP++
 
         return {
           toolCall: {
@@ -166,13 +338,15 @@ function parseDataStreamLine(line: string): StreamDelta | null {
         // Special handling for apply_file_edit tool results.
         // Some SDK/provider streams might omit the earlier toolName delta,
         // so we also detect by payload shape.
+        const extractedEditResult = extractStructuredFileEditResult(data.result)
         if (
-          (toolName === 'apply_file_edit' || isStructuredFileEditResult(data.result)) &&
-          isStructuredFileEditResult(data.result) &&
-          (data.result.applied === undefined || data.result.applied === true)
+          (toolName === 'apply_file_edit' || Boolean(extractedEditResult)) &&
+          extractedEditResult &&
+          (extractedEditResult.applied === undefined || extractedEditResult.applied === true)
         ) {
-          const editResult = data.result
+          const editResult = extractedEditResult
           result.fileEdit = {
+            fileId: typeof editResult.fileId === 'string' ? editResult.fileId : undefined,
             filePath: editResult.filePath,
             editType: editResult.editType,
             searchContent: typeof editResult.searchContent === 'string' ? editResult.searchContent : null,
@@ -216,6 +390,7 @@ function parseDataStreamLine(line: string): StreamDelta | null {
           toolName: string
         }
         TOOL_CALL_NAMES_IN_FLIGHT.set(data.toolCallId, data.toolName)
+        TOOL_CALLS_IN_CURRENT_STEP++
 
         return {
           toolCall: {
@@ -236,8 +411,19 @@ function parseDataStreamLine(line: string): StreamDelta | null {
         if (data.finishReason === 'error') {
           return { error: data.error ?? 'Unknown error during generation' }
         }
-        // Step finish — not an error, just continue
-        return null
+        // Step finish — emit stepMetadata and advance step counter
+        const finishReason =
+          typeof data.finishReason === 'string' ? data.finishReason : 'unknown'
+        const stepMeta: StreamDelta = {
+          stepMetadata: {
+            stepIndex: CURRENT_STEP_INDEX,
+            finishReason,
+            toolCallsInStep: TOOL_CALLS_IN_CURRENT_STEP,
+          },
+        }
+        CURRENT_STEP_INDEX++
+        TOOL_CALLS_IN_CURRENT_STEP = 0
+        return stepMeta
       } catch {
         return null
       }
@@ -258,8 +444,37 @@ function parseDataStreamLine(line: string): StreamDelta | null {
       }
     }
 
+    // 2: data / annotations — may contain thinking/reasoning or agent state
+    case '2': {
+      try {
+        const data = JSON.parse(payload)
+        if (Array.isArray(data)) {
+          for (const item of data) {
+            if (item && typeof item === 'object') {
+              const candidate = item as Record<string, unknown>
+              if (
+                (candidate.type === 'reasoning' || candidate.type === 'thinking') &&
+                typeof candidate.text === 'string'
+              ) {
+                return { thinking: candidate.text }
+              }
+              if (
+                candidate.type === 'agent_state' &&
+                typeof candidate.state === 'string'
+              ) {
+                return { stateTransition: candidate.state }
+              }
+            }
+          }
+        }
+        return null
+      } catch {
+        return null
+      }
+    }
+
     default:
-      // Ignore unknown prefixes (2: data, 8: message annotation, f: message id, etc.)
+      // Ignore unknown prefixes (8: message annotation, f: message id, etc.)
       return null
   }
 }
@@ -345,6 +560,8 @@ class DataStreamChatService implements IChatService {
           reader.releaseLock()
           abortControllers.delete(requestId)
           TOOL_CALL_NAMES_IN_FLIGHT.clear()
+          CURRENT_STEP_INDEX = 0
+          TOOL_CALLS_IN_CURRENT_STEP = 0
           yield { done: true }
         }
       }

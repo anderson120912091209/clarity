@@ -88,6 +88,7 @@ const _schema = i.schema({
       parent_id: i.string().optional(),
       pathname: i.string().optional(),
       projectId: i.string().optional(),
+      storagePath: i.string().optional(),
       type: i.string().optional(),
       url: i.string().optional(),
       user_id: i.string().optional(),

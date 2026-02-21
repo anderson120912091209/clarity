@@ -97,6 +97,7 @@ interface HighlightCluster {
 }
 
 interface StructuredFileEditPayload {
+  fileId?: string
   filePath: string
   editType: 'search_replace' | 'replace_file'
   searchContent: string | null
@@ -136,6 +137,7 @@ function parseStructuredFileEditPayloads(messageContent: string): StructuredFile
   for (const candidate of candidates) {
     if (!candidate || typeof candidate !== 'object') continue
     const raw = candidate as {
+      fileId?: unknown
       filePath?: unknown
       editType?: unknown
       searchContent?: unknown
@@ -147,6 +149,7 @@ function parseStructuredFileEditPayloads(messageContent: string): StructuredFile
     if (typeof raw.replaceContent !== 'string') continue
 
     payloads.push({
+      fileId: typeof raw.fileId === 'string' ? raw.fileId.trim() : undefined,
       filePath: raw.filePath.trim(),
       editType: raw.editType,
       searchContent: typeof raw.searchContent === 'string' ? raw.searchContent : null,
@@ -885,17 +888,31 @@ function EditorLayout() {
       if (!trimmed) return
 
       const structuredEdits = parseStructuredFileEditPayloads(trimmed)
-      const structuredBlocks: AssistantInsertBlock[] = structuredEdits.map((edit) => ({
-        filePath: edit.filePath,
-        insertMode: edit.editType === 'search_replace' ? ('search_replace' as InsertMode) : ('replace_file' as InsertMode),
-        hasExplicitInsertMode: true,
-        code:
-          edit.editType === 'search_replace' && edit.searchContent
-            ? buildSearchReplaceConflictBlock(edit.searchContent, edit.replaceContent)
-            : edit.replaceContent,
+      type BlockWithTarget = {
+        block: AssistantInsertBlock
+        targetFileId?: string | null
+      }
+
+      const structuredBlocks: BlockWithTarget[] = structuredEdits.map((edit) => ({
+        targetFileId: edit.fileId ?? null,
+        block: {
+          filePath: edit.filePath,
+          insertMode:
+            edit.editType === 'search_replace'
+              ? ('search_replace' as InsertMode)
+              : ('replace_file' as InsertMode),
+          hasExplicitInsertMode: true,
+          code:
+            edit.editType === 'search_replace' && edit.searchContent
+              ? buildSearchReplaceConflictBlock(edit.searchContent, edit.replaceContent)
+              : edit.replaceContent,
+        },
       }))
 
-      const parsedBlocks = parseAssistantInsertBlocks(trimmed)
+      const parsedBlocks = parseAssistantInsertBlocks(trimmed).map((block) => ({
+        block,
+        targetFileId: null,
+      }))
       const machineBlocks = parsedBlocks.length > 0 ? parsedBlocks : structuredBlocks
 
       if (options?.auto && machineBlocks.length === 0) {
@@ -906,8 +923,11 @@ function EditorLayout() {
           ? machineBlocks
           : [
               {
-                code: trimmed,
-                insertMode: 'append' as InsertMode,
+                block: {
+                  code: trimmed,
+                  insertMode: 'append' as InsertMode,
+                },
+                targetFileId: null,
               },
             ]
 
@@ -923,7 +943,8 @@ function EditorLayout() {
       const stagedByFileId = new Map<string, PendingStageEntry>()
       let primaryTarget: { fileId: string; focusLine: number } | null = null
 
-      for (const block of blocksToApply) {
+      for (const entry of blocksToApply) {
+        const block = entry.block
         if (
           machineBlocks.length > 0 &&
           block.insertMode === 'append' &&
@@ -938,9 +959,15 @@ function EditorLayout() {
         }
 
         const explicitTargetPath = block.filePath?.trim()
-        const targetFile = explicitTargetPath
-          ? findFileByPath(explicitTargetPath)
-          : currentlyOpen
+        const targetFileById =
+          entry.targetFileId && fileIdMap.current.has(entry.targetFileId)
+            ? fileIdMap.current.get(entry.targetFileId)
+            : null
+        const targetFile = targetFileById
+          ? targetFileById
+          : explicitTargetPath
+            ? findFileByPath(explicitTargetPath)
+            : currentlyOpen
 
         if (!targetFile?.id) {
           console.warn(

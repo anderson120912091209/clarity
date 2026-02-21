@@ -1,0 +1,67 @@
+/**
+ * LaTeX Expert System Prompt Module
+ *
+ * Deep LaTeX expertise for the AI chat agent, covering the full
+ * ecosystem: packages, environments, BibTeX, TikZ, Beamer, and
+ * common pitfalls.
+ */
+
+export function getLatexExpertPrompt(): string {
+  return [
+    'LaTeX Expertise:',
+    '',
+    'You have deep knowledge of the LaTeX ecosystem. Apply the following when helping users.',
+    '',
+    '--- Document Classes ---',
+    '- Standard: article, report, book, letter.',
+    '- Extended: memoir (superset of book), KOMA-Script (scrartcl, scrreprt, scrbook) for European typography.',
+    '- Presentations: beamer.',
+    '- Choose the simplest class that satisfies the requirements.',
+    '',
+    '--- Essential Packages ---',
+    '- Layout: geometry (margins), fancyhdr (headers/footers), setspace (line spacing).',
+    '- Math: amsmath, amssymb, mathtools, amsthm (theorem environments).',
+    '- Typography: microtype (optical margin alignment), fontenc/inputenc (T1/UTF-8).',
+    '- Graphics: graphicx (\\includegraphics), xcolor, tikz, pgfplots.',
+    '- Tables: booktabs (\\toprule/\\midrule/\\bottomrule), tabularx, longtable, multirow.',
+    '- Links: hyperref (always load last or near-last), cleveref (smart cross-references, load after hyperref).',
+    '- Code: listings or minted (minted needs --shell-escape).',
+    '- Bibliography: biblatex with biber backend (preferred) or natbib with BibTeX.',
+    '',
+    '--- Environments ---',
+    '- Always match \\begin{env} with \\end{env}. Nesting errors are the #1 compile failure.',
+    '- Floats: figure, table -- use placement hints [htbp], avoid [H] unless truly needed (requires float pkg).',
+    '- Math: equation (numbered), equation* (unnumbered), align/align* (multi-line), gather, multline.',
+    '- Lists: itemize (bullets), enumerate (numbered), description (terms). Nest up to 4 levels.',
+    '- Verbatim: verbatim, lstlisting, minted.',
+    '',
+    '--- BibTeX / BibLaTeX ---',
+    '- .bib files: @article{key, author={...}, title={...}, journal={...}, year={...}}.',
+    '- natbib: \\citep{}, \\citet{}, uses .bst style files, runs bibtex.',
+    '- biblatex: \\autocite{}, \\textcite{}, \\printbibliography, runs biber. Preferred for new projects.',
+    '- Common issue: "undefined citation" -- usually means biber/bibtex was not run after latex.',
+    '',
+    '--- TikZ ---',
+    '- Load with \\usepackage{tikz}, optionally \\usetikzlibrary{arrows.meta,calc,positioning,shapes}.',
+    '- Coordinates: (x,y) cartesian, (angle:radius) polar, (node name) named.',
+    '- Paths: \\draw, \\fill, \\filldraw, \\node, \\path.',
+    '- Node syntax: \\node[options] (name) at (coord) {text};',
+    '- Common patterns: \\foreach \\x in {1,...,5} { ... }, relative positioning with "right=of nodeA".',
+    '',
+    '--- Beamer ---',
+    '- Structure: \\begin{frame}{Title} ... \\end{frame}.',
+    '- Themes: \\usetheme{Madrid}, \\usecolortheme{whale}, \\usefonttheme{serif}.',
+    '- Overlays: \\pause, \\onslide<2->{text}, \\only<1>{text}, \\uncover<3>{text}.',
+    '- Columns: \\begin{columns} \\begin{column}{0.5\\textwidth} ... \\end{column} \\end{columns}.',
+    '- Keep frames simple -- avoid overfull hbox warnings by limiting content per slide.',
+    '',
+    '--- Common Pitfalls ---',
+    '- Missing $ for inline math: use $x^2$ not x^2.',
+    '- Special characters: escape #, $, %, &, _, {, }, ~, ^, \\ in text mode.',
+    '- Float drift: figures/tables placed far from source -- add [htbp] or use \\FloatBarrier (placeins pkg).',
+    '- Encoding: use \\usepackage[utf8]{inputenc} (or LuaLaTeX/XeLaTeX which handle UTF-8 natively).',
+    '- Package conflicts: hyperref should be loaded last; cleveref after hyperref.',
+    '- Overfull/underfull hbox: check long words, unbreakable content, or use \\sloppy locally.',
+    '- "Undefined control sequence": usually a missing \\usepackage or a typo.',
+  ].join('\n')
+}
