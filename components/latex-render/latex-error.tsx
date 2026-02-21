@@ -1,6 +1,7 @@
 'use client'
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert'
-import { AlertCircle } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { AlertCircle, Bug, Loader2 } from 'lucide-react'
 
 function parseLatexError(error: string): { summary: string; details?: string } {
   const normalized = error.trim()
@@ -28,7 +29,19 @@ function parseLatexError(error: string): { summary: string; details?: string } {
   }
 }
 
-export default function LatexError({ error }: { error: string }) {
+interface LatexErrorProps {
+  error: string
+  onAiDebug?: () => void
+  isAiDebugging?: boolean
+  isAiDebugEnabled?: boolean
+}
+
+export default function LatexError({
+  error,
+  onAiDebug,
+  isAiDebugging = false,
+  isAiDebugEnabled = true,
+}: LatexErrorProps) {
   const parsed = parseLatexError(error)
 
   return (
@@ -42,6 +55,32 @@ export default function LatexError({ error }: { error: string }) {
             {parsed.details}
           </pre>
         ) : null}
+        {isAiDebugEnabled ? (
+          <div className="flex items-center gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={onAiDebug}
+              disabled={!onAiDebug || isAiDebugging}
+              className="h-8 border-red-400/50 bg-red-500/10 text-red-100 hover:bg-red-500/20 hover:text-red-50 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {isAiDebugging ? (
+                <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <Bug className="mr-1.5 h-3.5 w-3.5" />
+              )}
+              {isAiDebugging ? 'AI debugging...' : 'AI Debug & Fix'}
+            </Button>
+            <p className="text-xs text-red-200/70">
+              Runs a one-click agent flow: inspect logs, diagnose root cause, and stage/apply edits.
+            </p>
+          </div>
+        ) : (
+          <p className="text-xs text-red-200/70">
+            AI Debug is unavailable because AI Chat is disabled.
+          </p>
+        )}
         <p className="text-xs text-red-200/70">
           Open the logs panel to view full compiler diagnostics.
         </p>

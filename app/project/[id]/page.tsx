@@ -31,6 +31,7 @@ import {
   type AssistantInsertBlock,
   type InsertMode,
 } from '@/features/agent/lib/assistant-insert'
+import { buildLatexAutoDebugPrompt } from '@/features/agent/services/latex-debug-agent'
 import { chatApplyService, type FileSuggestionApplyMode } from '@/services/agent/browser/chat/chatApplyService'
 import { changeManagerService, type StagedFileChange } from '@/features/agent/services/change-manager'
 import type { AgentWorkspaceFileContext } from '@/features/agent/types/chat-context'
@@ -100,6 +101,12 @@ interface StructuredFileEditPayload {
   editType: 'search_replace' | 'replace_file'
   searchContent: string | null
   replaceContent: string
+}
+
+interface ChatPromptRequest {
+  id: string
+  prompt: string
+  autoApplyStagedEdits?: boolean
 }
 
 function buildSearchReplaceConflictBlock(search: string, replace: string): string {
@@ -260,6 +267,8 @@ function shouldEnableCollabDebug(): boolean {
 function EditorLayout() {
   const searchParams = useSearchParams()
   const [isChatVisible, setIsChatVisible] = useState(false)
+  const [chatPromptRequest, setChatPromptRequest] = useState<ChatPromptRequest | null>(null)
+  const [activeLatexDebugRequestId, setActiveLatexDebugRequestId] = useState<string | null>(null)
   const [followConnectionId, setFollowConnectionId] = useState<number | null>(null)
   const [activeSelectionForComments, setActiveSelectionForComments] =
     useState<EditorSelectionPayload | null>(null)
@@ -815,6 +824,53 @@ function EditorLayout() {
     isRealtimeCollaborationEnabled,
     user?.id,
   ])
+  const isLatexAutoDebugRunning = Boolean(activeLatexDebugRequestId)
+
+  const handleLatexAutoDebug = useCallback(() => {
+    if (!isAiChatEnabled) return
+    if (!error || isLatexAutoDebugRunning) return
+
+    const requestId = instantId()
+    const debugPrompt = buildLatexAutoDebugPrompt({
+      compileError: error,
+      activeFilePath: activeFilePathForCollaboration,
+    })
+
+    setIsChatVisible(true)
+    setActiveLatexDebugRequestId(requestId)
+    setChatPromptRequest({
+      id: requestId,
+      prompt: debugPrompt,
+      autoApplyStagedEdits: true,
+    })
+  }, [
+    activeFilePathForCollaboration,
+    error,
+    isAiChatEnabled,
+    isLatexAutoDebugRunning,
+  ])
+
+  const handleChatExternalPromptConsumed = useCallback((requestId: string) => {
+    setChatPromptRequest((current) => (current?.id === requestId ? null : current))
+  }, [])
+
+  const handleChatExternalPromptSettled = useCallback(
+    (result: {
+      requestId: string
+      status: 'completed' | 'interrupted' | 'error' | 'skipped'
+      assistantMessageId: string | null
+    }) => {
+      if (result.requestId !== activeLatexDebugRequestId) return
+      setActiveLatexDebugRequestId(null)
+    },
+    [activeLatexDebugRequestId]
+  )
+
+  useEffect(() => {
+    if (error) return
+    setActiveLatexDebugRequestId(null)
+    setChatPromptRequest(null)
+  }, [error])
 
   const handleInsertAssistantContent = useCallback(
     (
@@ -1467,6 +1523,9 @@ function EditorLayout() {
               onPdfPointSelect={handlePdfPointSelect}
               isPdfNavigationEnabled={isPdfNavigationEnabled}
               onPdfReady={handlePdfReady}
+              onAiDebug={isAiChatEnabled ? handleLatexAutoDebug : undefined}
+              isAiDebugging={isLatexAutoDebugRunning}
+              isAiDebugEnabled={isAiChatEnabled}
             />
           </ResizablePanel>
           {isAiChatEnabled && isChatVisible && (
@@ -1496,6 +1555,9 @@ function EditorLayout() {
                   onRejectStagedFile={handleRejectStagedFile}
                   onAcceptAllStaged={handleAcceptAllStaged}
                   onRejectAllStaged={handleRejectAllStaged}
+                  externalPromptRequest={chatPromptRequest}
+                  onExternalPromptConsumed={handleChatExternalPromptConsumed}
+                  onExternalPromptSettled={handleChatExternalPromptSettled}
                 />
               </ResizablePanel>
             </>

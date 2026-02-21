@@ -441,6 +441,9 @@ interface LatexRendererProps {
   onPdfPointSelect?: (point: { page: number; h: number; v: number }) => void
   isPdfNavigationEnabled?: boolean
   onPdfReady?: () => void
+  onAiDebug?: () => void
+  isAiDebugging?: boolean
+  isAiDebugEnabled?: boolean
 }
 
 
@@ -458,6 +461,9 @@ function LatexRenderer({
   onPdfPointSelect,
   isPdfNavigationEnabled = true,
   onPdfReady,
+  onAiDebug,
+  isAiDebugging = false,
+  isAiDebugEnabled = true,
 }: LatexRendererProps) {
   const { project: data, projectId } = useProject();
   const { settings } = useDashboardSettings()
@@ -586,7 +592,12 @@ function LatexRenderer({
         <LatexLoading />
       ) : error ? (
         <div className="flex justify-center items-start w-full h-full p-4 overflow-auto">
-          <LatexError error={error} />
+          <LatexError
+            error={error}
+            onAiDebug={onAiDebug}
+            isAiDebugging={isAiDebugging}
+            isAiDebugEnabled={isAiDebugEnabled}
+          />
         </div>
       ) : pdfUrl ? (
         <div

@@ -46,11 +46,23 @@ import { parseRawResponse } from '@/features/agent/services/response-parser'
 import { cn } from '@/lib/utils'
 import { ChatMarkdown } from './chat-markdown'
 import { AssistantFileBlock } from './assistant-file-block'
-import type { StagedFileChange } from '@/features/agent/services/change-manager'
+import { changeManagerService, type StagedFileChange } from '@/features/agent/services/change-manager'
 import type {
   AgentChatContext,
   AgentWorkspaceFileContext,
 } from '@/features/agent/types/chat-context'
+
+export interface ChatPanelExternalPromptRequest {
+  id: string
+  prompt: string
+  autoApplyStagedEdits?: boolean
+}
+
+interface ExternalPromptResult {
+  requestId: string
+  status: 'completed' | 'interrupted' | 'error' | 'skipped'
+  assistantMessageId: string | null
+}
 
 interface ChatPanelProps {
   projectId: string
@@ -80,6 +92,9 @@ interface ChatPanelProps {
   onRejectStagedFile?: (fileId: string) => void | Promise<void>
   onAcceptAllStaged?: () => void | Promise<void>
   onRejectAllStaged?: () => void | Promise<void>
+  externalPromptRequest?: ChatPanelExternalPromptRequest | null
+  onExternalPromptConsumed?: (requestId: string) => void
+  onExternalPromptSettled?: (result: ExternalPromptResult) => void
 }
 
 interface ToolCallInfo {
@@ -98,10 +113,21 @@ interface PanelMessage {
   fileEdits?: FileEditDelta[]
 }
 
+interface SendPromptOptions {
+  autoApplyStagedEdits?: boolean
+}
+
+interface SendPromptResult {
+  status: 'completed' | 'interrupted' | 'error' | 'skipped'
+  assistantMessageId: string | null
+}
+
 const MAX_ACTIVE_FILE_CHARS = 36000
 const MAX_WORKSPACE_FILE_CHARS = 18000
 const MAX_WORKSPACE_TOTAL_CHARS = 150000
 const MAX_COMPILE_LOG_CHARS = 24000
+const AUTO_APPLY_POLL_TIMEOUT_MS = 2200
+const AUTO_APPLY_POLL_INTERVAL_MS = 120
 
 function trimWithNotice(value: string, maxChars: number): string {
   if (value.length <= maxChars) return value
@@ -133,6 +159,15 @@ function isChatModelPreference(value: string): value is ChatModelPreference {
   return QUICK_EDIT_GEMINI_MODEL_OPTIONS.some((option) => option.value === value)
 }
 
+function normalizePath(input: string): string {
+  return input
+    .replace(/\\/g, '/')
+    .replace(/^\.?\//, '')
+    .replace(/\/+/g, '/')
+    .trim()
+    .toLowerCase()
+}
+
 export function ChatPanel({
   projectId,
   userId,
@@ -154,6 +189,9 @@ export function ChatPanel({
   onRejectStagedFile,
   onAcceptAllStaged,
   onRejectAllStaged,
+  externalPromptRequest = null,
+  onExternalPromptConsumed,
+  onExternalPromptSettled,
 }: ChatPanelProps) {
   const { settings } = useDashboardSettings()
   const [messageInput, setMessageInput] = useState('')
@@ -178,6 +216,7 @@ export function ChatPanel({
   const manualStopRef = useRef(false)
   const persistedActiveThreadRef = useRef<string | null>(null)
   const messagesEndRef = useRef<HTMLDivElement | null>(null)
+  const consumedExternalPromptIdRef = useRef<string | null>(null)
 
   const {
     threads,
@@ -292,6 +331,78 @@ export function ChatPanel({
       unlinkedStagedChanges: unlinked,
     }
   }, [stagedChanges])
+  const workspaceFileIdByPath = useMemo(() => {
+    const map = new Map<string, string>()
+    for (const file of workspaceFiles) {
+      if (!file?.fileId || !file.path) continue
+      map.set(normalizePath(file.path), file.fileId)
+    }
+    return map
+  }, [workspaceFiles])
+
+  const resolveStagedFileIdsForMessage = useCallback(
+    (messageId: string, editedPaths: string[]): string[] => {
+      const linkedFromProps = stagedChanges
+        .filter((change) => change.sourceMessageId === messageId)
+        .map((change) => change.fileId)
+      if (linkedFromProps.length > 0) {
+        return Array.from(new Set(linkedFromProps))
+      }
+
+      const linkedFromStore = changeManagerService
+        .getAllChanges()
+        .filter((change) => change.sourceMessageId === messageId)
+        .map((change) => change.fileId)
+      if (linkedFromStore.length > 0) {
+        return Array.from(new Set(linkedFromStore))
+      }
+
+      const matchedByPath = editedPaths
+        .map((path) => workspaceFileIdByPath.get(normalizePath(path)))
+        .filter((fileId): fileId is string => Boolean(fileId))
+      if (matchedByPath.length === 0) return []
+
+      return matchedByPath.filter((fileId, index) => {
+        if (matchedByPath.indexOf(fileId) !== index) return false
+        const stagedEntry =
+          stagedChanges.find((change) => change.fileId === fileId) ??
+          changeManagerService.getChange(fileId)
+        return stagedEntry?.sourceMessageId === messageId
+      })
+    },
+    [stagedChanges, workspaceFileIdByPath]
+  )
+
+  const autoApplyLinkedToolEdits = useCallback(
+    async (assistantMessageId: string, editedPaths: string[]) => {
+      if (!onAcceptStagedFile) return
+      if (editedPaths.length === 0) return
+
+      const deadline = Date.now() + AUTO_APPLY_POLL_TIMEOUT_MS
+      let fileIds: string[] = []
+      while (Date.now() < deadline) {
+        fileIds = resolveStagedFileIdsForMessage(assistantMessageId, editedPaths)
+        if (fileIds.length > 0) break
+        await new Promise((resolve) => setTimeout(resolve, AUTO_APPLY_POLL_INTERVAL_MS))
+      }
+
+      if (fileIds.length === 0) {
+        console.warn(
+          `[AI Chat] Auto-apply requested for message ${assistantMessageId}, but no linked staged files were found.`
+        )
+        return
+      }
+
+      for (const fileId of fileIds) {
+        try {
+          await onAcceptStagedFile(fileId)
+        } catch (error) {
+          console.warn(`[AI Chat] Failed to auto-apply staged change for ${fileId}:`, error)
+        }
+      }
+    },
+    [onAcceptStagedFile, resolveStagedFileIdsForMessage]
+  )
 
   const currentDocumentLabel = useMemo(() => {
     if (!activeFileName) return 'Current document'
@@ -478,9 +589,14 @@ export function ChatPanel({
   )
 
   const sendPrompt = useCallback(
-    async (prompt: string) => {
+    async (prompt: string, options: SendPromptOptions = {}): Promise<SendPromptResult> => {
       const trimmedPrompt = prompt.trim()
-      if (!trimmedPrompt || isSubmitting) return
+      if (!trimmedPrompt || isSubmitting) {
+        return {
+          status: 'skipped',
+          assistantMessageId: null,
+        }
+      }
 
       const threadId = await ensureActiveThread(trimmedPrompt)
 
@@ -515,11 +631,7 @@ export function ChatPanel({
       let runId: string | null = null
       let streamedResponse = ''
       const collectedFileEdits: FileEditDelta[] = []
-
-      setSubmitError(null)
-      setIsSubmitting(true)
-      manualStopRef.current = false
-      abortControllerRef.current = controller
+      let completionStatus: SendPromptResult['status'] = 'completed'
 
       const userMessageId = await upsertThreadMessage({
         threadId,
@@ -551,6 +663,11 @@ export function ChatPanel({
         })
       }
 
+      setSubmitError(null)
+      setIsSubmitting(true)
+      manualStopRef.current = false
+      abortControllerRef.current = controller
+
       setLiveAssistantMessage({
         id: assistantMessageId,
         role: 'assistant',
@@ -581,7 +698,6 @@ export function ChatPanel({
           if (delta.error) throw new Error(delta.error)
           if (delta.done) break
 
-          // Handle text content
           if (delta.content) {
             streamedResponse += delta.content
             setLiveAssistantMessage((prev) =>
@@ -591,7 +707,6 @@ export function ChatPanel({
             )
           }
 
-          // Handle tool call start (show status pill)
           if (delta.toolCall) {
             const tc = delta.toolCall
             setLiveAssistantMessage((prev) => {
@@ -601,12 +716,14 @@ export function ChatPanel({
               if (alreadyTracked) return prev
               return {
                 ...prev,
-                toolCalls: [...existing, { toolCallId: tc.toolCallId, toolName: tc.toolName, status: 'running' as const }],
+                toolCalls: [
+                  ...existing,
+                  { toolCallId: tc.toolCallId, toolName: tc.toolName, status: 'running' as const },
+                ],
               }
             })
           }
 
-          // Handle tool result (mark complete, stage file edits)
           if (delta.toolResult) {
             setLiveAssistantMessage((prev) => {
               if (!prev || prev.id !== assistantMessageId) return prev
@@ -619,7 +736,6 @@ export function ChatPanel({
             })
           }
 
-          // Handle file edit from apply_file_edit tool
           if (delta.fileEdit) {
             const edit = delta.fileEdit
             collectedFileEdits.push(edit)
@@ -629,7 +745,6 @@ export function ChatPanel({
               return { ...prev, fileEdits: [...collectedFileEdits] }
             })
 
-            // Stage the change via changeManager so it shows as an AssistantFileBlock
             if (onInsertIntoEditor) {
               void onInsertIntoEditor(JSON.stringify(edit), {
                 auto: true,
@@ -639,17 +754,18 @@ export function ChatPanel({
             }
           }
         }
-        // Apply fallback parsing to clean any raw @file: metadata that leaked through
-        const parsed = parseRawResponse(streamedResponse)
-        const finalContent = parsed.displayText.trim().length > 0
-          ? parsed.displayText
-          : streamedResponse.trim().length > 0
-            ? streamedResponse
-            : 'No response received.'
 
-        // If fallback parser found edits, stage them too
+        const parsed = parseRawResponse(streamedResponse)
+        const finalContent =
+          parsed.displayText.trim().length > 0
+            ? parsed.displayText
+            : streamedResponse.trim().length > 0
+              ? streamedResponse
+              : 'No response received.'
+
         if (parsed.fileEdits.length > 0 && onInsertIntoEditor) {
           for (const edit of parsed.fileEdits) {
+            collectedFileEdits.push(edit)
             void onInsertIntoEditor(JSON.stringify(edit), {
               auto: true,
               sourceMessageId: assistantMessageId,
@@ -673,14 +789,22 @@ export function ChatPanel({
         if (runId) {
           await finishRun(runId, 'completed')
         }
+
+        if (options.autoApplyStagedEdits) {
+          const editedPaths = collectedFileEdits.map((edit) => edit.filePath)
+          await autoApplyLinkedToolEdits(assistantMessageId, editedPaths)
+        }
       } catch (error) {
         const aborted = manualStopRef.current || controller.signal.aborted
-        const errorMessage = error instanceof Error ? error.message : 'Failed to stream chat response.'
-        const fallbackContent = streamedResponse.trim().length > 0
-          ? streamedResponse
-          : aborted
-            ? 'Generation stopped.'
-            : 'Failed to generate a response. Please try again.'
+        completionStatus = aborted ? 'interrupted' : 'error'
+        const errorMessage =
+          error instanceof Error ? error.message : 'Failed to stream chat response.'
+        const fallbackContent =
+          streamedResponse.trim().length > 0
+            ? streamedResponse
+            : aborted
+              ? 'Generation stopped.'
+              : 'Failed to generate a response. Please try again.'
 
         await upsertThreadMessage({
           messageId: assistantMessageId,
@@ -696,7 +820,11 @@ export function ChatPanel({
         })
 
         if (runId) {
-          await finishRun(runId, aborted ? 'aborted' : 'failed', aborted ? undefined : errorMessage)
+          await finishRun(
+            runId,
+            aborted ? 'aborted' : 'failed',
+            aborted ? undefined : errorMessage
+          )
         }
 
         if (!aborted) {
@@ -710,8 +838,14 @@ export function ChatPanel({
         abortControllerRef.current = null
         manualStopRef.current = false
       }
+
+      return {
+        status: completionStatus,
+        assistantMessageId,
+      }
     },
     [
+      autoApplyLinkedToolEdits,
       ensureActiveThread,
       isSubmitting,
       memorySystemMessage,
@@ -726,11 +860,57 @@ export function ChatPanel({
     ]
   )
 
+  useEffect(() => {
+    if (!externalPromptRequest) return
+    const requestId = externalPromptRequest.id.trim()
+    if (!requestId) return
+    if (consumedExternalPromptIdRef.current === requestId) return
+    if (isSubmitting) return
+
+    consumedExternalPromptIdRef.current = requestId
+    onExternalPromptConsumed?.(requestId)
+    setSubmitError(null)
+    setMessageInput('')
+
+    void (async () => {
+      try {
+        const result = await sendPrompt(externalPromptRequest.prompt, {
+          autoApplyStagedEdits: externalPromptRequest.autoApplyStagedEdits,
+        })
+
+        onExternalPromptSettled?.({
+          requestId,
+          status: result.status,
+          assistantMessageId: result.assistantMessageId,
+        })
+      } catch (error) {
+        const message =
+          error instanceof Error ? error.message : 'Failed to run external chat prompt.'
+        setSubmitError(message)
+        onExternalPromptSettled?.({
+          requestId,
+          status: 'error',
+          assistantMessageId: null,
+        })
+      }
+    })()
+  }, [
+    externalPromptRequest,
+    isSubmitting,
+    onExternalPromptConsumed,
+    onExternalPromptSettled,
+    sendPrompt,
+  ])
+
   const handleSubmit = useCallback(() => {
     const prompt = messageInput.trim()
     if (!prompt) return
     setMessageInput('')
-    void sendPrompt(prompt)
+    void sendPrompt(prompt).catch((error) => {
+      const message = error instanceof Error ? error.message : 'Failed to send prompt.'
+      setSubmitError(message)
+      console.warn('Failed to send chat prompt:', error)
+    })
   }, [messageInput, sendPrompt])
 
   const handleRetryAssistantResponse = useCallback(
@@ -742,7 +922,11 @@ export function ChatPanel({
       for (let index = assistantIndex - 1; index >= 0; index -= 1) {
         const candidate = messages[index]
         if (candidate.role === 'user') {
-          void sendPrompt(candidate.content)
+          void sendPrompt(candidate.content).catch((error) => {
+            const message = error instanceof Error ? error.message : 'Failed to retry prompt.'
+            setSubmitError(message)
+            console.warn('Failed to retry chat prompt:', error)
+          })
           return
         }
       }

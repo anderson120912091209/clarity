@@ -111,7 +111,7 @@ export class ResilientIndexedDBStorage {
     const db = await this.dbPromise
 
     return new Promise((resolve, reject) => {
-      let request: IDBRequest<unknown>
+      let request: IDBRequest<IDBValidKey>
 
       try {
         const tx = db.transaction([this.storeName], 'readwrite')
