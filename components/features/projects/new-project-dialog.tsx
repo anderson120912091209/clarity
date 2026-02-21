@@ -11,8 +11,10 @@ import { useDashboardSettings } from '@/contexts/DashboardSettingsContext'
 import { db } from '@/lib/constants'
 import { tx, id } from '@instantdb/react'
 import { templateContent, typstTemplateContent } from '@/lib/constants/templates'
-import { LayoutTemplate, Command, Loader2 } from 'lucide-react'
-import { getWorkspaceName } from '@/lib/utils'
+import { latexTemplates, typstTemplates } from '@/lib/constants/templates'
+import TemplateCard from '@/components/projects/template-card'
+import { FileText, Loader2, ArrowRight, LayoutTemplate, Command, CheckIcon } from 'lucide-react'
+import { getWorkspaceName, cn } from '@/lib/utils'
 import posthog from 'posthog-js'
 
 interface NewProjectDialogProps {
@@ -39,7 +41,19 @@ export function NewProjectDialog({ children, open: controlledOpen, onOpenChange:
   const router = useRouter()
   const [title, setTitle] = useState('')
   const [docType, setDocType] = useState<'latex' | 'typst'>('latex')
+  const [selectedTemplate, setSelectedTemplate] = useState('blank')
+  const [isExpanded, setIsExpanded] = useState(false)
   const [isCreating, setIsCreating] = useState(false)
+
+  const currentTemplates = docType === 'latex' ? latexTemplates : typstTemplates
+
+  // Reset template selection when switching doc type if current template invalid
+  useEffect(() => {
+    const templateExists = currentTemplates.find(t => t.id === selectedTemplate)
+    if (!templateExists) {
+      setSelectedTemplate('blank')
+    }
+  }, [docType, currentTemplates, selectedTemplate])
 
   // Focus title input on open
   useEffect(() => {
@@ -51,6 +65,8 @@ export function NewProjectDialog({ children, open: controlledOpen, onOpenChange:
       // Reset state on close
       setTitle('')
       setDocType('latex')
+      setSelectedTemplate('blank')
+      setIsExpanded(false)
       setIsCreating(false)
     }
   }, [open])
@@ -67,9 +83,9 @@ export function NewProjectDialog({ children, open: controlledOpen, onOpenChange:
         
         let content = ''
         if (docType === 'latex') {
-          content = templateContent['blank'] // Default to blank
+          content = templateContent[selectedTemplate as keyof typeof templateContent] || templateContent['blank']
         } else {
-          content = typstTemplateContent['blank'] // Default to blank
+          content = typstTemplateContent[selectedTemplate as keyof typeof typstTemplateContent] || typstTemplateContent['blank']
         }
     
         const createFileStructure = () => {
@@ -94,7 +110,7 @@ export function NewProjectDialog({ children, open: controlledOpen, onOpenChange:
             user_id: user.id,
             title: title.trim(),
             project_content: content,
-            template: 'blank',
+            template: selectedTemplate,
             last_compiled: new Date(),
             word_count: 0,
             page_count: 0,
@@ -126,7 +142,7 @@ export function NewProjectDialog({ children, open: controlledOpen, onOpenChange:
         posthog.capture('project_created', {
           project_id: newProjectId,
           doc_type: docType,
-          template: 'blank',
+          template: selectedTemplate,
           source: 'quick_dialog',
         })
 
@@ -152,6 +168,10 @@ export function NewProjectDialog({ children, open: controlledOpen, onOpenChange:
   }, [open, handleCreate])
 
   const handleBrowseTemplates = () => {
+    setIsExpanded(!isExpanded)
+  }
+
+  const handleRouteToMarketplace = () => {
     setOpen(false)
     router.push('/new')
   }
@@ -177,8 +197,10 @@ export function NewProjectDialog({ children, open: controlledOpen, onOpenChange:
       ) : (
         triggerContent
       )}
-      <DialogContent className="sm:max-w-[600px] sm:top-[46%] p-0 gap-0 bg-[#1C1D1F]
-       border-[#2C2C2C] shadow-2xl overflow-hidden">
+      <DialogContent className={cn(
+        "sm:top-[46%] p-0 gap-0 bg-[#1C1D1F] border-[#2C2C2C] shadow-2xl overflow-hidden transition-all duration-200 ease-out",
+        isExpanded ? "sm:max-w-[800px]" : "sm:max-w-[600px]"
+      )}>
         <DialogTitle className="sr-only">Create new project</DialogTitle>
         
         {/* Header / Title Input */}
@@ -205,6 +227,35 @@ export function NewProjectDialog({ children, open: controlledOpen, onOpenChange:
             />
 
         </div>
+
+        {/* Expanded Templates Section */}
+        {isExpanded && (
+            <div className="px-6 pb-6 pt-2 border-t border-white/5 bg-[#151619]/50 animate-in slide-in-from-top-4 fade-in duration-300">
+                <div className="flex items-center justify-between mb-4">
+                     <span className="text-sm text-zinc-400 font-medium">Select a starting template</span>
+                     <Button 
+                         variant="ghost" 
+                         size="sm"
+                         onClick={handleRouteToMarketplace}
+                         className="text-zinc-400 hover:text-white hover:bg-white/5 gap-2 h-7 text-xs font-medium px-2 rounded-md transition-colors"
+                     >
+                         Templates Marketplace <ArrowRight className="w-3.5 h-3.5" />
+                     </Button>
+                </div>
+                
+                <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-5 gap-4 max-h-[360px] overflow-y-auto pr-2 custom-scrollbar">
+                    {currentTemplates.map((template) => (
+                        <TemplateCard 
+                            key={template.id}
+                            template={template}
+                            isSelected={selectedTemplate === template.id}
+                            onClick={() => setSelectedTemplate(template.id)}
+                            imageClassName="aspect-[1/1.414]"
+                        />
+                    ))}
+                </div>
+            </div>
+        )}
 
         {/* Footer Actions */}
         <div className="px-6 py-3 flex items-center justify-between border-t border-white/5">
@@ -237,8 +288,12 @@ export function NewProjectDialog({ children, open: controlledOpen, onOpenChange:
                     variant="ghost" 
                     size="sm"
                     onClick={handleBrowseTemplates}
-                    className="text-zinc-400 hover:text-zinc-200 hover:bg-[#151619]/60
-                    gap-2 h-7 text-xs font-medium px-2 rounded-md transition-colors"
+                    className={cn(
+                        "gap-2 h-7 text-xs font-medium px-2 rounded-md transition-colors",
+                        isExpanded 
+                            ? "bg-[#2C2C2C] text-white" 
+                            : "text-zinc-400 hover:text-zinc-200 hover:bg-[#151619]/60"
+                    )}
                 >
                     <LayoutTemplate className="w-3.5 h-3.5" />
                     Browse Templates

@@ -1,49 +1,32 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
 import { db } from '@/lib/constants'
 import { tx, id } from '@instantdb/react'
-import { CheckIcon, FileText, ChevronRight } from 'lucide-react'
+import { CheckIcon, FileText, LayoutTemplate, Command, FileCode2, FileType2, ArrowLeft, Loader2 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
-import { templateContent, typstTemplateContent } from '@/lib/constants/templates'
+import { templateContent, typstTemplateContent, latexTemplates, typstTemplates, Template } from '@/lib/constants/templates'
+import TemplateCard from '@/components/projects/template-card'
 import { useFrontend } from '@/contexts/FrontendContext'
 import { useDashboardSettings } from '@/contexts/DashboardSettingsContext'
 import { completeNavJourney, markNavMilestone } from '@/lib/perf/nav-trace'
 import { cn } from '@/lib/utils'
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import posthog from 'posthog-js'
+import Link from 'next/link'
 
-type DocType = 'latex' | 'typst'
-
-const latexTemplates = [
-  { id: 'blank', title: 'Blank Project', description: 'Start from scratch', image: '/blank_preview.webp' },
-  { id: 'article', title: 'Article', description: 'Standard academic article', image: '/article_preview.webp' },
-  { id: 'report', title: 'Report', description: 'Longer documents with chapters', image: '/report_preview.webp' },
-  { id: 'resume', title: 'Resume', description: 'Professional CV template', image: '/resume_preview.webp' },
-  { id: 'letter', title: 'Cover Letter', description: 'Professional letter format', image: '/letter_preview.webp' },
-  { id: 'proposal', title: 'Proposal', description: 'Project proposal template', image: '/proposal_preview.webp' },
-  { id: 'presentation', title: 'Presentation', description: 'Beamer slide deck', image: '/presentation_preview.webp' },
-  { id: 'assignment', title: 'Assignment', description: 'Homework & problem sets', image: '/assignment_preview.webp' },
-  { id: 'ieee_conf', title: 'IEEE Conference', description: 'IEEE conference paper', image: '/ieee_preview.webp' },
-]
-
-const typstTemplates = [
-  { id: 'blank', title: 'Blank Project', description: 'Start from scratch', image: '/blank_preview.webp' },
-  { id: 'report', title: 'Report', description: 'Standard report template', image: '/report_preview.webp' },
-  { id: 'resume', title: 'Resume', description: 'Modern CV template', image: '/resume_preview.webp' },
-  { id: 'letter', title: 'Letter', description: 'Standard letter format', image: '/letter_preview.webp' },
-]
+type DocType = 'latex' | 'typst' | 'all'
 
 export default function NewDocument() {
   const { user } = useFrontend()
   const { settings } = useDashboardSettings()
   const router = useRouter()
+  
   const [title, setTitle] = useState('Untitled Project')
-  const [docType, setDocType] = useState<DocType>('latex')
-  const [selectedTemplate, setSelectedTemplate] = useState<string>('blank')
+  const [activeFilter, setActiveFilter] = useState<DocType>('all')
+  const [selectedTemplate, setSelectedTemplate] = useState<{ id: string, type: 'latex' | 'typst' } | null>(null)
   const [titleError, setTitleError] = useState('')
   const [isCreating, setIsCreating] = useState(false)
 
@@ -52,17 +35,43 @@ export default function NewDocument() {
     completeNavJourney('new_doc_open')
   }, [])
 
-  const currentTemplates = docType === 'latex' ? latexTemplates : typstTemplates
+  // Combine and interleave templates for the "All" view to make it look diverse
+  const allTemplates = useMemo(() => {
+     let latex = latexTemplates.map(t => ({ ...t, type: 'latex' as const }))
+     let typst = typstTemplates.map(t => ({ ...t, type: 'typst' as const }))
+     
+     if (activeFilter === 'latex') return latex
+     if (activeFilter === 'typst') return typst
+     
+     // Mix them up a bit for 'all'
+     const mixed = []
+     const maxLength = Math.max(latex.length, typst.length)
+     for (let i = 0; i < maxLength; i++) {
+        if (i < latex.length) mixed.push(latex[i])
+        if (i < typst.length) mixed.push(typst[i])
+     }
+     return mixed
+  }, [activeFilter])
 
-  // Reset template selection when switching doc type if current template invalid
+  // Select the first template by default if none is selected
   useEffect(() => {
-    const templateExists = currentTemplates.find(t => t.id === selectedTemplate)
-    if (!templateExists) {
-      setSelectedTemplate('blank')
+    if (!selectedTemplate && allTemplates.length > 0) {
+      setSelectedTemplate({ id: allTemplates[0].id, type: allTemplates[0].type })
     }
-  }, [docType, currentTemplates, selectedTemplate])
+  }, [allTemplates, selectedTemplate])
 
-  const handleSubmit = (e: React.FormEvent) => {
+  // If filter changes and current selection is not visible, select first available
+  useEffect(() => {
+    if (selectedTemplate && activeFilter !== 'all' && selectedTemplate.type !== activeFilter) {
+      if (allTemplates.length > 0) {
+        setSelectedTemplate({ id: allTemplates[0].id, type: allTemplates[0].type })
+      } else {
+        setSelectedTemplate(null)
+      }
+    }
+  }, [activeFilter, selectedTemplate, allTemplates])
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!title.trim()) {
       setTitleError('Title cannot be empty')
@@ -73,208 +82,221 @@ export default function NewDocument() {
       setTitleError('You must be signed in to create a project')
       return
     }
+    if (!selectedTemplate) {
+      setTitleError('Please select a template')
+      return
+    }
 
     setTitleError('')
     setIsCreating(true)
 
-    const newProjectId = id()
-    const mainFileId = id()
-    const extension = docType === 'latex' ? 'tex' : 'typ'
-    const fileName = `main.${extension}`
-    
-    // Get content based on doc type
-    let content = ''
-    if (docType === 'latex') {
-      content = templateContent[selectedTemplate as keyof typeof templateContent] || ''
-    } else {
-      content = typstTemplateContent[selectedTemplate as keyof typeof typstTemplateContent] || ''
-    }
+    try {
+        const newProjectId = id()
+        const mainFileId = id()
+        const extension = selectedTemplate.type === 'latex' ? 'tex' : 'typ'
+        const fileName = `main.${extension}`
+        
+        // Get content based on doc type
+        let content = ''
+        if (selectedTemplate.type === 'latex') {
+          content = templateContent[selectedTemplate.id as keyof typeof templateContent] || templateContent['blank']
+        } else {
+          content = typstTemplateContent[selectedTemplate.id as keyof typeof typstTemplateContent] || typstTemplateContent['blank']
+        }
 
-    const createFileStructure = () => {
-      return [
-        {
-          id: mainFileId,
-          name: fileName,
-          type: 'file',
-          parent_id: null,
-          content: content,
-          isExpanded: null,
-          pathname: fileName,
-          user_id: userId,
-        },
-      ]
-    }
+        const fileStructure = [
+            {
+            id: mainFileId,
+            name: fileName,
+            type: 'file',
+            parent_id: null,
+            content: content,
+            isExpanded: null,
+            pathname: fileName,
+            user_id: userId,
+            },
+        ]
 
-    const fileStructure = createFileStructure()
+        await db.transact([
+            tx.projects[newProjectId].update({
+                user_id: userId,
+                title: title.trim(),
+                project_content: content,
+                template: selectedTemplate.id,
+                last_compiled: new Date(),
+                word_count: 0,
+                page_count: 0,
+                document_class: selectedTemplate.id,
+                created_at: new Date(),
+                type: selectedTemplate.type,
+                activeFileId: mainFileId,
+                pdfBackgroundTheme: settings.defaultPdfBackgroundTheme,
+                isPdfCaretNavigationEnabled: settings.defaultPdfCaretNavigation,
+            }),
+            ...fileStructure.map((node) =>
+                tx.files[node.id].update({
+                user_id: userId,
+                projectId: newProjectId,
+                name: node.name,
+                type: node.type,
+                parent_id: node.parent_id,
+                content: node.content || '',
+                created_at: new Date(),
+                isExpanded: node.isExpanded,
+                isOpen: true,
+                main_file: true,
+                pathname: node.pathname,
+                })
+            ),
+        ])
 
-    db.transact([
-      tx.projects[newProjectId].update({
-        user_id: userId,
-        title: title.trim(),
-        project_content: content, // Legacy field, check if still needed
-        template: selectedTemplate,
-        last_compiled: new Date(),
-        word_count: 0,
-        page_count: 0,
-        document_class: selectedTemplate,
-        created_at: new Date(),
-        type: docType, // Verify if 'type' field exists in schema or if we need to add it
-        activeFileId: mainFileId,
-        pdfBackgroundTheme: settings.defaultPdfBackgroundTheme,
-        isPdfCaretNavigationEnabled: settings.defaultPdfCaretNavigation,
-      }),
-      ...fileStructure.map((node) =>
-        tx.files[node.id].update({
-          user_id: userId,
-          projectId: newProjectId,
-          name: node.name,
-          type: node.type,
-          parent_id: node.parent_id,
-          content: node.content || '',
-          created_at: new Date(),
-          isExpanded: node.isExpanded,
-          isOpen: true,
-          main_file: true,
-          pathname: node.pathname,
+        // Track project creation event
+        posthog.capture('project_created', {
+            project_id: newProjectId,
+            doc_type: selectedTemplate.type,
+            template: selectedTemplate.id,
+            source: 'marketplace',
         })
-      ),
-    ])
 
-    // Track project creation event
-    posthog.capture('project_created', {
-      project_id: newProjectId,
-      doc_type: docType,
-      template: selectedTemplate,
-      source: 'template_page',
-    })
-
-    router.push(`/project/${newProjectId}`)
+        router.push(`/project/${newProjectId}`)
+    } catch (error) {
+        console.error("Failed to create project", error)
+        setIsCreating(false)
+        setTitleError('Something went wrong. Please try again.')
+    }
   }
 
   return (
-    <div className="min-h-screen bg-[#090909] text-white p-6 md:p-12 animate-in fade-in duration-500">
-      <div className="max-w-6xl mx-auto space-y-12">
-        
-        {/* Header Section */}
-        <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 pb-6 border-b border-white/5">
-          <div className="space-y-4">
-            <h1 className="text-4xl font-light tracking-tight text-white/90">
-              Create New <span className="text-white font-medium">Document</span>
-            </h1>
-            <p className="text-zinc-400 text-lg font-light max-w-xl">
-              Start your next project with one of our professionally crafted templates.
-            </p>
-          </div>
+    <div className="min-h-screen bg-[#0E0F11] text-white selection:bg-[#6D78E7]/30 selection:text-white relative overflow-hidden flex flex-col items-center">
+      
+      {/* Background Glowing Effects (Removed for minimalism) */}
+
+      {/* Navigation Bar */}
+      <div className="w-full max-w-7xl mx-auto px-6 py-6 absolute top-0 z-50 flex items-center justify-between pointer-events-none">
+          <Link href="/dashboard" className="pointer-events-auto flex items-center gap-2 text-zinc-400 hover:text-white transition-colors duration-200 text-sm font-medium">
+              <ArrowLeft className="w-4 h-4" />
+              Back to Dashboard
+          </Link>
+      </div>
+
+      <div className="w-full max-w-7xl px-6 md:px-10 pt-32 pb-24 z-10 flex flex-col md:flex-row gap-12 relative animate-in fade-in slide-in-from-bottom-8 duration-700 ease-out">
           
-          <div className="w-full md:w-auto min-w-[300px] space-y-4 bg-[#111] p-4 rounded-xl border border-white/5 shadow-2xl">
-              <div className="space-y-2">
-                <Label htmlFor="title" className="text-xs uppercase tracking-wider text-zinc-500 font-semibold pl-1">Project Title</Label>
-                <div className="flex gap-2">
-                  <Input
+        {/* Left Sidebar Focus Area */}
+        <div className="w-full md:w-64 shrink-0 flex flex-col gap-8">
+            <div className="space-y-2">
+                <h1 className="text-3xl font-semibold tracking-tight text-white mb-2">
+                    Templates
+                </h1>
+                <p className="text-sm text-zinc-400 leading-relaxed max-w-[240px]">
+                    Kickstart your next beautiful document with one of our tailored presets.
+                </p>
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+                <div className="text-xs font-semibold text-zinc-600 uppercase tracking-widest px-3 mb-1">Engines</div>
+                
+                <button
+                    onClick={() => setActiveFilter('all')}
+                    className={cn(
+                        "flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 text-left",
+                        activeFilter === 'all' ? "bg-white/10 text-white shadow-sm ring-1 ring-white/5" : "text-zinc-400 hover:bg-white/5 hover:text-zinc-200"
+                    )}
+                >
+                    <LayoutTemplate className="w-4 h-4 opacity-70" />
+                    All Templates
+                </button>
+                <button
+                    onClick={() => setActiveFilter('latex')}
+                    className={cn(
+                        "flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 text-left",
+                        activeFilter === 'latex' ? "bg-white/10 text-white shadow-sm ring-1 ring-white/5" : "text-zinc-400 hover:bg-white/5 hover:text-zinc-200"
+                    )}
+                >
+                    <FileCode2 className="w-4 h-4 opacity-70" />
+                    LaTeX Engine
+                </button>
+                <button
+                    onClick={() => setActiveFilter('typst')}
+                    className={cn(
+                        "flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 text-left",
+                        activeFilter === 'typst' ? "bg-white/10 text-white shadow-sm ring-1 ring-white/5" : "text-zinc-400 hover:bg-white/5 hover:text-zinc-200"
+                    )}
+                >
+                    <FileType2 className="w-4 h-4 opacity-70" />
+                    Typst Engine
+                </button>
+            </div>
+            
+            <div className="mt-4 p-4 rounded-xl bg-[#1A1C20] border border-white/5 shadow-inner">
+                <Label htmlFor="title" className="text-[11px] uppercase tracking-wider text-zinc-500 font-semibold mb-2 block">Project Name</Label>
+                <Input
                     id="title"
                     value={title}
                     onChange={(e) => {
-                      setTitle(e.target.value)
-                      if (titleError) setTitleError('')
+                        setTitle(e.target.value)
+                        if (titleError) setTitleError('')
                     }}
-                    placeholder="My Awesome Paper"
+                    placeholder="Untitled Project"
                     className={cn(
-                      "bg-[#090909] border-white/10 text-white placeholder:text-zinc-600 focus-visible:ring-1 focus-visible:ring-white/20 transition-all",
-                      titleError ? "border-red-500/50 focus-visible:ring-red-500/50" : ""
+                        "bg-[#151619] border-white/10 text-white placeholder:text-zinc-600 focus-visible:ring-1 focus-visible:ring-[#6D78E7] transition-all h-9 text-sm w-full mb-3",
+                        titleError ? "border-red-500/50 focus-visible:ring-red-500/50" : ""
                     )}
-                  />
-                  <Button 
-                    onClick={handleSubmit} 
-                    disabled={isCreating}
-                    className="bg-white text-black hover:bg-zinc-200 transition-colors"
-                  >
-                    {isCreating ? 'Creating...' : <ChevronRight className="w-4 h-4" />}
-                  </Button>
-                </div>
-                {titleError && <p className="text-red-400 text-xs pl-1">{titleError}</p>}
-              </div>
-          </div>
+                />
+                <Button
+                    onClick={handleSubmit}
+                    disabled={!title.trim() || isCreating || !selectedTemplate}
+                    className="w-full h-9 bg-white hover:bg-zinc-200 text-black transition-colors gap-2 text-sm font-medium rounded-lg shadow-sm active:scale-95"
+                >
+                    {isCreating ? (
+                        <>
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                            Creating...
+                        </>
+                    ) : (
+                        <>
+                            Create Project
+                            <div className="flex items-center gap-0.5 bg-black/5 rounded px-1.5 py-0.5 ml-1">
+                                <Command className="w-3 h-3 text-black/60" />
+                                <span className="font-sans text-[10px] leading-none text-black/60">↵</span>
+                            </div>
+                        </>
+                    )}
+                </Button>
+                {titleError && <p className="text-red-400 text-xs mt-2 font-medium">{titleError}</p>}
+            </div>
         </div>
 
-        {/* Template Selection */}
-        <div className="space-y-8">
-          <div className="flex items-center justify-between">
-            <Tabs value={docType} onValueChange={(v) => setDocType(v as DocType)} className="w-auto">
-              <TabsList className="bg-[#111] border border-white/5 p-1 h-11">
-                <TabsTrigger 
-                  value="latex" 
-                  className="px-6 data-[state=active]:bg-[#222] data-[state=active]:text-white text-zinc-400"
-                >
-                  Running LaTeX
-                </TabsTrigger>
-                <TabsTrigger 
-                  value="typst" 
-                  className="px-6 data-[state=active]:bg-[#222] data-[state=active]:text-white text-zinc-400"
-                >
-                  Running Typst
-                </TabsTrigger>
-              </TabsList>
-            </Tabs>
+        {/* Right Side Grid */}
+        <div className="flex-1">
             
-            <span className="text-sm text-zinc-500 font-mono">
-              {currentTemplates.length} templates available
-            </span>
+          <div className="flex items-center justify-between mb-6">
+              <h2 className="text-lg font-medium text-white/90">
+                  {activeFilter === 'all' ? 'Featured Collections' : activeFilter === 'latex' ? 'LaTeX Templates' : 'Typst Templates'}
+              </h2>
+              <span className="text-xs font-mono text-zinc-500 bg-white/5 px-2 py-1 rounded border border-white/5">
+                  {allTemplates.length} Available
+              </span>
           </div>
 
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-            {currentTemplates.map((template) => (
-              <div
-                key={template.id}
-                onClick={() => setSelectedTemplate(template.id)}
-                className={cn(
-                  "group relative cursor-pointer rounded-xl overflow-hidden border transition-all duration-300",
-                  selectedTemplate === template.id 
-                    ? "border-white/40 ring-1 ring-white/10 bg-[#111]" 
-                    : "border-white/5 bg-[#0e0e0e] hover:border-white/20 hover:bg-[#111]"
-                )}
-              >
-                <div className="aspect-[3/4] w-full relative overflow-hidden bg-[#050505]">
-                  {/* Since we might not have images for all, use a placeholder if needed, but assuming paths exist */}
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-60 z-10" />
-                  
-                  {/* Icon Placeholder for missing images */}
-                  <div className="absolute inset-0 flex items-center justify-center text-zinc-800">
-                    <FileText className="w-16 h-16 opacity-20" />
-                  </div>
-                  
-                  {/* Actual Image */}
-                   <img
-                    src={template.image}
-                    alt={template.title}
-                    className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-105 opacity-80 group-hover:opacity-100"
-                    onError={(e) => {
-                      (e.target as HTMLImageElement).style.opacity = '0'
-                    }}
+          <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-20">
+            {allTemplates.map((template) => {
+              const isSelected = selectedTemplate?.id === template.id && selectedTemplate?.type === template.type;
+              
+              return (
+                  <TemplateCard 
+                      key={`${template.type}-${template.id}`}
+                      template={template}
+                      isSelected={isSelected}
+                      onClick={() => setSelectedTemplate({ id: template.id, type: template.type })}
+                      showTypeBadge={true}
+                      imageClassName="aspect-[1/1.414]"
                   />
-                  
-                  {selectedTemplate === template.id && (
-                    <div className="absolute top-3 right-3 z-20 bg-white rounded-full p-1 shadow-lg animate-in zoom-in-50 duration-200">
-                      <CheckIcon className="w-3 h-3 text-black" />
-                    </div>
-                  )}
-                </div>
-
-                <div className="p-4 space-y-1 relative z-20">
-                  <h3 className={cn(
-                    "font-medium text-sm transition-colors",
-                    selectedTemplate === template.id ? "text-white" : "text-zinc-300 group-hover:text-white"
-                  )}>
-                    {template.title}
-                  </h3>
-                  <p className="text-xs text-zinc-500 line-clamp-2">
-                    {template.description}
-                  </p>
-                </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
         </div>
       </div>
     </div>
   )
 }
+

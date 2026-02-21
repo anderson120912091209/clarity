@@ -620,3 +620,30 @@ export const typstTemplateContent = {
   resume: typstResumeContent,
   letter: typstLetterContent,
 }
+
+export interface Template {
+  id: string
+  title: string
+  image: string
+  type?: 'latex' | 'typst'
+  description?: string
+}
+
+export const latexTemplates = [
+  { id: 'blank', title: 'Blank Project', description: 'Start from scratch', image: '/blank_preview.webp' },
+  { id: 'article', title: 'Article', description: 'Standard academic article', image: '/article_preview.webp' },
+  { id: 'report', title: 'Report', description: 'Longer documents with chapters', image: '/report_preview.webp' },
+  { id: 'resume', title: 'Resume', description: 'Professional CV template', image: '/resume_preview.webp' },
+  { id: 'letter', title: 'Cover Letter', description: 'Professional letter format', image: '/letter_preview.webp' },
+  { id: 'proposal', title: 'Proposal', description: 'Project proposal template', image: '/proposal_preview.webp' },
+  { id: 'presentation', title: 'Presentation', description: 'Beamer slide deck', image: '/presentation_preview.webp' },
+  { id: 'assignment', title: 'Assignment', description: 'Homework & problem sets', image: '/assignment_preview.webp' },
+  { id: 'ieee_conf', title: 'IEEE Conference', description: 'IEEE conference paper', image: '/ieee_preview.webp' },
+]
+
+export const typstTemplates = [
+  { id: 'blank', title: 'Blank Project', description: 'Start from scratch', image: '/blank_preview.webp' },
+  { id: 'report', title: 'Report', description: 'Standard report template', image: '/report_preview.webp' },
+  { id: 'resume', title: 'Resume', description: 'Modern CV template', image: '/resume_preview.webp' },
+  { id: 'letter', title: 'Letter', description: 'Standard letter format', image: '/letter_preview.webp' },
+]
