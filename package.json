@@ -7,7 +7,11 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "test:collab": "vitest run features/collaboration/__tests__"
+    "test:collab": "vitest run features/collaboration/__tests__",
+    "test:eval": "vitest run lib/agent/__tests__/eval",
+    "test:eval:watch": "vitest watch lib/agent/__tests__/eval",
+    "test:eval:latex": "vitest run lib/agent/__tests__/eval -t 'LaTeX scenarios'",
+    "test:eval:typst": "vitest run lib/agent/__tests__/eval -t 'Typst scenarios'"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^1.0.6",

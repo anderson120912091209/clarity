@@ -11,6 +11,7 @@ export type FileSystemNode = {
   type: 'file' | 'folder'
   content?: string
   url?: string
+  storagePath?: string
   parent_id?: string | null
   projectId: string
   isExpanded?: boolean
@@ -215,6 +216,7 @@ export function useFileSystem(projectId: string, actorUserId: string, options?: 
           name: file.name,
           type: 'file',
           url: url,
+          storagePath: path,
           projectId,
           user_id: ownerUserId,
           parent_id: parentId,

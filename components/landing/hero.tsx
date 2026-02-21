@@ -73,7 +73,7 @@ export function Hero() {
                  overflow-hidden border border-black/70 mx-auto max-w-[1100px] bg-white translate-y-1">
                      <img 
                         src="/landing/screenshot2.png"
-                        alt="Jules Editor Interface"
+                        alt="Clarity Editor Interface"
                         className="w-full h-auto block"
                      />
                  </div>

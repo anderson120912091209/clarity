@@ -1,68 +1,45 @@
 'use client'
 
-import { id as instantId } from '@instantdb/react'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useMemo, useState, useEffect, useRef } from 'react'
 import {
-  ArrowDownToLine,
-  ArrowUp,
-  Check,
-  ChevronsRight,
-  Clock3,
-  Copy,
   FileText,
-  RotateCcw,
-  Square,
-  SquarePen,
   X,
+  Check,
+  ArrowDownToLine,
+  Plus,
+  Search,
 } from 'lucide-react'
-import { Button } from '@/components/ui/button'
 import { QUICK_EDIT_GEMINI_MODEL_OPTIONS } from '@/lib/constants/gemini-models'
-import { db } from '@/lib/constants'
-import { useChatThreadsState } from '@/features/agent'
 import {
   useDashboardSettings,
   type ChatModelPreference,
 } from '@/contexts/DashboardSettingsContext'
-import {
-  computeNextSeq,
-  createRun,
-  createThread,
-  finishRun,
-  setProjectActiveThread,
-  upsertThreadMessage,
-  type PersistedMessage,
-} from '@/features/agent/services/chat-threads-store'
-import {
-  buildMemorySystemMessage,
-  markMemoryItemsUsed,
-  selectPromptMemories,
-  sortMemoryItems,
-  upsertMemoryCandidates,
-  type PersistedMemoryItem,
-} from '@/features/agent/services/chat-memory-store'
-import { extractMemoryCandidatesFromUserMessage } from '@/features/agent/services/memory-extractor'
-import { chatService, type ChatMessage, type FileEditDelta } from '@/services/agent/browser/chat/chatService'
-import { parseRawResponse } from '@/features/agent/services/response-parser'
+import { useChatSession } from '@/features/agent/hooks/useChatSession'
+import type {
+  ChatPanelExternalPromptRequest,
+  ExternalPromptResult,
+  PanelMessage,
+} from '@/features/agent/hooks/useChatSession'
+import type { StagedFileChange } from '@/features/agent/services/change-manager'
+import type { AgentWorkspaceFileContext } from '@/features/agent/types/chat-context'
 import { cn } from '@/lib/utils'
+
+// New decomposed components
+import { ThinkingBlock } from './thinking-block'
+import { AgentActivityPanel } from './agent-activity-panel'
+import { StreamingIndicator } from './streaming-indicator'
+import { UserMessage } from './user-message'
+import { MessageActions } from './message-actions'
+import { ChatHeader } from './chat-header'
+import { ThreadList } from './thread-list'
+import { StagedChangesBar } from './staged-changes-bar'
+import { ChatMessageList } from './chat-message-list'
+import { ChatInputArea } from './chat-input-area'
 import { ChatMarkdown } from './chat-markdown'
 import { AssistantFileBlock } from './assistant-file-block'
-import { changeManagerService, type StagedFileChange } from '@/features/agent/services/change-manager'
-import type {
-  AgentChatContext,
-  AgentWorkspaceFileContext,
-} from '@/features/agent/types/chat-context'
 
-export interface ChatPanelExternalPromptRequest {
-  id: string
-  prompt: string
-  autoApplyStagedEdits?: boolean
-}
-
-interface ExternalPromptResult {
-  requestId: string
-  status: 'completed' | 'interrupted' | 'error' | 'skipped'
-  assistantMessageId: string | null
-}
+// Re-export for backwards compat
+export type { ChatPanelExternalPromptRequest }
 
 interface ChatPanelProps {
   projectId: string
@@ -95,77 +72,13 @@ interface ChatPanelProps {
   externalPromptRequest?: ChatPanelExternalPromptRequest | null
   onExternalPromptConsumed?: (requestId: string) => void
   onExternalPromptSettled?: (result: ExternalPromptResult) => void
-}
-
-interface ToolCallInfo {
-  toolCallId: string
-  toolName: string
-  status: 'running' | 'completed'
-}
-
-interface PanelMessage {
-  id: string
-  role: 'user' | 'assistant'
-  content: string
-  isStreaming?: boolean
-  isError?: boolean
-  toolCalls?: ToolCallInfo[]
-  fileEdits?: FileEditDelta[]
-}
-
-interface SendPromptOptions {
-  autoApplyStagedEdits?: boolean
-}
-
-interface SendPromptResult {
-  status: 'completed' | 'interrupted' | 'error' | 'skipped'
-  assistantMessageId: string | null
-}
-
-const MAX_ACTIVE_FILE_CHARS = 36000
-const MAX_WORKSPACE_FILE_CHARS = 18000
-const MAX_WORKSPACE_TOTAL_CHARS = 150000
-const MAX_COMPILE_LOG_CHARS = 24000
-const AUTO_APPLY_POLL_TIMEOUT_MS = 2200
-const AUTO_APPLY_POLL_INTERVAL_MS = 120
-
-function trimWithNotice(value: string, maxChars: number): string {
-  if (value.length <= maxChars) return value
-  return `${value.slice(0, maxChars)}\n\n[Truncated]`
-}
-
-// countClosedCodeBlocks removed — edits are now handled via structured tool calls
-
-function buildThreadTitle(prompt: string): string {
-  const singleLine = prompt.trim().replace(/\s+/g, ' ')
-  if (!singleLine) return 'New chat'
-  if (singleLine.length <= 48) return singleLine
-  return `${singleLine.slice(0, 45)}...`
-}
-
-function formatThreadDate(iso?: string): string {
-  if (!iso) return 'No activity'
-  const date = new Date(iso)
-  if (Number.isNaN(date.getTime())) return 'No activity'
-  return date.toLocaleString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    hour: 'numeric',
-    minute: '2-digit',
-  })
+  onOpenWorkspaceFile?: (fileId: string) => void
+  isFloating?: boolean
+  onToggleFloat?: () => void
 }
 
 function isChatModelPreference(value: string): value is ChatModelPreference {
   return QUICK_EDIT_GEMINI_MODEL_OPTIONS.some((option) => option.value === value)
-}
-
-function normalizePath(input: string): string {
-  return input
-    .replace(/\\/g, '/')
-    .replace(/^\.?\//, '')
-    .replace(/\/+/g, '/')
-    .trim()
-    .toLowerCase()
 }
 
 export function ChatPanel({
@@ -192,115 +105,114 @@ export function ChatPanel({
   externalPromptRequest = null,
   onExternalPromptConsumed,
   onExternalPromptSettled,
+  onOpenWorkspaceFile,
+  isFloating = false,
+  onToggleFloat,
 }: ChatPanelProps) {
+  // ── Local UI state ──
+
   const { settings } = useDashboardSettings()
   const [messageInput, setMessageInput] = useState('')
-  const [submitError, setSubmitError] = useState<string | null>(null)
-  const [isSubmitting, setIsSubmitting] = useState(false)
   const [selectedModel, setSelectedModel] = useState<ChatModelPreference>(
     settings.defaultChatModel
   )
-  const [showCurrentDocument, setShowCurrentDocument] = useState(
-    settings.defaultChatIncludeCurrentDocument
-  )
-  const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null)
+  const [attachedFileIds, setAttachedFileIds] = useState<Set<string>>(() => {
+    const initial = new Set<string>()
+    if (settings.defaultChatIncludeCurrentDocument && activeFileId) {
+      initial.add(activeFileId)
+    }
+    return initial
+  })
+  const [showThreadList, setShowThreadList] = useState(false)
+  const [showFilePicker, setShowFilePicker] = useState(false)
+  const [filePickerSearch, setFilePickerSearch] = useState('')
   const [insertingMessageId, setInsertingMessageId] = useState<string | null>(null)
   const [runningStagedAction, setRunningStagedAction] = useState<string | null>(null)
-  const [activeThreadId, setActiveThreadId] = useState<string | null>(initialActiveThreadId)
-  const [showThreadList, setShowThreadList] = useState(false)
-  const [liveAssistantMessage, setLiveAssistantMessage] = useState<PanelMessage | null>(null)
+  const filePickerRef = useRef<HTMLDivElement | null>(null)
 
-  const activeRequestIdRef = useRef<string | null>(null)
-  const activeRunIdRef = useRef<string | null>(null)
-  const abortControllerRef = useRef<AbortController | null>(null)
-  const manualStopRef = useRef(false)
-  const persistedActiveThreadRef = useRef<string | null>(null)
-  const messagesEndRef = useRef<HTMLDivElement | null>(null)
-  const consumedExternalPromptIdRef = useRef<string | null>(null)
+  useEffect(() => {
+    setSelectedModel(settings.defaultChatModel)
+  }, [settings.defaultChatModel])
 
-  const {
-    threads,
-    messages: persistedMessages,
-    isLoading: isThreadsLoading,
-    error: threadsQueryError,
-  } = useChatThreadsState({
+  // Sync active file when it changes externally (tab switch)
+  useEffect(() => {
+    if (!activeFileId) return
+    setAttachedFileIds((prev) => {
+      // If the previous active file was the only thing in the set, swap to new active file
+      if (prev.size === 1 && activeFileId && !prev.has(activeFileId)) {
+        return new Set([activeFileId])
+      }
+      return prev
+    })
+  }, [activeFileId])
+
+  // Close file picker when clicking outside
+  useEffect(() => {
+    if (!showFilePicker) return
+    const handleClickOutside = (e: MouseEvent) => {
+      if (filePickerRef.current && !filePickerRef.current.contains(e.target as Node)) {
+        setShowFilePicker(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [showFilePicker])
+
+  // ── Derived ──
+
+  const libraryEnabled = useMemo(() => {
+    if (activeFilePath?.toLowerCase().endsWith('.typ')) return true
+    return workspaceFiles.some((file) => file.path?.toLowerCase().endsWith('.typ'))
+  }, [activeFilePath, workspaceFiles])
+
+  const includeCurrentDocument = Boolean(activeFileId && attachedFileIds.has(activeFileId))
+
+  const attachedFileContexts = useMemo(
+    () => workspaceFiles.filter((f) => attachedFileIds.has(f.fileId)),
+    [workspaceFiles, attachedFileIds]
+  )
+
+  const attachedFileIdsArray = useMemo(() => Array.from(attachedFileIds), [attachedFileIds])
+
+  const filteredWorkspaceFiles = useMemo(() => {
+    if (!filePickerSearch.trim()) return workspaceFiles
+    const q = filePickerSearch.toLowerCase()
+    return workspaceFiles.filter(
+      (f) => f.path.toLowerCase().includes(q)
+    )
+  }, [workspaceFiles, filePickerSearch])
+
+  // ── Chat session hook ──
+
+  const session = useChatSession({
     projectId,
     userId,
-    activeThreadId,
+    initialActiveThreadId,
+    activeFileId,
+    activeFileName,
+    activeFilePath,
+    fileContent,
+    workspaceFiles,
+    compileLogs,
+    compileError,
+    selectedModel,
+    includeCurrentDocument,
+    attachedFileIds: attachedFileIdsArray,
+    libraryEnabled,
+    onInsertIntoEditor,
+    stagedChanges,
+    anyStagedStreaming,
+    onAcceptStagedFile,
+    externalPromptRequest,
+    onExternalPromptConsumed,
+    onExternalPromptSettled,
   })
 
-  const memoryQuery = db.useQuery(
-    userId
-      ? {
-          ai_memory_items: {
-            $: {
-              where: {
-                user_id: userId,
-              },
-            },
-          },
-        }
-      : null
-  )
+  // ── Staged changes linkage ──
 
-  const persistedMemoryItems = useMemo(
-    () => sortMemoryItems((memoryQuery.data?.ai_memory_items ?? []) as PersistedMemoryItem[]),
-    [memoryQuery.data?.ai_memory_items]
-  )
-
-  const promptMemoryItems = useMemo(
-    () =>
-      selectPromptMemories(persistedMemoryItems, {
-        projectId,
-        threadId: activeThreadId,
-      }),
-    [activeThreadId, persistedMemoryItems, projectId]
-  )
-
-  const memorySystemMessage = useMemo(
-    () => buildMemorySystemMessage(promptMemoryItems),
-    [promptMemoryItems]
-  )
-
-  const activeThread = useMemo(
-    () => threads.find((thread) => thread.id === activeThreadId) ?? null,
-    [activeThreadId, threads]
-  )
-
-  useEffect(() => {
-    if (!threads.length) return
-    if (activeThreadId && threads.some((thread) => thread.id === activeThreadId)) return
-
-    const preferredThread =
-      initialActiveThreadId && threads.some((thread) => thread.id === initialActiveThreadId)
-        ? initialActiveThreadId
-        : null
-
-    const nextThreadId = preferredThread ?? threads[0]?.id ?? null
-    if (nextThreadId && nextThreadId !== activeThreadId) {
-      setActiveThreadId(nextThreadId)
-    }
-  }, [activeThreadId, initialActiveThreadId, threads])
-
-  useEffect(() => {
-    if (!activeThreadId || !projectId) return
-    if (persistedActiveThreadRef.current === activeThreadId) return
-
-    persistedActiveThreadRef.current = activeThreadId
-    void setProjectActiveThread(projectId, activeThreadId).catch((error) => {
-      console.warn('Failed to persist active chat thread:', error)
-    })
-  }, [activeThreadId, projectId])
-
-  useEffect(() => {
-    setSubmitError(null)
-    setLiveAssistantMessage(null)
-  }, [activeThreadId])
-
-  const canSubmit =
-    messageInput.trim().length > 0 && !isSubmitting && Boolean(projectId) && Boolean(userId)
   const hasStagedChanges = stagedChanges.length > 0
   const stagedActionsDisabled = anyStagedStreaming || runningStagedAction !== null
+
   const { linkedStagedChangesByMessageId, unlinkedStagedChanges } = useMemo(() => {
     const linked = new Map<string, StagedFileChange[]>()
     const unlinked: StagedFileChange[] = []
@@ -311,7 +223,6 @@ export function ChatPanel({
         unlinked.push(change)
         continue
       }
-
       const list = linked.get(messageId)
       if (list) {
         list.push(change)
@@ -323,640 +234,52 @@ export function ChatPanel({
     for (const list of linked.values()) {
       list.sort((left, right) => right.updatedAt - left.updatedAt)
     }
-
     unlinked.sort((left, right) => right.updatedAt - left.updatedAt)
 
-    return {
-      linkedStagedChangesByMessageId: linked,
-      unlinkedStagedChanges: unlinked,
-    }
+    return { linkedStagedChangesByMessageId: linked, unlinkedStagedChanges: unlinked }
   }, [stagedChanges])
-  const workspaceFileIdByPath = useMemo(() => {
-    const map = new Map<string, string>()
-    for (const file of workspaceFiles) {
-      if (!file?.fileId || !file.path) continue
-      map.set(normalizePath(file.path), file.fileId)
-    }
-    return map
-  }, [workspaceFiles])
 
-  const resolveStagedFileIdsForMessage = useCallback(
-    (messageId: string, editedPaths: string[]): string[] => {
-      const linkedFromProps = stagedChanges
-        .filter((change) => change.sourceMessageId === messageId)
-        .map((change) => change.fileId)
-      if (linkedFromProps.length > 0) {
-        return Array.from(new Set(linkedFromProps))
-      }
+  // ── Handlers ──
 
-      const linkedFromStore = changeManagerService
-        .getAllChanges()
-        .filter((change) => change.sourceMessageId === messageId)
-        .map((change) => change.fileId)
-      if (linkedFromStore.length > 0) {
-        return Array.from(new Set(linkedFromStore))
-      }
-
-      const matchedByPath = editedPaths
-        .map((path) => workspaceFileIdByPath.get(normalizePath(path)))
-        .filter((fileId): fileId is string => Boolean(fileId))
-      if (matchedByPath.length === 0) return []
-
-      return matchedByPath.filter((fileId, index) => {
-        if (matchedByPath.indexOf(fileId) !== index) return false
-        const stagedEntry =
-          stagedChanges.find((change) => change.fileId === fileId) ??
-          changeManagerService.getChange(fileId)
-        return stagedEntry?.sourceMessageId === messageId
-      })
-    },
-    [stagedChanges, workspaceFileIdByPath]
-  )
-
-  const autoApplyLinkedToolEdits = useCallback(
-    async (assistantMessageId: string, editedPaths: string[]) => {
-      if (!onAcceptStagedFile) return
-      if (editedPaths.length === 0) return
-
-      const deadline = Date.now() + AUTO_APPLY_POLL_TIMEOUT_MS
-      let fileIds: string[] = []
-      while (Date.now() < deadline) {
-        fileIds = resolveStagedFileIdsForMessage(assistantMessageId, editedPaths)
-        if (fileIds.length > 0) break
-        await new Promise((resolve) => setTimeout(resolve, AUTO_APPLY_POLL_INTERVAL_MS))
-      }
-
-      if (fileIds.length === 0) {
-        console.warn(
-          `[AI Chat] Auto-apply requested for message ${assistantMessageId}, but no linked staged files were found.`
-        )
-        return
-      }
-
-      for (const fileId of fileIds) {
-        try {
-          await onAcceptStagedFile(fileId)
-        } catch (error) {
-          console.warn(`[AI Chat] Failed to auto-apply staged change for ${fileId}:`, error)
-        }
-      }
-    },
-    [onAcceptStagedFile, resolveStagedFileIdsForMessage]
-  )
-
-  const currentDocumentLabel = useMemo(() => {
-    if (!activeFileName) return 'Current document'
-    return activeFileName.length > 30 ? `${activeFileName.slice(0, 27)}...` : activeFileName
-  }, [activeFileName])
-
-  useEffect(() => {
-    setSelectedModel(settings.defaultChatModel)
-  }, [settings.defaultChatModel])
-
-  useEffect(() => {
-    setShowCurrentDocument(settings.defaultChatIncludeCurrentDocument)
-  }, [settings.defaultChatIncludeCurrentDocument])
-
-  const handleModelChange = useCallback(
-    (nextModel: string) => {
-      if (!isChatModelPreference(nextModel)) return
-      setSelectedModel(nextModel)
-    },
-    []
-  )
-
-  const handleShowCurrentDocumentChange = useCallback(
-    (nextValue: boolean) => {
-      setShowCurrentDocument(nextValue)
-    },
-    []
-  )
-
-  const currentDocumentContext = useMemo(() => {
-    if (!showCurrentDocument || !fileContent) return ''
-    const normalized = fileContent.trim()
-    if (!normalized) return ''
-    return trimWithNotice(normalized, MAX_ACTIVE_FILE_CHARS)
-  }, [fileContent, showCurrentDocument])
-
-  const libraryEnabled = useMemo(() => {
-    if (activeFilePath?.toLowerCase().endsWith('.typ')) return true
-    return workspaceFiles.some((file) => file.path?.toLowerCase().endsWith('.typ'))
-  }, [activeFilePath, workspaceFiles])
-
-  const requestContext = useMemo<AgentChatContext>(() => {
-    let remainingWorkspaceBudget = MAX_WORKSPACE_TOTAL_CHARS
-    const normalizedWorkspaceFiles: AgentWorkspaceFileContext[] = []
-
-    for (const file of workspaceFiles) {
-      if (!file?.path || typeof file.content !== 'string') continue
-      if (remainingWorkspaceBudget <= 0) break
-
-      const trimmed = trimWithNotice(
-        file.content,
-        Math.min(MAX_WORKSPACE_FILE_CHARS, remainingWorkspaceBudget)
-      )
-      normalizedWorkspaceFiles.push({
-        fileId: file.fileId,
-        path: file.path,
-        content: trimmed,
-      })
-      remainingWorkspaceBudget -= trimmed.length
-    }
-
-    return {
-      userId,
-      activeFileId: activeFileId ?? null,
-      activeFileName: activeFileName ?? null,
-      activeFilePath: activeFilePath ?? null,
-      activeFileContent: currentDocumentContext,
-      workspaceFiles: normalizedWorkspaceFiles,
-      compile: {
-        logs:
-          compileLogs && compileLogs.trim().length > 0
-            ? trimWithNotice(compileLogs.trim(), MAX_COMPILE_LOG_CHARS)
-            : null,
-        error: compileError ?? null,
-      },
-      settings: {
-        includeCurrentDocument: showCurrentDocument,
-        webEnabled: false,
-        libraryEnabled,
-      },
-    }
-  }, [
-    activeFileId,
-    activeFileName,
-    activeFilePath,
-    compileError,
-    compileLogs,
-    currentDocumentContext,
-    libraryEnabled,
-    showCurrentDocument,
-    userId,
-    workspaceFiles,
-  ])
-
-  const messages = useMemo(() => {
-    const persisted = persistedMessages
-      .filter((message) => message.role === 'user' || message.role === 'assistant')
-      .map((message) => ({
-        id: message.id,
-        role: message.role as 'user' | 'assistant',
-        content: message.content ?? '',
-        isStreaming: false,
-        isError: message.status === 'error',
-      }))
-
-    if (!liveAssistantMessage) return persisted
-    if (persisted.some((message) => message.id === liveAssistantMessage.id)) return persisted
-
-    return [...persisted, liveAssistantMessage]
-  }, [liveAssistantMessage, persistedMessages])
-
-  const threadsErrorMessage = threadsQueryError
-    ? 'Failed to load saved chats.'
-    : memoryQuery.error
-      ? 'Failed to load persistent memory.'
-      : null
-
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ block: 'end' })
-  }, [messages, isSubmitting])
-
-  useEffect(() => {
-    return () => {
-      if (activeRequestIdRef.current) {
-        chatService.abort(activeRequestIdRef.current)
-      }
-      abortControllerRef.current?.abort()
-      activeRequestIdRef.current = null
-      activeRunIdRef.current = null
-      abortControllerRef.current = null
-    }
+  const handleModelChange = useCallback((nextModel: string) => {
+    if (!isChatModelPreference(nextModel)) return
+    setSelectedModel(nextModel)
   }, [])
 
-  const stopStreaming = useCallback(() => {
-    manualStopRef.current = true
-    if (activeRequestIdRef.current) {
-      chatService.abort(activeRequestIdRef.current)
-      activeRequestIdRef.current = null
-    }
-    abortControllerRef.current?.abort()
-    abortControllerRef.current = null
-  }, [])
-
-  const ensureActiveThread = useCallback(
-    async (titleSeed?: string) => {
-      if (activeThreadId) return activeThreadId
-
-      const nextThreadId = await createThread({
-        projectId,
-        userId,
-        title: titleSeed ? buildThreadTitle(titleSeed) : 'New chat',
-      })
-
-      setActiveThreadId(nextThreadId)
-      return nextThreadId
-    },
-    [activeThreadId, projectId, userId]
-  )
-
-  const resetChat = useCallback(async () => {
-    stopStreaming()
-    setSubmitError(null)
-    setMessageInput('')
-    setIsSubmitting(false)
-    setLiveAssistantMessage(null)
-    const nextThreadId = await createThread({
-      projectId,
-      userId,
-      title: 'New chat',
-    })
-    setActiveThreadId(nextThreadId)
-    setShowThreadList(false)
-  }, [projectId, stopStreaming, userId])
-
-  const switchToThread = useCallback(
-    (threadId: string) => {
-      stopStreaming()
-      setSubmitError(null)
-      setLiveAssistantMessage(null)
-      setActiveThreadId(threadId)
-      setShowThreadList(false)
-    },
-    [stopStreaming]
-  )
-
-  const sendPrompt = useCallback(
-    async (prompt: string, options: SendPromptOptions = {}): Promise<SendPromptResult> => {
-      const trimmedPrompt = prompt.trim()
-      if (!trimmedPrompt || isSubmitting) {
-        return {
-          status: 'skipped',
-          assistantMessageId: null,
-        }
-      }
-
-      const threadId = await ensureActiveThread(trimmedPrompt)
-
-      const conversationHistory: ChatMessage[] = persistedMessages
-        .filter(
-          (message) =>
-            (message.role === 'user' || message.role === 'assistant') &&
-            (message.content?.trim().length ?? 0) > 0
-        )
-        .map((message) => ({
-          role: message.role as 'user' | 'assistant',
-          content: message.content ?? '',
-        }))
-
-      const requestMessages: ChatMessage[] = [
-        ...(memorySystemMessage
-          ? [
-              {
-                role: 'user',
-                content: `Context from prior interactions:\n${memorySystemMessage}`,
-              } as ChatMessage,
-            ]
-          : []),
-        ...conversationHistory,
-        { role: 'user', content: trimmedPrompt },
-      ]
-
-      const baseSeq = computeNextSeq(persistedMessages as Array<Pick<PersistedMessage, 'seq'>>)
-      const assistantMessageId = instantId()
-      const controller = new AbortController()
-
-      let runId: string | null = null
-      let streamedResponse = ''
-      const collectedFileEdits: FileEditDelta[] = []
-      let completionStatus: SendPromptResult['status'] = 'completed'
-
-      const userMessageId = await upsertThreadMessage({
-        threadId,
-        projectId,
-        userId,
-        role: 'user',
-        content: trimmedPrompt,
-        seq: baseSeq,
-        status: 'completed',
-      })
-
-      if (promptMemoryItems.length > 0) {
-        void markMemoryItemsUsed(promptMemoryItems.map((item) => item.id)).catch((error) => {
-          console.warn('Failed to update memory usage timestamps:', error)
-        })
-      }
-
-      const memoryCandidates = extractMemoryCandidatesFromUserMessage(trimmedPrompt)
-      if (memoryCandidates.length > 0) {
-        void upsertMemoryCandidates({
-          userId,
-          projectId,
-          threadId,
-          sourceMessageId: userMessageId,
-          existing: persistedMemoryItems,
-          candidates: memoryCandidates,
-        }).catch((error) => {
-          console.warn('Failed to persist extracted memory items:', error)
-        })
-      }
-
-      setSubmitError(null)
-      setIsSubmitting(true)
-      manualStopRef.current = false
-      abortControllerRef.current = controller
-
-      setLiveAssistantMessage({
-        id: assistantMessageId,
-        role: 'assistant',
-        content: '',
-        isStreaming: true,
-      })
-
-      try {
-        const { output, requestId } = await chatService.generate({
-          messages: requestMessages,
-          stream: true,
-          abortSignal: controller.signal,
-          model: selectedModel,
-          context: requestContext,
-        })
-
-        activeRequestIdRef.current = requestId
-        runId = await createRun({
-          threadId,
-          messageId: assistantMessageId,
-          userId,
-          requestId,
-          model: selectedModel,
-        })
-        activeRunIdRef.current = runId
-
-        for await (const delta of output) {
-          if (delta.error) throw new Error(delta.error)
-          if (delta.done) break
-
-          if (delta.content) {
-            streamedResponse += delta.content
-            setLiveAssistantMessage((prev) =>
-              prev && prev.id === assistantMessageId
-                ? { ...prev, content: streamedResponse, isStreaming: true }
-                : prev
-            )
-          }
-
-          if (delta.toolCall) {
-            const tc = delta.toolCall
-            setLiveAssistantMessage((prev) => {
-              if (!prev || prev.id !== assistantMessageId) return prev
-              const existing = prev.toolCalls ?? []
-              const alreadyTracked = existing.some((t) => t.toolCallId === tc.toolCallId)
-              if (alreadyTracked) return prev
-              return {
-                ...prev,
-                toolCalls: [
-                  ...existing,
-                  { toolCallId: tc.toolCallId, toolName: tc.toolName, status: 'running' as const },
-                ],
-              }
-            })
-          }
-
-          if (delta.toolResult) {
-            setLiveAssistantMessage((prev) => {
-              if (!prev || prev.id !== assistantMessageId) return prev
-              const updated = (prev.toolCalls ?? []).map((t) =>
-                t.toolCallId === delta.toolResult!.toolCallId
-                  ? { ...t, status: 'completed' as const }
-                  : t
-              )
-              return { ...prev, toolCalls: updated }
-            })
-          }
-
-          if (delta.fileEdit) {
-            const edit = delta.fileEdit
-            collectedFileEdits.push(edit)
-
-            setLiveAssistantMessage((prev) => {
-              if (!prev || prev.id !== assistantMessageId) return prev
-              return { ...prev, fileEdits: [...collectedFileEdits] }
-            })
-
-            if (onInsertIntoEditor) {
-              void onInsertIntoEditor(JSON.stringify(edit), {
-                auto: true,
-                sourceMessageId: assistantMessageId,
-                skipEditorFocus: true,
-              })
-            }
-          }
-        }
-
-        const parsed = parseRawResponse(streamedResponse)
-        const finalContent =
-          parsed.displayText.trim().length > 0
-            ? parsed.displayText
-            : streamedResponse.trim().length > 0
-              ? streamedResponse
-              : 'No response received.'
-
-        if (parsed.fileEdits.length > 0 && onInsertIntoEditor) {
-          for (const edit of parsed.fileEdits) {
-            collectedFileEdits.push(edit)
-            void onInsertIntoEditor(JSON.stringify(edit), {
-              auto: true,
-              sourceMessageId: assistantMessageId,
-              skipEditorFocus: true,
-            })
-          }
-        }
-
-        await upsertThreadMessage({
-          messageId: assistantMessageId,
-          threadId,
-          projectId,
-          userId,
-          role: 'assistant',
-          content: finalContent,
-          seq: baseSeq + 1,
-          status: 'completed',
-          sourceMessageId: assistantMessageId,
-        })
-
-        if (runId) {
-          await finishRun(runId, 'completed')
-        }
-
-        if (options.autoApplyStagedEdits) {
-          const editedPaths = collectedFileEdits.map((edit) => edit.filePath)
-          await autoApplyLinkedToolEdits(assistantMessageId, editedPaths)
-        }
-      } catch (error) {
-        const aborted = manualStopRef.current || controller.signal.aborted
-        completionStatus = aborted ? 'interrupted' : 'error'
-        const errorMessage =
-          error instanceof Error ? error.message : 'Failed to stream chat response.'
-        const fallbackContent =
-          streamedResponse.trim().length > 0
-            ? streamedResponse
-            : aborted
-              ? 'Generation stopped.'
-              : 'Failed to generate a response. Please try again.'
-
-        await upsertThreadMessage({
-          messageId: assistantMessageId,
-          threadId,
-          projectId,
-          userId,
-          role: 'assistant',
-          content: fallbackContent,
-          seq: baseSeq + 1,
-          status: aborted ? 'interrupted' : 'error',
-          error: aborted ? '' : errorMessage,
-          sourceMessageId: assistantMessageId,
-        })
-
-        if (runId) {
-          await finishRun(
-            runId,
-            aborted ? 'aborted' : 'failed',
-            aborted ? undefined : errorMessage
-          )
-        }
-
-        if (!aborted) {
-          setSubmitError(errorMessage)
-        }
-      } finally {
-        setIsSubmitting(false)
-        setLiveAssistantMessage(null)
-        activeRequestIdRef.current = null
-        activeRunIdRef.current = null
-        abortControllerRef.current = null
-        manualStopRef.current = false
-      }
-
-      return {
-        status: completionStatus,
-        assistantMessageId,
-      }
-    },
-    [
-      autoApplyLinkedToolEdits,
-      ensureActiveThread,
-      isSubmitting,
-      memorySystemMessage,
-      onInsertIntoEditor,
-      persistedMessages,
-      persistedMemoryItems,
-      projectId,
-      promptMemoryItems,
-      requestContext,
-      selectedModel,
-      userId,
-    ]
-  )
-
-  useEffect(() => {
-    if (!externalPromptRequest) return
-    const requestId = externalPromptRequest.id.trim()
-    if (!requestId) return
-    if (consumedExternalPromptIdRef.current === requestId) return
-    if (isSubmitting) return
-
-    consumedExternalPromptIdRef.current = requestId
-    onExternalPromptConsumed?.(requestId)
-    setSubmitError(null)
-    setMessageInput('')
-
-    void (async () => {
-      try {
-        const result = await sendPrompt(externalPromptRequest.prompt, {
-          autoApplyStagedEdits: externalPromptRequest.autoApplyStagedEdits,
-        })
-
-        onExternalPromptSettled?.({
-          requestId,
-          status: result.status,
-          assistantMessageId: result.assistantMessageId,
-        })
-      } catch (error) {
-        const message =
-          error instanceof Error ? error.message : 'Failed to run external chat prompt.'
-        setSubmitError(message)
-        onExternalPromptSettled?.({
-          requestId,
-          status: 'error',
-          assistantMessageId: null,
-        })
-      }
-    })()
-  }, [
-    externalPromptRequest,
-    isSubmitting,
-    onExternalPromptConsumed,
-    onExternalPromptSettled,
-    sendPrompt,
-  ])
+  const canSubmit =
+    messageInput.trim().length > 0 &&
+    !session.isSubmitting &&
+    Boolean(projectId) &&
+    Boolean(userId)
 
   const handleSubmit = useCallback(() => {
     const prompt = messageInput.trim()
     if (!prompt) return
     setMessageInput('')
-    void sendPrompt(prompt).catch((error) => {
-      const message = error instanceof Error ? error.message : 'Failed to send prompt.'
-      setSubmitError(message)
+    void session.sendPrompt(prompt).catch((error) => {
       console.warn('Failed to send chat prompt:', error)
     })
-  }, [messageInput, sendPrompt])
+  }, [messageInput, session])
 
-  const handleRetryAssistantResponse = useCallback(
-    (assistantMessageId: string) => {
-      if (isSubmitting) return
-      const assistantIndex = messages.findIndex((message) => message.id === assistantMessageId)
-      if (assistantIndex <= 0) return
-
-      for (let index = assistantIndex - 1; index >= 0; index -= 1) {
-        const candidate = messages[index]
-        if (candidate.role === 'user') {
-          void sendPrompt(candidate.content).catch((error) => {
-            const message = error instanceof Error ? error.message : 'Failed to retry prompt.'
-            setSubmitError(message)
-            console.warn('Failed to retry chat prompt:', error)
-          })
-          return
-        }
-      }
-    },
-    [isSubmitting, messages, sendPrompt]
-  )
-
-  const handleCopyAssistantResponse = useCallback(async (message: PanelMessage) => {
-    try {
-      await navigator.clipboard.writeText(message.content)
-      setCopiedMessageId(message.id)
-      window.setTimeout(() => {
-        setCopiedMessageId((current) => (current === message.id ? null : current))
-      }, 1400)
-    } catch (error) {
-      console.warn('Failed to copy assistant response:', error)
-    }
+  const handleCopy = useCallback((content: string) => {
+    void navigator.clipboard.writeText(content).catch(() => {})
   }, [])
 
-  const handleApplyAssistantResponse = useCallback(
+  const handleRetry = useCallback(
+    (messageId: string) => {
+      session.retryAssistantMessage(messageId)
+    },
+    [session]
+  )
+
+  const handleApply = useCallback(
     async (message: PanelMessage) => {
       if (!onInsertIntoEditor) return
       const textToApply = message.content.trim()
       if (!textToApply) return
-
       setInsertingMessageId(message.id)
       try {
-        await onInsertIntoEditor(textToApply, {
-          sourceMessageId: message.id,
-        })
+        await onInsertIntoEditor(textToApply, { sourceMessageId: message.id })
       } catch (error) {
         console.warn('Failed to apply assistant response to editor:', error)
       } finally {
@@ -981,357 +304,394 @@ export function ChatPanel({
     [stagedActionsDisabled]
   )
 
+  const handleNewChat = useCallback(() => {
+    void session.createNewChat()
+    setMessageInput('')
+    setShowThreadList(false)
+  }, [session])
+
+  const handleSwitchThread = useCallback(
+    (threadId: string) => {
+      session.switchThread(threadId)
+      setShowThreadList(false)
+    },
+    [session]
+  )
+
+  // ── Thread list data ──
+
+  const threadListItems = useMemo(
+    () =>
+      session.threads.map((thread) => ({
+        id: thread.id,
+        title: thread.title,
+        lastModified: thread.lastMessageAt
+          ? new Date(thread.lastMessageAt).getTime()
+          : Date.now(),
+        isActive: thread.id === session.activeThreadId,
+      })),
+    [session.threads, session.activeThreadId]
+  )
+
+  // ── Render ──
+
   return (
-    <>
-      <div className={cn('flex h-full w-full flex-col bg-[#101011]', !isVisible && 'pointer-events-none')}>
-        <div className="flex items-center justify-between px-4 py-2.5 shrink-0 bg-[#101011] border-b border-white/5">
-          <div className="flex items-center gap-2">
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              onClick={onToggle}
-              className="h-7 w-7 rounded-md text-zinc-400 hover:text-zinc-100 hover:bg-white/5"
-              title="Hide AI Chat"
-            >
-              <ChevronsRight className="h-4 w-4" />
-            </Button>
-            <span className="text-lg font-semibold tracking-tight text-zinc-100">AI Chat</span>
-            <span className="text-xs text-zinc-500">
-              {activeThread?.title?.trim() || 'New chat'}
-            </span>
-          </div>
+    <div
+      className={cn(
+        'flex h-full w-full flex-col bg-[#121212] transition-opacity duration-300 ease-out',
+        isVisible ? 'opacity-100' : 'opacity-0 pointer-events-none'
+      )}
+    >
+      {/* ── Header ── */}
+      <ChatHeader
+        threadTitle={session.activeThread?.title?.trim() || undefined}
+        onNewChat={handleNewChat}
+        onToggleThreadList={() => setShowThreadList((v) => !v)}
+        showThreadListToggle
+        onHide={onToggle}
+        isFloating={isFloating}
+        onToggleFloat={onToggleFloat}
+      />
 
-          <div className="flex items-center gap-1.5">
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8 rounded-lg text-zinc-400 hover:text-zinc-100 hover:bg-white/5"
-              title="Recent chats"
-              onClick={() => setShowThreadList((value) => !value)}
-            >
-              <Clock3 className="h-4 w-4" />
-            </Button>
-            <Button
-              type="button"
-              size="icon"
-              onClick={() => {
-                void resetChat()
-              }}
-              className="h-8 w-8 rounded-lg bg-[#6D78E7] hover:bg-[#6D78E7]/90 text-white border border-white/10 shadow-sm transition-all"
-              title="New chat"
-            >
-              <SquarePen className="h-4 w-4" />
-            </Button>
-          </div>
+      {/* ── Thread List ── */}
+      {showThreadList && (
+        <div className="border-b border-white/[0.07] bg-[#0f0f11] max-h-56 overflow-hidden">
+          {session.isThreadsLoading ? (
+            <div className="px-3 py-2 text-[11px] text-zinc-600">Loading chats…</div>
+          ) : (
+            <ThreadList
+              threads={threadListItems}
+              onSelectThread={handleSwitchThread}
+              onDeleteThread={session.deleteThread}
+            />
+          )}
         </div>
+      )}
 
-        {showThreadList && (
-          <div className="border-b border-white/10 bg-[#111216] max-h-56 overflow-y-auto">
-            {isThreadsLoading ? (
-              <div className="px-3 py-2 text-xs text-zinc-500">Loading chats...</div>
-            ) : threads.length === 0 ? (
-              <div className="px-3 py-2 text-xs text-zinc-500">No chats yet. Start a new one.</div>
-            ) : (
-              <div className="py-1">
-                {threads.map((thread) => {
-                  const isActive = thread.id === activeThreadId
-                  return (
-                    <button
-                      key={thread.id}
-                      type="button"
-                      onClick={() => switchToThread(thread.id)}
-                      className={cn(
-                        'w-full px-3 py-2 text-left transition-colors',
-                        isActive ? 'bg-white/10' : 'hover:bg-white/5'
-                      )}
-                    >
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="truncate text-sm text-zinc-200">
-                          {thread.title?.trim() || 'Untitled chat'}
-                        </span>
-                        <span className="shrink-0 text-[10px] text-zinc-500">
-                          {formatThreadDate(thread.lastMessageAt)}
-                        </span>
-                      </div>
-                      {thread.lastMessagePreview?.trim() ? (
-                        <p className="mt-1 truncate text-xs text-zinc-500">
-                          {thread.lastMessagePreview}
-                        </p>
-                      ) : null}
-                    </button>
-                  )
-                })}
-              </div>
-            )}
-          </div>
+      {/* ── Main Content ── */}
+      <div className="mx-2 my-2 flex min-h-0 flex-1 flex-col rounded-xl border border-white/10 bg-zinc-950/40 overflow-hidden">
+        {/* Staged changes bar */}
+        {hasStagedChanges && (
+          <StagedChangesBar
+            changeCount={stagedChanges.length}
+            isStreaming={anyStagedStreaming}
+            onAcceptAll={() => void runStagedAction('accept-all', onAcceptAllStaged)}
+            onRejectAll={() => void runStagedAction('reject-all', onRejectAllStaged)}
+          />
         )}
 
-        <div className="mx-2 my-2 flex min-h-0 flex-1 flex-col rounded-xl border border-white/10 bg-zinc-950/40 overflow-hidden">
-          {hasStagedChanges && (
-            <div className="border-b border-white/10 bg-[#15161c] px-3 py-2">
-              <div className="flex items-center justify-between gap-2">
-                <div className="text-xs text-zinc-300">
-                  {stagedChanges.length} file{stagedChanges.length === 1 ? '' : 's'} with staged changes
-                </div>
-                <div className="flex items-center gap-1">
-                  <button
-                    type="button"
-                    onClick={() => void runStagedAction('reject-all', onRejectAllStaged)}
-                    disabled={stagedActionsDisabled}
-                    className="inline-flex h-6 items-center gap-1 rounded-md border border-[#3b3d46] px-2 text-[11px] text-zinc-300 transition-colors hover:bg-white/5 disabled:cursor-not-allowed disabled:opacity-45"
-                  >
-                    <X className="h-3 w-3" />
-                    <span>Reject All</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => void runStagedAction('accept-all', onAcceptAllStaged)}
-                    disabled={stagedActionsDisabled}
-                    className="inline-flex h-6 items-center gap-1 rounded-md bg-[#6D78E7] px-2 text-[11px] text-white transition-colors hover:bg-[#5b65d6] disabled:cursor-not-allowed disabled:opacity-45"
-                  >
-                    <Check className="h-3 w-3" />
-                    <span>Accept All</span>
-                  </button>
-                </div>
+        {/* Message list */}
+        <ChatMessageList autoScroll>
+          {session.messages.length === 0 ? (
+            <div className="flex h-full flex-col items-center justify-center gap-3 px-4 py-8 text-center">
+              {session.isThreadsLoading ? (
+                <p className="text-[12px] text-zinc-600">Loading chat history…</p>
+              ) : (
+                <>
+                  <div className="h-8 w-8 rounded-xl bg-[#6d78e7]/10 border border-[#6d78e7]/15 flex items-center justify-center">
+                    <svg className="h-4 w-4 text-[#8b95f0]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8.625 12a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H8.25m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H12m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0h-.375M21 12c0 4.556-4.03 8.25-9 8.25a9.764 9.764 0 0 1-2.555-.337A5.972 5.972 0 0 1 5.41 20.97a5.969 5.969 0 0 1-.474-.065 4.48 4.48 0 0 0 .978-2.025c.09-.457-.133-.901-.467-1.226C3.93 16.178 3 14.189 3 12c0-4.556 4.03-8.25 9-8.25s9 3.694 9 8.25Z" />
+                    </svg>
+                  </div>
+                  <div>
+                    <p className="text-[13px] font-medium text-zinc-300">Ask Clarity</p>
+                    <p className="mt-1 text-[11px] text-zinc-600 max-w-[200px] leading-relaxed">
+                      Get help with edits, debugging, and explanations.
+                    </p>
+                  </div>
+                </>
+              )}
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {session.messages.map((message) => {
+                if (message.role === 'user') {
+                  return (
+                    <UserMessage
+                      key={message.id}
+                      content={message.content}
+                    />
+                  )
+                }
+
+                const linkedChanges = linkedStagedChangesByMessageId.get(message.id) ?? []
+                const toolCalls = message.toolCalls ?? []
+                const messageFileEdits = message.fileEdits ?? []
+                const hasAgentActivity = toolCalls.length > 0 || messageFileEdits.length > 0
+
+                return (
+                  <div key={message.id} className="w-full space-y-1.5 px-1">
+                    {/* Thinking / Reasoning block */}
+                    {message.thinking && message.thinking.trim().length > 0 && (
+                      <ThinkingBlock
+                        thinking={message.thinking.trim()}
+                        isStreaming={message.isStreaming}
+                        defaultOpen={message.isStreaming}
+                      />
+                    )}
+
+                    {/* Agent Activity (tool calls + file edits) */}
+                    {hasAgentActivity && (
+                      <AgentActivityPanel
+                        toolCalls={toolCalls.map((tc) => ({
+                          toolCallId: tc.toolCallId,
+                          toolName: tc.toolName,
+                          status: tc.status,
+                          startedAt: 0,
+                          error: tc.detail,
+                        }))}
+                        isStreaming={Boolean(message.isStreaming)}
+                      />
+                    )}
+
+                    {/* Main content */}
+                    <div
+                      className={cn(
+                        message.isError ? 'text-rose-300' : 'text-zinc-300'
+                      )}
+                    >
+                      <ChatMarkdown
+                        content={message.content}
+                        hideFencedCodeBlocks={linkedChanges.length > 0}
+                        onFileClick={(filename) => {
+                          // Try staged changes first
+                          const stagedMatch = stagedChanges.find(
+                            (c) => c.fileName === filename || c.filePath?.endsWith(`/${filename}`) || c.filePath === filename
+                          )
+                          if (stagedMatch) {
+                            void onJumpToStagedFile?.(stagedMatch.fileId)
+                            return
+                          }
+                          // Try workspace files
+                          const wsMatch = workspaceFiles.find(
+                            (f) => f.path === filename || f.path.endsWith(`/${filename}`)
+                          )
+                          if (wsMatch) {
+                            onOpenWorkspaceFile?.(wsMatch.fileId)
+                          }
+                        }}
+                        className={cn(
+                          message.isError ? 'text-rose-300' : 'text-zinc-300'
+                        )}
+                      />
+                    </div>
+
+                    {/* File edit blocks */}
+                    {linkedChanges.length > 0 && (
+                      <div className="space-y-1.5">
+                        {linkedChanges.map((change) => {
+                          const openActionId = `open-${message.id}-${change.fileId}`
+                          const rejectActionId = `reject-${message.id}-${change.fileId}`
+                          const acceptActionId = `accept-${message.id}-${change.fileId}`
+
+                          return (
+                            <AssistantFileBlock
+                              key={`${message.id}-${change.fileId}`}
+                              change={change}
+                              disabled={stagedActionsDisabled}
+                              isOpening={runningStagedAction === openActionId}
+                              isRejecting={runningStagedAction === rejectActionId}
+                              isAccepting={runningStagedAction === acceptActionId}
+                              onOpen={() =>
+                                void runStagedAction(openActionId, () =>
+                                  onJumpToStagedFile?.(change.fileId)
+                                )
+                              }
+                              onReject={() =>
+                                void runStagedAction(rejectActionId, () =>
+                                  onRejectStagedFile?.(change.fileId)
+                                )
+                              }
+                              onAccept={() =>
+                                void runStagedAction(acceptActionId, () =>
+                                  onAcceptStagedFile?.(change.fileId)
+                                )
+                              }
+                            />
+                          )
+                        })}
+                      </div>
+                    )}
+
+                    {/* Streaming indicator with interrupt */}
+                    {message.isStreaming && (
+                      <StreamingIndicator
+                        state={
+                          message.toolCalls?.some((t) => t.status === 'running')
+                            ? 'tool_executing'
+                            : message.thinking
+                              ? 'llm_generating'
+                              : 'llm_generating'
+                        }
+                        toolName={
+                          message.toolCalls?.find((t) => t.status === 'running')?.toolName
+                        }
+                        onStop={session.stopStreaming}
+                      />
+                    )}
+
+                    {/* Message actions (copy, retry, apply) */}
+                    {!message.isStreaming && (
+                      <MessageActions
+                        content={message.content}
+                        messageId={message.id}
+                        onCopy={handleCopy}
+                        onRetry={handleRetry}
+                      >
+                        {onInsertIntoEditor && (
+                          <button
+                            type="button"
+                            onClick={() => void handleApply(message)}
+                            disabled={insertingMessageId === message.id}
+                            className="inline-flex h-6 items-center gap-1.5 rounded-md px-2 text-[11px] font-medium text-zinc-600 transition-colors hover:bg-white/5 hover:text-zinc-300 disabled:cursor-not-allowed disabled:opacity-40"
+                            title="Apply code to editor"
+                          >
+                            <ArrowDownToLine className="h-3 w-3" />
+                            <span>
+                              {insertingMessageId === message.id ? 'Applying…' : 'Apply'}
+                            </span>
+                          </button>
+                        )}
+                      </MessageActions>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </ChatMessageList>
+
+        {/* ── Input Area ── */}
+        <div className="pt-2 relative" ref={filePickerRef}>
+          {/* File picker popover */}
+          {showFilePicker && (
+            <div className="absolute bottom-full left-3 right-3 mb-1.5 z-50 rounded-xl border border-white/[0.09] bg-[#16171e] shadow-xl shadow-black/40 overflow-hidden">
+              <div className="flex items-center gap-2 border-b border-white/[0.06] px-3 py-2">
+                <Search className="h-3.5 w-3.5 text-zinc-600 shrink-0" />
+                <input
+                  type="text"
+                  value={filePickerSearch}
+                  onChange={(e) => setFilePickerSearch(e.target.value)}
+                  placeholder="Search files…"
+                  className="flex-1 bg-transparent text-[12px] text-zinc-300 placeholder:text-zinc-600 focus:outline-none"
+                  autoFocus
+                />
+                <button
+                  type="button"
+                  onClick={() => { setShowFilePicker(false); setFilePickerSearch('') }}
+                  className="text-zinc-600 hover:text-zinc-400 transition-colors"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
               </div>
-              <p className="mt-1 text-[11px] text-zinc-500">
-                Open each assistant response to review file blocks and jump directly to the diff in-editor.
-              </p>
-              {unlinkedStagedChanges.length > 0 && (
-                <p className="mt-1 text-[11px] text-zinc-500">
-                  {unlinkedStagedChanges.length} change
-                  {unlinkedStagedChanges.length === 1 ? '' : 's'} are not linked to a message yet.
-                </p>
+              <div className="max-h-52 overflow-y-auto py-1">
+                {filteredWorkspaceFiles.length === 0 ? (
+                  <p className="px-3 py-3 text-[11px] text-zinc-600 text-center">No files found</p>
+                ) : (
+                  filteredWorkspaceFiles.map((file) => {
+                    const isAttached = attachedFileIds.has(file.fileId)
+                    const filename = file.path.split('/').pop() ?? file.path
+                    const dir = file.path.includes('/') ? file.path.split('/').slice(0, -1).join('/') : ''
+                    return (
+                      <button
+                        key={file.fileId}
+                        type="button"
+                        onClick={() => {
+                          setAttachedFileIds((prev) => {
+                            const next = new Set(prev)
+                            if (next.has(file.fileId)) next.delete(file.fileId)
+                            else next.add(file.fileId)
+                            return next
+                          })
+                        }}
+                        className={cn(
+                          'flex w-full items-center gap-2.5 px-3 py-1.5 text-left transition-colors',
+                          isAttached
+                            ? 'bg-[#6d78e7]/8 text-zinc-200'
+                            : 'text-zinc-400 hover:bg-white/[0.04] hover:text-zinc-200'
+                        )}
+                      >
+                        <FileText className={cn('h-3.5 w-3.5 shrink-0', isAttached ? 'text-[#8b95f0]' : 'text-zinc-600')} />
+                        <div className="min-w-0 flex-1">
+                          <span className="text-[12px] font-medium">{filename}</span>
+                          {dir && <span className="ml-1.5 text-[10px] text-zinc-600">{dir}</span>}
+                        </div>
+                        {isAttached && <Check className="h-3 w-3 text-[#8b95f0] shrink-0" />}
+                      </button>
+                    )
+                  })
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Attached file pills */}
+          {(attachedFileContexts.length > 0 || workspaceFiles.length > 0) && (
+            <div className="mb-2 px-3 flex flex-wrap items-center gap-1.5">
+              {attachedFileContexts.map((file) => {
+                const filename = file.path.split('/').pop() ?? file.path
+                return (
+                  <div
+                    key={file.fileId}
+                    className="inline-flex h-6 items-center gap-1.5 rounded-lg border border-white/[0.08] bg-white/[0.04] pl-2 pr-1 text-[11px] font-medium text-zinc-400"
+                  >
+                    <FileText className="h-3 w-3 text-zinc-600 shrink-0" />
+                    <span className="max-w-[130px] truncate">{filename}</span>
+                    <button
+                      type="button"
+                      className="ml-0.5 rounded p-0.5 text-zinc-700 hover:text-zinc-300 transition-colors"
+                      onClick={() =>
+                        setAttachedFileIds((prev) => {
+                          const next = new Set(prev)
+                          next.delete(file.fileId)
+                          return next
+                        })
+                      }
+                      title="Remove"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </div>
+                )
+              })}
+              {workspaceFiles.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => { setShowFilePicker((v) => !v); setFilePickerSearch('') }}
+                  className={cn(
+                    'inline-flex h-6 items-center gap-1 rounded-lg border px-2 text-[11px] font-medium transition-colors',
+                    showFilePicker
+                      ? 'border-[#6d78e7]/30 bg-[#6d78e7]/10 text-[#8b95f0]'
+                      : 'border-white/[0.06] bg-white/[0.03] text-zinc-600 hover:border-white/10 hover:bg-white/[0.05] hover:text-zinc-400'
+                  )}
+                >
+                  <Plus className="h-3 w-3" />
+                  <span>Add file</span>
+                </button>
               )}
             </div>
           )}
-          <div className="flex-1 overflow-y-auto px-3 py-3">
-            {messages.length === 0 ? (
-              <div className="mx-auto mt-6 max-w-xs text-center text-sm leading-6 text-zinc-500">
-                {isThreadsLoading
-                  ? 'Loading chat history...'
-                  : 'Ask for edits, debugging help, or explanations for the current document.'}
-              </div>
-            ) : (
-              <div className="space-y-6">
-                {messages.map((message) => {
-                  if (message.role === 'user') {
-                    return (
-                      <div key={message.id} className="flex w-full justify-end">
-                        <div className="max-w-[92%] rounded-2xl bg-[#40414f] px-4 py-3 text-[15px] leading-7 text-zinc-100">
-                          <div className="whitespace-pre-wrap">{message.content}</div>
-                        </div>
-                      </div>
-                    )
-                  }
 
-                  const linkedChanges = linkedStagedChangesByMessageId.get(message.id) ?? []
-
-                  return (
-                    <div key={message.id} className="w-full space-y-2">
-                      <div
-                        className={cn(
-                          'text-[15px] leading-7',
-                          message.isError ? 'text-rose-200' : 'text-zinc-200'
-                        )}
-                      >
-                        <ChatMarkdown
-                          content={message.content}
-                          hideFencedCodeBlocks={linkedChanges.length > 0}
-                          className={cn(
-                            'text-[15px] leading-8',
-                            message.isError ? 'text-rose-200' : 'text-zinc-200'
-                          )}
-                        />
-                      </div>
-
-                      {linkedChanges.length > 0 && (
-                        <div className="space-y-1.5">
-                          {linkedChanges.map((change) => {
-                            const openActionId = `open-${message.id}-${change.fileId}`
-                            const rejectActionId = `reject-${message.id}-${change.fileId}`
-                            const acceptActionId = `accept-${message.id}-${change.fileId}`
-
-                            return (
-                              <AssistantFileBlock
-                                key={`${message.id}-${change.fileId}`}
-                                change={change}
-                                disabled={stagedActionsDisabled}
-                                isOpening={runningStagedAction === openActionId}
-                                isRejecting={runningStagedAction === rejectActionId}
-                                isAccepting={runningStagedAction === acceptActionId}
-                                onOpen={() =>
-                                  void runStagedAction(openActionId, () =>
-                                    onJumpToStagedFile?.(change.fileId)
-                                  )
-                                }
-                                onReject={() =>
-                                  void runStagedAction(rejectActionId, () =>
-                                    onRejectStagedFile?.(change.fileId)
-                                  )
-                                }
-                                onAccept={() =>
-                                  void runStagedAction(acceptActionId, () =>
-                                    onAcceptStagedFile?.(change.fileId)
-                                  )
-                                }
-                              />
-                            )
-                          })}
-                        </div>
-                      )}
-
-                      {message.isStreaming && (
-                        <div className="flex items-center gap-2 pl-1 text-xs text-zinc-500">
-                          <span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-zinc-500" />
-                          <span>Thinking...</span>
-                        </div>
-                      )}
-
-                      {!message.isStreaming && (
-                        <div className="flex items-center gap-1.5 text-xs text-zinc-400">
-                          <button
-                            type="button"
-                            onClick={() => void handleCopyAssistantResponse(message)}
-                            className="inline-flex items-center gap-1 rounded-md px-2 py-1 transition-colors hover:bg-white/5 hover:text-zinc-100"
-                            title="Copy response"
-                          >
-                            {copiedMessageId === message.id ? (
-                              <Check className="h-3.5 w-3.5" />
-                            ) : (
-                              <Copy className="h-3.5 w-3.5" />
-                            )}
-                            <span>{copiedMessageId === message.id ? 'Copied' : 'Copy'}</span>
-                          </button>
-
-                          <button
-                            type="button"
-                            onClick={() => handleRetryAssistantResponse(message.id)}
-                            disabled={isSubmitting}
-                            className="inline-flex items-center gap-1 rounded-md px-2 py-1 transition-colors hover:bg-white/5 hover:text-zinc-100 disabled:cursor-not-allowed disabled:opacity-50"
-                            title="Retry this prompt"
-                          >
-                            <RotateCcw className="h-3.5 w-3.5" />
-                            <span>Retry</span>
-                          </button>
-
-                          {onInsertIntoEditor && (
-                            <button
-                              type="button"
-                              onClick={() => void handleApplyAssistantResponse(message)}
-                              disabled={insertingMessageId === message.id}
-                              className="inline-flex items-center gap-1 rounded-md px-2 py-1 transition-colors hover:bg-white/5 hover:text-zinc-100 disabled:cursor-not-allowed disabled:opacity-50"
-                              title="Apply code to editor"
-                            >
-                              <ArrowDownToLine className="h-3.5 w-3.5" />
-                              <span>{insertingMessageId === message.id ? 'Applying...' : 'Apply Code'}</span>
-                            </button>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  )
-                })}
-                <div ref={messagesEndRef} />
-              </div>
-            )}
-          </div>
-
-          <div className="p-3">
-            <div className="mb-3 flex flex-wrap items-center gap-2">
-              {showCurrentDocument && (
-                <button
-                  type="button"
-                  className="inline-flex h-8 items-center gap-2 rounded-xl border border-[#343542] bg-[#1b1c22] px-3 text-sm font-medium text-zinc-200 hover:bg-[#20212a] transition-colors"
-                >
-                  <FileText className="h-4 w-4 text-zinc-400" />
-                  <span>{currentDocumentLabel}</span>
-                  <span
-                    role="button"
-                    tabIndex={0}
-                    className="ml-1 text-zinc-400 hover:text-zinc-200"
-                    onClick={(event) => {
-                      event.stopPropagation()
-                      handleShowCurrentDocumentChange(false)
-                    }}
-                    onKeyDown={(event) => {
-                      if (event.key === 'Enter' || event.key === ' ') {
-                        event.preventDefault()
-                        event.stopPropagation()
-                        handleShowCurrentDocumentChange(false)
-                      }
-                    }}
-                  >
-                    <X className="h-3.5 w-3.5" />
-                  </span>
-                </button>
-              )}
-              {!showCurrentDocument && (
-                <button
-                  type="button"
-                  onClick={() => handleShowCurrentDocumentChange(true)}
-                  className="inline-flex h-8 items-center gap-2 rounded-xl border border-[#343542] bg-[#1b1c22] px-3 text-sm font-medium text-zinc-300 transition-colors hover:bg-[#20212a] hover:text-zinc-100"
-                >
-                  <FileText className="h-4 w-4 text-zinc-400" />
-                  <span>Attach current document</span>
-                </button>
-              )}
-            </div>
-
-            <div className="rounded-2xl border border-[#3a3b45] bg-[#202228] p-3">
-              <textarea
-                value={messageInput}
-                onChange={(event) => setMessageInput(event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key === 'Enter' && !event.shiftKey) {
-                    event.preventDefault()
-                    handleSubmit()
-                  }
-                }}
-                rows={3}
-                placeholder="Ask AI, use @ to mention specific PDFs or / to access saved prompts"
-                className="w-full resize-none bg-transparent text-[15px] leading-6 text-zinc-100 placeholder:text-zinc-500 focus:outline-none"
-              />
-
-              {(submitError || threadsErrorMessage) && (
-                <p className="mt-2 text-xs text-rose-300">{submitError ?? threadsErrorMessage}</p>
-              )}
-
-              <div className="mt-3 flex items-end gap-3">
-                <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-1.5 gap-y-2 text-zinc-400">
-                  <label className="mr-1 flex shrink-0 items-center gap-1.5 text-sm text-zinc-300">
-                    <span className="text-zinc-400">Model</span>
-                    <select
-                      value={selectedModel}
-                      onChange={(event) => handleModelChange(event.target.value)}
-                      className="h-7 max-w-[8.5rem] rounded-md border border-[#3a3b45] bg-[#1b1c22] px-2 text-sm text-zinc-200 focus:outline-none focus:ring-1 focus:ring-[#6D78E7]"
-                    >
-                      {QUICK_EDIT_GEMINI_MODEL_OPTIONS.map((option) => (
-                        <option key={option.value} value={option.value}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                </div>
-
-                <Button
-                  type="button"
-                  size="icon"
-                  disabled={!canSubmit && !isSubmitting}
-                  onClick={isSubmitting ? stopStreaming : handleSubmit}
-                  className="h-10 w-10 shrink-0 rounded-full bg-[#6D78E7] text-white hover:bg-[#5b65d6] disabled:opacity-50"
-                  title={isSubmitting ? 'Stop generating' : 'Send message'}
-                >
-                  {isSubmitting ? <Square className="h-4 w-4" /> : <ArrowUp className="h-4 w-4" />}
-                </Button>
-              </div>
-            </div>
-          </div>
+          <ChatInputArea
+            value={messageInput}
+            onChange={setMessageInput}
+            onSubmit={handleSubmit}
+            onStop={session.stopStreaming}
+            isSubmitting={session.isSubmitting}
+            disabled={session.isSubmitting}
+            modelOptions={QUICK_EDIT_GEMINI_MODEL_OPTIONS}
+            selectedModel={selectedModel}
+            onModelChange={handleModelChange}
+            placeholder="Ask AI, use @ to mention specific PDFs or / to access saved prompts"
+          />
         </div>
+
+        {(session.submitError || session.threadsErrorMessage) && (
+          <p className="px-3 pb-2 text-xs text-rose-300">
+            {session.submitError ?? session.threadsErrorMessage}
+          </p>
+        )}
       </div>
-    </>
+    </div>
   )
 }

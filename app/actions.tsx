@@ -1,10 +1,10 @@
 'use server'
 
 import { chat as chatImpl, generate as generateImpl } from '@/features/agent/services/chat-api'
-import type { ChatMessage } from '@/features/agent/types/chat.types'
+import type { PanelMessage } from '@/features/agent/types/chat.types'
 
 // Wrapper functions for backward compatibility
-export async function chat(messages: ChatMessage[], context: string) {
+export async function chat(messages: PanelMessage[], context: string) {
   return chatImpl(messages, context)
 }
 

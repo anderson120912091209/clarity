@@ -1,4 +1,4 @@
-import type { ChatMessage } from '@/features/agent/types/chat.types'
+import type { PanelMessage } from '@/features/agent/types/chat.types'
 import { readRuntimeUserHeaders } from '@/lib/client/runtime-user-context'
 
 type AgentRole = 'user' | 'assistant'
@@ -25,7 +25,7 @@ function resolveApiUrl(pathname: string): string {
   return `${baseWithProtocol.replace(/\/+$/, '')}${pathname}`
 }
 
-function normalizeMessages(messages: ChatMessage[]): Array<{ role: AgentRole; content: string }> {
+function normalizeMessages(messages: PanelMessage[]): Array<{ role: AgentRole; content: string }> {
   return messages
     .filter((message) => {
       const isValidRole = message.role === 'user' || message.role === 'assistant'
@@ -80,7 +80,7 @@ function extractAiSdkText(raw: string): string {
   return textChunks.join('')
 }
 
-export async function chat(messages: ChatMessage[], context: string): Promise<string> {
+export async function chat(messages: PanelMessage[], context: string): Promise<string> {
   const normalizedMessages = normalizeMessages(messages)
   const trimmedContext = context.trim()
 

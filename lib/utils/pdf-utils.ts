@@ -1,6 +1,7 @@
 'use client'
 import '@ungap/with-resolvers'
 import { PDFDocumentProxy } from 'pdfjs-dist'
+import { db } from '@/lib/constants'
 // CLSI URL is configured via NEXT_PUBLIC_CLSI_URL environment variable
 
 export async function createPreview(
@@ -240,10 +241,29 @@ export async function fetchPdf(
       let content = file.content || ''
       let encoding: 'utf-8' | 'base64' = 'utf-8'
       
-      // If content is empty but we have a URL (uploaded file), fetch it
-      if (!content && file.url) {
+      // If content is empty but we have an uploaded file, fetch it
+      if (!content && (file.storagePath || file.url)) {
         try {
-          const response = await fetch(file.url)
+          // Always get a fresh signed download URL to avoid expiration issues.
+          // Fall back to the stored (possibly stale) URL for legacy files
+          // that don't have storagePath yet.
+          let downloadUrl = file.url
+          if (file.storagePath) {
+            try {
+              downloadUrl = await db.storage.getDownloadUrl(file.storagePath)
+            } catch (urlError) {
+              console.warn(
+                `[CLSI] Failed to refresh download URL for "${file.name}", falling back to stored URL`,
+                urlError
+              )
+            }
+          }
+
+          if (!downloadUrl) {
+            throw new Error('No download URL available for this file')
+          }
+
+          const response = await fetch(downloadUrl)
           if (!response.ok) {
             throw new Error(`Storage responded ${response.status} ${response.statusText}`)
           }

@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@/components/ui/resizable'
+import { type ImperativePanelHandle } from 'react-resizable-panels'
+import { cn } from '@/lib/utils'
 import { AppLayout } from '@/components/layout/app-layout'
 import EditorSidebar from '@/components/layout/editor-sidebar'
 import SidebarToggle from '@/components/layout/sidebar-toggle'
@@ -15,7 +17,10 @@ import { ProjectProvider } from '@/contexts/ProjectContext'
 import { useParams, useSearchParams } from 'next/navigation'
 import { useProject } from '@/contexts/ProjectContext'
 import { EditorTabs } from '@/components/editor/editor-tabs'
-import { PDFNavContent, useLatex } from '@/components/latex-render/latex'
+import { PDFNavContent, useLatex, type PdfViewMode } from '@/components/latex-render/latex'
+import type { ChatViewMode } from '@/components/latex-render/latex'
+import FloatingPdfViewer from '@/components/latex-render/floating-pdf-viewer'
+import FloatingWindow from '@/components/ui/floating-window'
 import type { EditorSyntaxTheme } from '@/components/editor/types'
 import { db } from '@/lib/constants'
 import { id as instantId, tx } from '@instantdb/react'
@@ -97,6 +102,7 @@ interface HighlightCluster {
 }
 
 interface StructuredFileEditPayload {
+  fileId?: string
   filePath: string
   editType: 'search_replace' | 'replace_file'
   searchContent: string | null
@@ -136,6 +142,7 @@ function parseStructuredFileEditPayloads(messageContent: string): StructuredFile
   for (const candidate of candidates) {
     if (!candidate || typeof candidate !== 'object') continue
     const raw = candidate as {
+      fileId?: unknown
       filePath?: unknown
       editType?: unknown
       searchContent?: unknown
@@ -147,6 +154,7 @@ function parseStructuredFileEditPayloads(messageContent: string): StructuredFile
     if (typeof raw.replaceContent !== 'string') continue
 
     payloads.push({
+      fileId: typeof raw.fileId === 'string' ? raw.fileId.trim() : undefined,
       filePath: raw.filePath.trim(),
       editType: raw.editType,
       searchContent: typeof raw.searchContent === 'string' ? raw.searchContent : null,
@@ -267,6 +275,10 @@ function shouldEnableCollabDebug(): boolean {
 function EditorLayout() {
   const searchParams = useSearchParams()
   const [isChatVisible, setIsChatVisible] = useState(false)
+  const chatPanelRef = useRef<ImperativePanelHandle>(null)
+  const pdfPanelRef = useRef<ImperativePanelHandle>(null)
+  const [pdfViewMode, setPdfViewMode] = useState<PdfViewMode>('docked')
+  const [chatViewMode, setChatViewMode] = useState<ChatViewMode>('docked')
   const [chatPromptRequest, setChatPromptRequest] = useState<ChatPromptRequest | null>(null)
   const [activeLatexDebugRequestId, setActiveLatexDebugRequestId] = useState<string | null>(null)
   const [followConnectionId, setFollowConnectionId] = useState<number | null>(null)
@@ -824,6 +836,53 @@ function EditorLayout() {
     isRealtimeCollaborationEnabled,
     user?.id,
   ])
+  // Toggle between docked and floating PDF view
+  const handleTogglePdfViewMode = useCallback(() => {
+    setPdfViewMode((prev) => {
+      const next = prev === 'docked' ? 'floating' : 'docked'
+      if (next === 'floating') {
+        pdfPanelRef.current?.collapse()
+      } else {
+        pdfPanelRef.current?.expand()
+      }
+      return next
+    })
+  }, [])
+
+  // Toggle between docked and floating AI Chat view
+  const handleToggleChatViewMode = useCallback(() => {
+    setChatViewMode((prev) => {
+      const next = prev === 'docked' ? 'floating' : 'docked'
+      if (next === 'floating') {
+        // Collapse the docked chat panel and show the floating one
+        chatPanelRef.current?.collapse()
+        setIsChatVisible(true)
+      } else {
+        // Re-dock: expand the panel if chat is visible
+        setIsChatVisible(true)
+        // Small delay so the panel ref picks up the expand after state settles
+        setTimeout(() => chatPanelRef.current?.expand(), 0)
+      }
+      return next
+    })
+  }, [])
+
+  // Drive smooth open/close of the chat panel via imperative API
+  // When chat is in floating mode, always keep the docked panel collapsed
+  useEffect(() => {
+    const panel = chatPanelRef.current
+    if (!panel) return
+    if (chatViewMode === 'floating') {
+      panel.collapse()
+      return
+    }
+    if (isChatVisible) {
+      panel.expand()
+    } else {
+      panel.collapse()
+    }
+  }, [isChatVisible, chatViewMode])
+
   const isLatexAutoDebugRunning = Boolean(activeLatexDebugRequestId)
 
   const handleLatexAutoDebug = useCallback(() => {
@@ -885,17 +944,31 @@ function EditorLayout() {
       if (!trimmed) return
 
       const structuredEdits = parseStructuredFileEditPayloads(trimmed)
-      const structuredBlocks: AssistantInsertBlock[] = structuredEdits.map((edit) => ({
-        filePath: edit.filePath,
-        insertMode: edit.editType === 'search_replace' ? ('search_replace' as InsertMode) : ('replace_file' as InsertMode),
-        hasExplicitInsertMode: true,
-        code:
-          edit.editType === 'search_replace' && edit.searchContent
-            ? buildSearchReplaceConflictBlock(edit.searchContent, edit.replaceContent)
-            : edit.replaceContent,
+      type BlockWithTarget = {
+        block: AssistantInsertBlock
+        targetFileId?: string | null
+      }
+
+      const structuredBlocks: BlockWithTarget[] = structuredEdits.map((edit) => ({
+        targetFileId: edit.fileId ?? null,
+        block: {
+          filePath: edit.filePath,
+          insertMode:
+            edit.editType === 'search_replace'
+              ? ('search_replace' as InsertMode)
+              : ('replace_file' as InsertMode),
+          hasExplicitInsertMode: true,
+          code:
+            edit.editType === 'search_replace' && edit.searchContent
+              ? buildSearchReplaceConflictBlock(edit.searchContent, edit.replaceContent)
+              : edit.replaceContent,
+        },
       }))
 
-      const parsedBlocks = parseAssistantInsertBlocks(trimmed)
+      const parsedBlocks = parseAssistantInsertBlocks(trimmed).map((block) => ({
+        block,
+        targetFileId: null,
+      }))
       const machineBlocks = parsedBlocks.length > 0 ? parsedBlocks : structuredBlocks
 
       if (options?.auto && machineBlocks.length === 0) {
@@ -906,8 +979,11 @@ function EditorLayout() {
           ? machineBlocks
           : [
               {
-                code: trimmed,
-                insertMode: 'append' as InsertMode,
+                block: {
+                  code: trimmed,
+                  insertMode: 'append' as InsertMode,
+                },
+                targetFileId: null,
               },
             ]
 
@@ -923,7 +999,8 @@ function EditorLayout() {
       const stagedByFileId = new Map<string, PendingStageEntry>()
       let primaryTarget: { fileId: string; focusLine: number } | null = null
 
-      for (const block of blocksToApply) {
+      for (const entry of blocksToApply) {
+        const block = entry.block
         if (
           machineBlocks.length > 0 &&
           block.insertMode === 'append' &&
@@ -938,9 +1015,15 @@ function EditorLayout() {
         }
 
         const explicitTargetPath = block.filePath?.trim()
-        const targetFile = explicitTargetPath
-          ? findFileByPath(explicitTargetPath)
-          : currentlyOpen
+        const targetFileById =
+          entry.targetFileId && fileIdMap.current.has(entry.targetFileId)
+            ? fileIdMap.current.get(entry.targetFileId)
+            : null
+        const targetFile = targetFileById
+          ? targetFileById
+          : explicitTargetPath
+            ? findFileByPath(explicitTargetPath)
+            : currentlyOpen
 
         if (!targetFile?.id) {
           console.warn(
@@ -1444,7 +1527,7 @@ function EditorLayout() {
   const pdfHeader = (
     <div className="flex items-center justify-between w-full h-full overflow-hidden">
         <div className="flex-1 min-w-0 flex items-center justify-end gap-2 pr-1">
-          <PDFNavContent 
+          <PDFNavContent
             isLoading={isLoading}
             autoFetch={autoFetch}
             scale={scale}
@@ -1459,6 +1542,8 @@ function EditorLayout() {
             onDownload={handleDownload}
             onToggleLogs={() => setShowLogs(!showLogs)}
             showLogs={showLogs}
+            pdfViewMode={pdfViewMode}
+            onToggleViewMode={handleTogglePdfViewMode}
           />
         </div>
     </div>
@@ -1508,8 +1593,8 @@ function EditorLayout() {
           <ResizableHandle className="w-2 bg-transparent flex items-center justify-center group outline-none">
             <div className="h-8 w-1 bg-zinc-700 rounded-full opacity-0 group-hover:opacity-100 transition-all" />
           </ResizableHandle>
-          <ResizablePanel defaultSize={50} minSize={20} collapsible={true}>
-            <LatexRenderer 
+          <ResizablePanel ref={pdfPanelRef} defaultSize={50} minSize={20} collapsible={true}>
+            <LatexRenderer
               pdfUrl={pdfUrl}
               isLoading={isLoading}
               error={error}
@@ -1528,13 +1613,28 @@ function EditorLayout() {
               isAiDebugEnabled={isAiChatEnabled}
             />
           </ResizablePanel>
-          {isAiChatEnabled && isChatVisible && (
+          {isAiChatEnabled && (
             <>
-              <ResizableHandle className="w-2 bg-transparent flex items-center justify-center group outline-none">
-                <div className="h-8 w-1 bg-zinc-700 rounded-full opacity-0 group-hover:opacity-100 transition-all" />
+              <ResizableHandle
+                className={cn(
+                  'w-2 bg-transparent flex items-center justify-center group outline-none transition-all duration-300 ease-out',
+                  (!isChatVisible || chatViewMode === 'floating') && 'opacity-0 pointer-events-none'
+                )}
+              >
+                <div className="h-8 w-1 bg-zinc-700 rounded-full opacity-0 group-hover:opacity-100 transition-all duration-200" />
               </ResizableHandle>
-              <ResizablePanel defaultSize={20} minSize={20} maxSize={45} collapsible={true}>
-                <ChatPanel 
+              <ResizablePanel
+                ref={chatPanelRef}
+                defaultSize={0}
+                minSize={18}
+                maxSize={45}
+                collapsible
+                collapsedSize={0}
+                onCollapse={() => { if (chatViewMode === 'docked') setIsChatVisible(false) }}
+                onExpand={() => { if (chatViewMode === 'docked') setIsChatVisible(true) }}
+                style={{ transition: 'flex-basis 0.3s cubic-bezier(0.4, 0, 0.2, 1)' }}
+              >
+                <ChatPanel
                   projectId={projectId}
                   userId={user?.id ?? ''}
                   initialActiveThreadId={project?.activeChatThreadId ?? null}
@@ -1558,11 +1658,78 @@ function EditorLayout() {
                   externalPromptRequest={chatPromptRequest}
                   onExternalPromptConsumed={handleChatExternalPromptConsumed}
                   onExternalPromptSettled={handleChatExternalPromptSettled}
+                  onOpenWorkspaceFile={setActiveFile}
+                  onToggleFloat={handleToggleChatViewMode}
                 />
               </ResizablePanel>
             </>
           )}
         </ResizablePanelGroup>
+
+        {/* Floating PDF Viewer */}
+        {pdfViewMode === 'floating' && (
+          <FloatingPdfViewer
+            pdfUrl={pdfUrl}
+            isLoading={isLoading}
+            error={error}
+            scale={scale}
+            onScaleChange={setPrivateScale}
+            logs={logs}
+            showLogs={showLogs}
+            header={pdfHeader}
+            scrollRequest={pdfScrollRequest}
+            highlightRequest={pdfHighlightRequest}
+            onPdfPointSelect={handlePdfPointSelect}
+            isPdfNavigationEnabled={isPdfNavigationEnabled}
+            onPdfReady={handlePdfReady}
+            onAiDebug={isAiChatEnabled ? handleLatexAutoDebug : undefined}
+            isAiDebugging={isLatexAutoDebugRunning}
+            isAiDebugEnabled={isAiChatEnabled}
+            onClose={handleTogglePdfViewMode}
+          />
+        )}
+
+        {/* Floating AI Chat */}
+        {isAiChatEnabled && chatViewMode === 'floating' && isChatVisible && (
+          <FloatingWindow
+            title="AI Chat"
+            defaultWidth={420}
+            defaultHeight={600}
+            minWidth={320}
+            minHeight={400}
+            initialOffset={{ x: 200, y: 0 }}
+            onClose={handleToggleChatViewMode}
+          >
+            <ChatPanel
+              projectId={projectId}
+              userId={user?.id ?? ''}
+              initialActiveThreadId={project?.activeChatThreadId ?? null}
+              fileContent={fileContent}
+              isVisible={true}
+              onToggle={handleToggleChatViewMode}
+              activeFileId={currentlyOpen?.id}
+              activeFileName={currentlyOpen?.name}
+              activeFilePath={currentlyOpen ? resolveFilePath(currentlyOpen) ?? currentlyOpen.name : undefined}
+              workspaceFiles={workspaceFilesForChat}
+              compileLogs={logs}
+              compileError={error}
+              onInsertIntoEditor={handleInsertAssistantContent}
+              stagedChanges={stagedChanges}
+              anyStagedStreaming={anyStagedStreaming}
+              onJumpToStagedFile={handleJumpToStagedFile}
+              onAcceptStagedFile={handleAcceptStagedFile}
+              onRejectStagedFile={handleRejectStagedFile}
+              onAcceptAllStaged={handleAcceptAllStaged}
+              onRejectAllStaged={handleRejectAllStaged}
+              externalPromptRequest={chatPromptRequest}
+              onExternalPromptConsumed={handleChatExternalPromptConsumed}
+              onExternalPromptSettled={handleChatExternalPromptSettled}
+              onOpenWorkspaceFile={setActiveFile}
+              isFloating={true}
+              onToggleFloat={handleToggleChatViewMode}
+            />
+          </FloatingWindow>
+        )}
       </AppLayout>
     </CollaborationRoomProvider>
   )

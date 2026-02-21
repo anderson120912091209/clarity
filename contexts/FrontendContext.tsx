@@ -42,7 +42,8 @@ export function FrontendProvider({ children }: { children: ReactNode }) {
   const { user, isLoading } = db.useAuth()
   const router = useRouter()
   const pathname = usePathname()
-  const isPublicRoute = pathname === '/' || pathname === '/login'
+  const isPublicRoute =
+    pathname === '/' || pathname === '/login' || pathname === '/blogs' || pathname.startsWith('/blogs/')
   const accountPlanQuery = db.useQuery(
     user
       ? {
