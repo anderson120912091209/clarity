@@ -3,9 +3,12 @@ import { Manrope } from 'next/font/google'
 import './globals.css'
 import '@/styles/agent/quick-edit.css'
 import { FrontendProvider } from '@/contexts/FrontendContext'
+import { LocaleProvider } from '@/contexts/LocaleContext'
 import { ThemeProvider } from '@/components/theme-provider'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { Analytics } from "@vercel/analytics/react"
+import { getLocale } from '@/lib/i18n/get-locale'
+import { getDictionary } from '@/lib/i18n/dictionaries'
 
 const manrope = Manrope({ subsets: ['latin'] })
 export const metadata: Metadata = {
@@ -27,22 +30,25 @@ export const metadata: Metadata = {
   },
 }
 
-// ... imports
-
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode
 }>) {
+  const locale = await getLocale()
+  const dictionary = await getDictionary(locale)
+
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang={locale} suppressHydrationWarning>
       <body className={manrope.className} suppressHydrationWarning>
         <ThemeProvider attribute="class" defaultTheme="system" disableTransitionOnChange>
           <TooltipProvider>
-            <FrontendProvider>
-              {children}
-              <Analytics />
-            </FrontendProvider>
+            <LocaleProvider initialLocale={locale} initialDictionary={dictionary}>
+              <FrontendProvider>
+                {children}
+                <Analytics />
+              </FrontendProvider>
+            </LocaleProvider>
           </TooltipProvider>
         </ThemeProvider>
       </body>

@@ -2,8 +2,10 @@
 
 import { Button } from '@/components/ui/button'
 import Link from 'next/link'
+import { useLocale } from '@/contexts/LocaleContext'
 
 export function Hero() {
+  const { t } = useLocale()
   const ctaButtonSizeClass = 'h-[54px] w-full max-w-[250px]'
   const badgeSizeClass = 'w-full max-w-[250px]'
   const productHuntLaunchUrl =
@@ -14,16 +16,15 @@ export function Hero() {
   return (
     <section className="relative pt-24 pb-16 md:pt-40 md:pb-24 px-6 overflow-hidden">
       <div className="max-w-5xl mx-auto flex flex-col items-start text-left">
-        
+
         {/* Headline */}
         <h1 className="text-3xl md:text-[38px] leading-[1.2] font-semibold tracking-tight text-zinc-300 mb-5 max-w-3xl">
-          Collaborative AI-Powered Scientific Editor.<br />
+          {t('hero.headline')}<br />
         </h1>
 
         {/* Subtext */}
         <p className="max-w-xl text-sm md:text-lg text-zinc-400 mb-8 leading-relaxed font-normal">
-          Clarity helps researchers, professors and students to compose and collaborate on their research papers faster. 
-          (Supports LaTeX & Typst) 
+          {t('hero.subtext')}
         </p>
 
         {/* CTA */}
@@ -34,19 +35,19 @@ export function Hero() {
              text-sm font-semibold shadow-md rounded-md transition-colors cursor-crosshair`}
           >
             <Link href="/login" className="flex h-full w-full items-center justify-center cursor-crosshair">
-              Get Started Now
+              {t('hero.cta')}
             </Link>
           </Button>
           <a
             href={productHuntLaunchUrl}
             target="_blank"
             rel="noopener noreferrer"
-            aria-label="Clarity on Product Hunt"
+            aria-label={t('hero.product_hunt_aria')}
             className={`${badgeSizeClass} cursor-crosshair hidden sm:block`}
           >
             <img
               src={productHuntBadgeSrc}
-              alt="{clarity} - AI powered overleaf alternative | Product Hunt"
+              alt={t('hero.product_hunt_alt')}
               className="block h-auto w-full"
               width={250}
               height={54}
@@ -61,19 +62,19 @@ export function Hero() {
             <div className="relative overflow-hidden rounded-md pt-8 md:pt-20 px-4 md:px-12">
                  {/* Background Image */}
                  <div className="absolute inset-0 pointer-events-none">
-                    <img 
-                        src="/landing/heroscene-art.jpg" 
-                        alt="Hero background" 
+                    <img
+                        src="/landing/heroscene-art.jpg"
+                        alt={t('hero.bg_alt')}
                         className="w-full h-full object-cover opacity-50 md:opacity-100"
                     />
                  </div>
-                 
+
                  {/* Foreground Video/Image Container */}
-                 <div className="relative z-10 shadow-2xl rounded-t-xl 
+                 <div className="relative z-10 shadow-2xl rounded-t-xl
                  overflow-hidden border border-black/70 mx-auto max-w-[1100px] bg-white translate-y-1">
-                     <img 
+                     <img
                         src="/landing/screenshot2.png"
-                        alt="Clarity Editor Interface"
+                        alt={t('hero.screenshot_alt')}
                         className="w-full h-auto block"
                      />
                  </div>
@@ -85,12 +86,12 @@ export function Hero() {
           href={productHuntLaunchUrl}
           target="_blank"
           rel="noopener noreferrer"
-          aria-label="Clarity on Product Hunt"
+          aria-label={t('hero.product_hunt_aria')}
           className={`${badgeSizeClass} cursor-crosshair mx-auto mt-8 block sm:hidden`}
         >
           <img
             src={productHuntBadgeSrc}
-            alt="{clarity} - AI powered overleaf alternative | Product Hunt"
+            alt={t('hero.product_hunt_alt')}
             className="block h-auto w-full"
             width={250}
             height={54}
