@@ -152,7 +152,7 @@ export function NewProjectDialog({ children, open: controlledOpen, onOpenChange:
         console.error("Failed to create project", e)
         setIsCreating(false)
     }
-  }, [docType, router, setOpen, settings.defaultPdfBackgroundTheme, settings.defaultPdfCaretNavigation, title, user])
+  }, [docType, router, selectedTemplate, setOpen, settings.defaultPdfBackgroundTheme, settings.defaultPdfCaretNavigation, title, user])
 
   // Handle keyboard shortcuts
   useEffect(() => {
