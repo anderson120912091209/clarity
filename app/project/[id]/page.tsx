@@ -709,6 +709,9 @@ function EditorLayout() {
     setPrivateScale,
     pdfDarkMode,
     togglePdfDarkMode,
+    latexCompiler,
+    setLatexCompiler,
+    isTypstProject,
   } = useLatex(liveFileContentOverrides)
   
   const [showLogs, setShowLogs] = useState(false)
@@ -1555,6 +1558,9 @@ function EditorLayout() {
             onToggleViewMode={handleTogglePdfViewMode}
             pdfDarkMode={pdfDarkMode}
             onToggleDarkMode={togglePdfDarkMode}
+            latexCompiler={latexCompiler}
+            onLatexCompilerChange={setLatexCompiler}
+            isTypstProject={isTypstProject}
           />
         </div>
     </div>

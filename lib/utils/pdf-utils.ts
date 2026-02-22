@@ -42,11 +42,14 @@ interface EditorFiles {
   [key: string]: any
 }
 
+export type LatexCompiler = 'pdflatex' | 'xelatex' | 'lualatex'
+
 interface FetchPdfOptions {
   signal?: AbortSignal
   mode?: 'manual' | 'auto'
   clientUserId?: string
   clientUserPlan?: string
+  latexCompiler?: LatexCompiler
 }
 
 export interface SynctexContext {
@@ -208,12 +211,12 @@ export async function fetchPdf(
 
   const compileTarget = hasMainTex
     ? {
-        compiler: 'pdflatex' as const,
+        compiler: (options.latexCompiler || 'pdflatex') as string,
         rootResourcePath: 'main.tex',
         label: 'LaTeX',
       }
     : {
-        compiler: 'typst' as const,
+        compiler: 'typst' as string,
         rootResourcePath: 'main.typ',
         label: 'Typst',
       }

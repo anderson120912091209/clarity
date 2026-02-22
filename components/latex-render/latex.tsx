@@ -21,7 +21,7 @@ import { useProject } from '@/contexts/ProjectContext'
 import { useDashboardSettings } from '@/contexts/DashboardSettingsContext'
 import { createPathname } from '@/lib/utils/client-utils'
 import { useFrontend } from '@/contexts/FrontendContext'
-import { fetchPdf, type SynctexContext } from '@/lib/utils/pdf-utils'
+import { fetchPdf, type SynctexContext, type LatexCompiler } from '@/lib/utils/pdf-utils'
 import LatexLoading from './latex-loading'
 import LatexCanvas from './latex-canvas'
 import { cn } from '@/lib/utils'
@@ -73,6 +73,12 @@ export function useLatex(liveFileContentOverrides: Record<string, string> = {}) 
   
   const [scale, setScale] = useState(DEFAULT_PDF_SCALE)
   const [pdfDarkMode, setPdfDarkMode] = useState(false)
+  const [latexCompiler, setLatexCompiler] = useState<LatexCompiler>(() => {
+    if (typeof window === 'undefined' || !projectId) return 'pdflatex'
+    const stored = window.localStorage.getItem(`clarity-latex-compiler-${projectId}`)
+    if (stored === 'xelatex' || stored === 'lualatex') return stored
+    return 'pdflatex'
+  })
   const autoFetch = data?.isAutoFetching ?? false
   const effectiveFiles = useMemo(() => {
     if (!Array.isArray(files)) return files
@@ -163,6 +169,13 @@ export function useLatex(liveFileContentOverrides: Record<string, string> = {}) 
       }
       return next
     })
+  }, [projectId])
+
+  const setLatexCompilerPersisted = useCallback((compiler: LatexCompiler) => {
+    setLatexCompiler(compiler)
+    if (typeof window !== 'undefined' && projectId) {
+      window.localStorage.setItem(`clarity-latex-compiler-${projectId}`, compiler)
+    }
   }, [projectId])
 
   const setPrivateScale = useCallback(
@@ -282,6 +295,7 @@ export function useLatex(liveFileContentOverrides: Record<string, string> = {}) 
         mode,
         clientUserId: user.id,
         clientUserPlan: plan,
+        latexCompiler,
       })
       if (runId !== compileRunRef.current) return
 
@@ -316,7 +330,7 @@ export function useLatex(liveFileContentOverrides: Record<string, string> = {}) 
         activeAutoCompileAbortRef.current = null
       }
     }
-  }, [isDataLoading, user, effectiveFiles, projectId, queuePersist, plan])
+  }, [isDataLoading, user, effectiveFiles, projectId, queuePersist, plan, latexCompiler])
 
   // Auto-compile effect
   useEffect(() => {
@@ -332,7 +346,7 @@ export function useLatex(liveFileContentOverrides: Record<string, string> = {}) 
       return
     }
 
-    const autoCompileDelayMs = hasMainTyp ? 600 : 1000
+    const autoCompileDelayMs = hasMainTyp ? 300 : 1000
     const debounceTimer = setTimeout(() => {
       if (lastAutoCompileFingerprintRef.current === autoCompileFingerprint) {
         return
@@ -400,6 +414,9 @@ export function useLatex(liveFileContentOverrides: Record<string, string> = {}) 
     setPrivateScale,
     pdfDarkMode,
     togglePdfDarkMode,
+    latexCompiler,
+    setLatexCompiler: setLatexCompilerPersisted,
+    isTypstProject: hasMainTyp,
   }
 }
 
@@ -697,6 +714,9 @@ export function PDFNavContent({
   onToggleViewMode,
   pdfDarkMode = false,
   onToggleDarkMode,
+  latexCompiler = 'pdflatex',
+  onLatexCompilerChange,
+  isTypstProject = false,
 }: {
   isLoading: boolean
   autoFetch: boolean
@@ -716,6 +736,9 @@ export function PDFNavContent({
   onToggleViewMode?: () => void
   pdfDarkMode?: boolean
   onToggleDarkMode?: () => void
+  latexCompiler?: LatexCompiler
+  onLatexCompilerChange?: (compiler: LatexCompiler) => void
+  isTypstProject?: boolean
 }) {
   // Keyboard shortcut for compilation (Cmd+S)
   useEffect(() => {
@@ -760,6 +783,20 @@ export function PDFNavContent({
              <span className="text-[9px] font-semibold text-white/80">⌘S</span>
           </div>
         </Button>
+
+        {/* Compiler Selector (LaTeX only) */}
+        {!isTypstProject && onLatexCompilerChange && (
+          <select
+            value={latexCompiler}
+            onChange={(e) => onLatexCompilerChange(e.target.value as LatexCompiler)}
+            className="h-7 rounded-md bg-white/[0.06] border border-white/[0.08] text-[11px] font-medium text-white/70 px-1.5 outline-none hover:bg-white/[0.1] hover:text-white/90 transition-colors cursor-pointer shrink-0"
+            title="Select LaTeX compiler"
+          >
+            <option value="pdflatex" className="bg-[#1C1D21] text-white">pdfLaTeX</option>
+            <option value="xelatex" className="bg-[#1C1D21] text-white">XeLaTeX</option>
+            <option value="lualatex" className="bg-[#1C1D21] text-white">LuaLaTeX</option>
+          </select>
+        )}
 
         {/* Toggles */}
         <div className="flex items-center gap-0.5 shrink-0">
