@@ -21,9 +21,9 @@ export function StagedChangesBar({
   const disabled = isStreaming
 
   return (
-    <div className="border-b border-white/[0.06] bg-gradient-to-r from-[#111215] via-[#12131a] to-[#111215] px-3 py-2">
-      <div className="flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2">
+    <div className="border-b border-white/[0.06] px-3 py-2">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex items-center gap-2 min-w-0">
           <div className="flex h-5 w-5 items-center justify-center rounded-md bg-[#6d78e7]/10 border border-[#6d78e7]/15">
             <GitCommit className="h-3 w-3 text-[#8b95f0]" />
           </div>

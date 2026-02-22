@@ -329,8 +329,8 @@ export function ChatPanel({
   // ── Render ──
 
   return (
-    <div className="relative h-full w-full overflow-hidden bg-[#121212]">
-      <div className="flex h-full w-[max(100%,320px)] min-w-[320px] flex-col">
+    <div className="relative h-full w-full bg-[#101011]">
+      <div className="flex h-full w-full flex-col overflow-hidden">
         {/* ── Header ── */}
         <ChatHeader
         threadTitle={session.activeThread?.title?.trim() || undefined}
@@ -344,7 +344,7 @@ export function ChatPanel({
 
       {/* ── Thread List ── */}
       {showThreadList && (
-        <div className="border-b border-white/[0.07] bg-[#0f0f11] max-h-56 overflow-hidden">
+        <div className="border-b border-white/[0.07] max-h-56 overflow-hidden">
           {session.isThreadsLoading ? (
             <div className="px-3 py-2 text-[11px] text-zinc-600">Loading chats…</div>
           ) : (
@@ -358,7 +358,8 @@ export function ChatPanel({
       )}
 
       {/* ── Main Content ── */}
-      <div className="mx-2 my-2 flex min-h-0 flex-1 flex-col rounded-xl border border-white/10 bg-zinc-950/40 overflow-hidden">
+      <div className="mx-2 my-2 flex min-h-0 flex-1 flex-col rounded-xl border border-white/5
+        bg-#121212 overflow-hidden">
         {/* Staged changes bar */}
         {hasStagedChanges && (
           <StagedChangesBar

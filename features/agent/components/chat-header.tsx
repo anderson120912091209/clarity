@@ -22,7 +22,7 @@ export function ChatHeader({
   onToggleFloat,
 }: ChatHeaderProps) {
   return (
-    <div className="flex items-center justify-between px-3 py-2 shrink-0 border-b border-white/[0.06] bg-[#0f0f11]">
+    <div className="flex items-center justify-between px-3 py-2 shrink-0">
       <div className="flex items-center gap-2 min-w-0">
         {onHide && !isFloating && (
           <button

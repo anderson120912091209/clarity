@@ -270,7 +270,7 @@ export function ChatMarkdown({ content, className, hideFencedCodeBlocks = false,
     <div
       ref={containerRef}
       className={cn(
-        'chat-markdown text-[13.5px] leading-relaxed text-zinc-300',
+        'chat-markdown break-words text-[13.5px] leading-relaxed text-zinc-300',
         '[&_a]:text-[#8b95f0] [&_a]:underline-offset-2 [&_a:hover]:underline',
         '[&_p]:my-0 [&_p+p]:mt-2',
         '[&_ul]:my-2 [&_ul]:list-disc [&_ul]:pl-5 [&_ul]:space-y-0.5',

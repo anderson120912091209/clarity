@@ -63,13 +63,12 @@ export const ChatInputArea = forwardRef<ChatInputAreaHandle, ChatInputAreaProps>
       },
     }))
 
-    // Resize: single line collapses to natural height, grows as you type
+    // Resize: fit placeholder when empty, grow as you type
     useLayoutEffect(() => {
       const textarea = textareaRef.current
       if (!textarea) return
-      // Reset to 1 row so scrollHeight is accurate
       textarea.style.height = '0px'
-      const next = Math.min(textarea.scrollHeight, MAX_HEIGHT)
+      const next = Math.min(textarea.scrollHeight, value ? MAX_HEIGHT : MAX_HEIGHT / 2)
       textarea.style.height = `${next}px`
     }, [value])
 
@@ -102,7 +101,7 @@ export const ChatInputArea = forwardRef<ChatInputAreaHandle, ChatInputAreaProps>
       <div className="shrink-0 px-3 pb-3">
         <div
           className={cn(
-            'relative rounded-xl border bg-[#141519]',
+            'relative rounded-xl border bg-[#161616]',
             'transition-[border-color,box-shadow] duration-150 ease-out',
             'border-white/[0.08]',
             'focus-within:border-[#6d78e7]/50 focus-within:shadow-[0_0_0_1px_rgba(109,120,231,0.18),0_0_12px_rgba(109,120,231,0.06)]',

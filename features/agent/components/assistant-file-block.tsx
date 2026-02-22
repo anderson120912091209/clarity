@@ -141,7 +141,7 @@ export function AssistantFileBlock({
         <div className="mt-2.5 h-px w-full bg-white/[0.04]" />
 
         {/* Actions row */}
-        <div className="mt-2.5 flex items-center justify-between">
+        <div className="mt-2.5 flex flex-wrap items-center justify-between gap-2">
           <button
             onClick={onOpen}
             disabled={actionDisabled || !onOpen}
