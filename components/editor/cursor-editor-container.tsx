@@ -12,6 +12,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { useProject } from '@/contexts/ProjectContext'
 import { getFileExtension } from '@/lib/utils/client-utils'
 import ImageViewer from './image-viewer'
+import FilePreviewPlaceholder, { NON_PREVIEWABLE_EXTENSIONS } from './file-preview-placeholder'
 import { Command, ChevronRight, File } from 'lucide-react'
 import type { EditorSyntaxTheme } from '@/components/editor/types'
 import { chatApplyService } from '@/services/agent/browser/chat/chatApplyService'
@@ -78,6 +79,7 @@ const CursorEditorContainer: React.FC<CursorEditorContainerProps> = ({
   const ext = fileType.toLowerCase()
   const isImageFile = ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp', 'svg'].includes(ext)
   const isPdfFile = ext === 'pdf'
+  const isNonPreviewableFile = NON_PREVIEWABLE_EXTENSIONS.has(ext)
 
   const openFilePath = useMemo(() => {
     if (!openFile?.name) return undefined
@@ -346,6 +348,8 @@ const CursorEditorContainer: React.FC<CursorEditorContainerProps> = ({
             <div className="flex items-center justify-center h-full text-zinc-400">PDF URL not found</div>
           )}
         </div>
+      ) : isNonPreviewableFile ? (
+        <FilePreviewPlaceholder fileName={currentlyOpen.name} extension={ext} />
       ) : (
         // Edit Selection Actions Popover UI
         <div
