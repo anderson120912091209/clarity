@@ -32,8 +32,7 @@ export function NodesSyncSvg({
           {/* Main Central Hub */}
           <motion.g
             initial={{ scale: 0.8, opacity: 0 }}
-            whileInView={{ scale: 1, opacity: 1 }}
-            viewport={{ once: true }}
+            animate={{ scale: 1, opacity: 1 }}
             transition={{ duration: 1, ease: 'easeOut' }}
           >
             <rect x="230" y="120" width="100" height="60" rx="12" fill="#121214" stroke="rgba(255,255,255,0.15)" strokeWidth="1" />
@@ -74,19 +73,19 @@ export function NodesSyncSvg({
           </motion.circle>
 
           {/* Source Nodes */}
-          <motion.g initial={{ x: -20, opacity: 0 }} whileInView={{ x: 0, opacity: 1 }} viewport={{ once: true }} transition={{ delay: 0.2, duration: 0.8 }}>
+          <motion.g initial={{ x: -20, opacity: 0 }} animate={{ x: 0, opacity: 1 }} transition={{ delay: 0.2, duration: 0.8 }}>
             <rect x="40" y="55" width="80" height="30" rx="6" fill="#121214" stroke="rgba(255,255,255,0.1)" strokeWidth="1" />
             <circle cx="55" cy="70" r="5" fill="#f87171" className="opacity-80" />
             <text x="68" y="74" fill="rgba(255,255,255,0.6)" fontSize="10" fontFamily="sans-serif">User 1</text>
           </motion.g>
 
-          <motion.g initial={{ x: -20, opacity: 0 }} whileInView={{ x: 0, opacity: 1 }} viewport={{ once: true }} transition={{ delay: 0.4, duration: 0.8 }}>
+          <motion.g initial={{ x: -20, opacity: 0 }} animate={{ x: 0, opacity: 1 }} transition={{ delay: 0.4, duration: 0.8 }}>
             <rect x="20" y="135" width="80" height="30" rx="6" fill="#121214" stroke="rgba(255,255,255,0.1)" strokeWidth="1" />
             <circle cx="35" cy="150" r="5" fill="#60a5fa" className="opacity-80" />
             <text x="48" y="154" fill="rgba(255,255,255,0.6)" fontSize="10" fontFamily="sans-serif">User 2</text>
           </motion.g>
 
-          <motion.g initial={{ x: -20, opacity: 0 }} whileInView={{ x: 0, opacity: 1 }} viewport={{ once: true }} transition={{ delay: 0.6, duration: 0.8 }}>
+          <motion.g initial={{ x: -20, opacity: 0 }} animate={{ x: 0, opacity: 1 }} transition={{ delay: 0.6, duration: 0.8 }}>
             <rect x="40" y="215" width="80" height="30" rx="6" fill="#121214" stroke="rgba(255,255,255,0.1)" strokeWidth="1" />
             <circle cx="55" cy="230" r="5" fill="#34d399" className="opacity-80" />
             <text x="68" y="234" fill="rgba(255,255,255,0.6)" fontSize="10" fontFamily="sans-serif">User 3</text>

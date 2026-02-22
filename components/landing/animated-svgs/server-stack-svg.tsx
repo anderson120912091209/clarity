@@ -35,8 +35,7 @@ export function ServerStackSvg({
           {/* Isometric Server Block 1 (Bottom) */}
           <motion.g
             initial={{ y: 20, opacity: 0 }}
-            whileInView={{ y: 0, opacity: 1 }}
-            viewport={{ once: true }}
+            animate={{ y: 0, opacity: 1 }}
             transition={{ duration: 1, ease: 'easeOut', delay: 0.2 }}
           >
             {/* Top Face */}
@@ -74,16 +73,14 @@ export function ServerStackSvg({
           {/* Isometric Server Block 2 (Top) */}
           <motion.g
             initial={{ y: -10, opacity: 0 }}
-            whileInView={{ y: -35, opacity: 1 }}
-            viewport={{ once: true }}
+            animate={{ y: -35, opacity: 1 }}
             transition={{ duration: 1, ease: 'easeOut', delay: 0.4 }}
           >
              {/* Glowing connecting line between servers */}
             <line x1="0" y1="-80" x2="0" y2="-40" stroke="rgba(109,120,231,0.4)" strokeWidth="1" strokeDasharray="4 4" />
             <motion.circle
               cx="0" cy="-80" r="2" fill="#6d78e7"
-              whileInView={{ cy: [-40, -80] }}
-              viewport={{ once: true }}
+              animate={{ cy: [-40, -80] }}
               transition={{ repeat: Infinity, duration: 1.5, ease: 'linear' }}
             />
 
@@ -119,8 +116,7 @@ export function ServerStackSvg({
             <motion.circle
               cx="-15" cy="-82" r="4" fill="#6d78e7"
               initial={{ opacity: 0.8 }}
-              whileInView={{ opacity: 0 }}
-              viewport={{ once: true }}
+              animate={{ opacity: 0 }}
               transition={{ repeat: Infinity, duration: 2 }}
             />
             <circle cx="-25" cy="-87" r="2" fill="rgba(255,255,255,0.2)" />
@@ -137,8 +133,7 @@ export function ServerStackSvg({
           />
           <motion.circle
              cx="80" cy="-90" r="2" fill="#8b95f0"
-             whileInView={{ cx: [80, 140], cy: [-90, -60], opacity: [1, 0] }}
-             viewport={{ once: true }}
+             animate={{ cx: [80, 140], cy: [-90, -60], opacity: [1, 0] }}
              transition={{ repeat: Infinity, duration: 2, ease: 'linear', delay: 1 }}
           />
         </g>

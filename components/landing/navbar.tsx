@@ -9,7 +9,7 @@ export function Navbar({ minimal = false }: { minimal?: boolean }) {
   const { t } = useLocale()
 
   return (
-    <header className="fixed top-0 w-full z-50 px-4 md:px-6 py-4 bg-[#0c0c0e]/80 backdrop-blur-md border-b border-white/5">
+    <header className="fixed top-0 w-full z-50 px-4 md:px-6 py-4 bg-[#0c0c0e]/80 backdrop-blur-md border-b border-white/5 relative">
       <div className="max-w-5xl mx-auto flex items-center justify-between">
         <Link href="/" className="flex items-center gap-2.5">
            <img
@@ -21,10 +21,21 @@ export function Navbar({ minimal = false }: { minimal?: boolean }) {
 
         {!minimal && (
           <>
-            <div className="flex items-center gap-3">
+            {/* Center — Blog link */}
+            <nav className="absolute left-1/2 -translate-x-1/2 hidden md:block">
               <Link
                 href="/blogs"
                 className="text-sm font-medium text-zinc-400 transition-colors hover:text-white"
+              >
+                {t('nav.blogs')}
+              </Link>
+            </nav>
+
+            {/* Right — Discord, Language, Auth */}
+            <div className="flex items-center gap-4">
+              <Link
+                href="/blogs"
+                className="text-sm font-medium text-zinc-400 transition-colors hover:text-white md:hidden"
               >
                 {t('nav.blogs')}
               </Link>
@@ -36,8 +47,8 @@ export function Navbar({ minimal = false }: { minimal?: boolean }) {
                 aria-label={t('nav.discord_aria')}
               >
                 <svg
-                  width="20"
-                  height="20"
+                  width="18"
+                  height="18"
                   viewBox="0 0 24 24"
                   fill="currentColor"
                   xmlns="http://www.w3.org/2000/svg"

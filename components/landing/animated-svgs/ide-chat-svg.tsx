@@ -33,8 +33,7 @@ export function IdeChatSvg({
           {/* === CODE EDITOR WINDOW === */}
           <motion.g
             initial={{ y: 12, opacity: 0 }}
-            whileInView={{ y: 0, opacity: 1 }}
-            viewport={{ once: true }}
+            animate={{ y: 0, opacity: 1 }}
             transition={{ duration: 0.9, ease: 'easeOut' }}
           >
             {/* Window frame */}
@@ -81,8 +80,7 @@ export function IdeChatSvg({
           {/* === FLOATING AI SUGGESTION CARD === */}
           <motion.g
             initial={{ y: -10, opacity: 0 }}
-            whileInView={{ y: 0, opacity: 1 }}
-            viewport={{ once: true }}
+            animate={{ y: 0, opacity: 1 }}
             transition={{ duration: 0.8, ease: 'easeOut', delay: 0.3 }}
           >
             {/* Card body */}

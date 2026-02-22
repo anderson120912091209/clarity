@@ -31,7 +31,7 @@ export function Hero() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.7, delay: 0.2 }}
-          className="text-4xl md:text-6xl lg:text-7xl leading-[1.08] font-bold tracking-tight text-zinc-100 mb-6 max-w-4xl"
+          className="text-4xl md:text-6xl lg:text-7xl leading-[1.08] font-bold tracking-tight text-zinc-100 mb-6 max-w-5xl [word-break:keep-all]"
         >
           {t('hero.headline')}
         </motion.h1>
@@ -41,7 +41,7 @@ export function Hero() {
           initial={{ opacity: 0, y: 15 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.7, delay: 0.35 }}
-          className="max-w-2xl text-base md:text-lg text-zinc-400 mb-10 leading-relaxed"
+          className="max-w-2xl text-base md:text-lg text-zinc-400 mb-10 leading-relaxed [word-break:keep-all]"
         >
           {t('hero.subtext')}
         </motion.p>

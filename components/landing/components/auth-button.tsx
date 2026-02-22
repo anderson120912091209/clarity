@@ -11,8 +11,8 @@ export function AuthButton() {
 
   if (user) {
     return (
-        <Link className="hidden md:flex items-center gap-8 text-[13px]
-        hover:text-white font-medium text-zinc-400"
+        <Link className="hidden md:flex items-center text-sm
+        hover:text-white font-medium text-zinc-400 transition-colors"
         href="/projects">
           {t('nav.dashboard')}
         </Link>
@@ -20,7 +20,7 @@ export function AuthButton() {
   }
 
   return (
-    <div className="flex items-center gap-6">
+    <div className="flex items-center gap-3">
       <Link
         href="/login"
         className="text-sm font-medium text-zinc-400 hover:text-white transition-colors"
@@ -29,7 +29,7 @@ export function AuthButton() {
       </Link>
       <Button
         asChild
-        className="h-9 px-5 bg-white text-black hover:bg-zinc-200
+        className="h-8 px-4 bg-white text-black hover:bg-zinc-200
          font-medium text-sm rounded-full transition-colors"
       >
         <Link href="/login">
