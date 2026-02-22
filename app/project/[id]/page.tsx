@@ -1306,20 +1306,27 @@ function EditorLayout() {
         nonce: editorGotoNonceRef.current,
       })
 
-      window.setTimeout(() => {
-        const preview = chatApplyService.previewSuggestionInActiveEditor(
-          entry.proposedContent,
-          'replace_file',
-          { suppressPersistence: true }
-        )
-        if (!preview?.appliedInEditor) return
-        changeManagerService.updateChange(fileId, {
-          isPreviewApplied: true,
-          firstChangedLine: preview.firstChangedLine,
-          diffs: preview.diffs,
-          summary: preview.summary,
-        })
-      }, 0)
+      // Use requestAnimationFrame to ensure the editor has finished
+      // switching to the new file before we try to apply the preview.
+      // setTimeout(0) was unreliable — Monaco needs a paint cycle.
+      requestAnimationFrame(() => {
+        try {
+          const preview = chatApplyService.previewSuggestionInActiveEditor(
+            entry.proposedContent,
+            'replace_file',
+            { suppressPersistence: true }
+          )
+          if (!preview?.appliedInEditor) return
+          changeManagerService.updateChange(fileId, {
+            isPreviewApplied: true,
+            firstChangedLine: preview.firstChangedLine,
+            diffs: preview.diffs,
+            summary: preview.summary,
+          })
+        } catch (error) {
+          console.warn('[handleJumpToStagedFile] Failed to apply preview:', error)
+        }
+      })
     },
     [setActiveFile]
   )

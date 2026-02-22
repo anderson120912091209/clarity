@@ -52,6 +52,7 @@ class ChatApplyService {
   private activeEditorBinding: ActiveEditorBinding | null = null
   private inlinePreviewEntries: InlineDiffPreviewEntry[] = []
   private pendingProgrammaticPersistBypassCount = 0
+  private previewLock: Promise<void> = Promise.resolve()
 
   bindActiveEditor(binding: ActiveEditorBinding): void {
     this.activeEditorBinding = binding
@@ -71,6 +72,13 @@ class ChatApplyService {
 
   private markProgrammaticPersistBypass(): void {
     this.pendingProgrammaticPersistBypassCount += 1
+    // Safety: auto-reset after 2s if the counter gets stuck (e.g. editor
+    // didn't fire onChange). Prevents permanent bypass pollution.
+    setTimeout(() => {
+      if (this.pendingProgrammaticPersistBypassCount > 0) {
+        this.pendingProgrammaticPersistBypassCount = Math.max(0, this.pendingProgrammaticPersistBypassCount - 1)
+      }
+    }, 2000)
   }
 
   applySuggestionToFile(
@@ -170,87 +178,102 @@ class ChatApplyService {
       return { ...result, appliedInEditor: false }
     }
 
+    // Clear any previous preview before applying new one
     this.clearInlinePreview()
 
-    const fullRange = model.getFullModelRange()
-    if (options?.suppressPersistence) {
-      this.markProgrammaticPersistBypass()
+    try {
+      const fullRange = model.getFullModelRange()
+      if (options?.suppressPersistence) {
+        this.markProgrammaticPersistBypass()
+      }
+      activeEditor.executeEdits('ai-chat-apply-preview', [
+        {
+          range: fullRange,
+          text: result.nextContent,
+          forceMoveMarkers: true,
+        },
+      ])
+    } catch (error) {
+      console.warn('[ChatApplyService] Failed to execute editor edits:', error)
+      return { ...result, appliedInEditor: false }
     }
-    activeEditor.executeEdits('ai-chat-apply-preview', [
-      {
-        range: fullRange,
-        text: result.nextContent,
-        forceMoveMarkers: true,
-      },
-    ])
 
-    this.inlinePreviewEntries = result.diffs.map((diff) => {
-      const decorationIds = addDiffDecorations(activeEditor, monacoInstance, diff)
-      const viewZoneId =
-        diff.type === 'deletion' || diff.type === 'edit'
-          ? addDeletedLinesViewZone(activeEditor, diff, Math.max(0, diff.startLine - 1))
-          : null
+    try {
+      this.inlinePreviewEntries = result.diffs.map((diff) => {
+        const decorationIds = addDiffDecorations(activeEditor, monacoInstance, diff)
+        const viewZoneId =
+          diff.type === 'deletion' || diff.type === 'edit'
+            ? addDeletedLinesViewZone(activeEditor, diff, Math.max(0, diff.startLine - 1))
+            : null
 
-      const entry: InlineDiffPreviewEntry = {
-        diff,
-        decorationIds,
-        viewZoneId: viewZoneId ?? null,
-        widget: null,
-        root: null,
-        resolved: false,
-      }
-
-      const clearEntryUI = () => {
-        if (entry.decorationIds.length > 0) {
-          activeEditor.deltaDecorations(entry.decorationIds, [])
-          entry.decorationIds = []
+        const entry: InlineDiffPreviewEntry = {
+          diff,
+          decorationIds,
+          viewZoneId: viewZoneId ?? null,
+          widget: null,
+          root: null,
+          resolved: false,
         }
 
-        if (entry.viewZoneId) {
-          const zoneId = entry.viewZoneId
-          activeEditor.changeViewZones((accessor) => accessor.removeZone(zoneId))
-          entry.viewZoneId = null
+        const clearEntryUI = () => {
+          try {
+            if (entry.decorationIds.length > 0) {
+              activeEditor.deltaDecorations(entry.decorationIds, [])
+              entry.decorationIds = []
+            }
+
+            if (entry.viewZoneId) {
+              const zoneId = entry.viewZoneId
+              activeEditor.changeViewZones((accessor) => accessor.removeZone(zoneId))
+              entry.viewZoneId = null
+            }
+
+            if (entry.widget && entry.root) {
+              entry.root.unmount()
+              activeEditor.removeContentWidget(entry.widget)
+              entry.widget = null
+              entry.root = null
+            }
+          } catch (cleanupError) {
+            console.warn('[ChatApplyService] Failed to clean up entry UI:', cleanupError)
+          }
         }
 
-        if (entry.widget && entry.root) {
-          entry.root.unmount()
-          activeEditor.removeContentWidget(entry.widget)
-          entry.widget = null
-          entry.root = null
+        const markResolved = (): boolean => {
+          if (entry.resolved) return false
+          entry.resolved = true
+          return true
         }
-      }
 
-      const markResolved = (): boolean => {
-        if (entry.resolved) return false
-        entry.resolved = true
-        return true
-      }
+        const acceptDiff = () => {
+          if (!markResolved()) return
+          clearEntryUI()
+          onChange?.(activeEditor.getValue())
+        }
 
-      const acceptDiff = () => {
-        if (!markResolved()) return
-        clearEntryUI()
-        onChange?.(activeEditor.getValue())
-      }
+        const rejectDiff = () => {
+          if (!markResolved()) return
+          this.revertInlineDiff(activeEditor, monacoInstance, entry.diff)
+          clearEntryUI()
+          onChange?.(activeEditor.getValue())
+        }
 
-      const rejectDiff = () => {
-        if (!markResolved()) return
-        this.revertInlineDiff(activeEditor, monacoInstance, entry.diff)
-        clearEntryUI()
-        onChange?.(activeEditor.getValue())
-      }
+        const widgetResult = createAcceptRejectWidget(
+          activeEditor,
+          monacoInstance,
+          diff,
+          acceptDiff,
+          rejectDiff
+        )
 
-      const widgetResult = createAcceptRejectWidget(
-        activeEditor,
-        monacoInstance,
-        diff,
-        acceptDiff,
-        rejectDiff
-      )
-
-      entry.widget = widgetResult.widget
-      entry.root = widgetResult.root
-      return entry
-    })
+        entry.widget = widgetResult.widget
+        entry.root = widgetResult.root
+        return entry
+      })
+    } catch (error) {
+      console.warn('[ChatApplyService] Failed to create diff decorations:', error)
+      return { ...result, appliedInEditor: false }
+    }
 
     onChange?.(activeEditor.getValue())
     return { ...result, appliedInEditor: true }
@@ -295,33 +318,63 @@ class ChatApplyService {
   }
 
   private clearInlinePreview(): void {
-    if (!this.activeEditorBinding) {
-      this.inlinePreviewEntries = []
-      return
-    }
+    const entries = this.inlinePreviewEntries
+    this.inlinePreviewEntries = []
+
+    if (!this.activeEditorBinding) return
 
     const activeEditor = this.activeEditorBinding.editor
-    for (const entry of this.inlinePreviewEntries) {
+
+    // Batch all decoration removals into a single deltaDecorations call
+    const allDecorationIds: string[] = []
+    const viewZoneIds: string[] = []
+
+    for (const entry of entries) {
       if (entry.decorationIds.length > 0) {
-        activeEditor.deltaDecorations(entry.decorationIds, [])
+        allDecorationIds.push(...entry.decorationIds)
         entry.decorationIds = []
       }
-
       if (entry.viewZoneId) {
-        const zoneId = entry.viewZoneId
-        activeEditor.changeViewZones((accessor) => accessor.removeZone(zoneId))
+        viewZoneIds.push(entry.viewZoneId)
         entry.viewZoneId = null
       }
+    }
 
+    // Single batched decoration removal (much faster than per-entry)
+    try {
+      if (allDecorationIds.length > 0) {
+        activeEditor.deltaDecorations(allDecorationIds, [])
+      }
+    } catch (error) {
+      console.warn('[ChatApplyService] Failed to remove decorations:', error)
+    }
+
+    // Single batched viewzone removal
+    try {
+      if (viewZoneIds.length > 0) {
+        activeEditor.changeViewZones((accessor) => {
+          for (const zoneId of viewZoneIds) {
+            try { accessor.removeZone(zoneId) } catch { /* zone already removed */ }
+          }
+        })
+      }
+    } catch (error) {
+      console.warn('[ChatApplyService] Failed to remove view zones:', error)
+    }
+
+    // Clean up widgets
+    for (const entry of entries) {
       if (entry.widget && entry.root) {
-        entry.root.unmount()
-        activeEditor.removeContentWidget(entry.widget)
+        try {
+          entry.root.unmount()
+          activeEditor.removeContentWidget(entry.widget)
+        } catch {
+          // Widget already removed or editor disposed
+        }
         entry.widget = null
         entry.root = null
       }
     }
-
-    this.inlinePreviewEntries = []
   }
 
   private revertInlineDiff(

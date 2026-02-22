@@ -698,6 +698,7 @@ export function useChatSession(opts: UseChatSessionOptions) {
       const collectedToolCalls = new Map<string, ToolCallInfo>()
       let collectedThinking = ''
       let completionStatus: SendPromptResult['status'] = 'completed'
+      let editChainPromise: Promise<void> = Promise.resolve()
 
       const userMessageId = await upsertThreadMessage({
         threadId,
@@ -870,14 +871,19 @@ export function useChatSession(opts: UseChatSessionOptions) {
             })
 
             if (onInsertIntoEditor) {
-              void Promise.resolve(
-                onInsertIntoEditor(JSON.stringify(edit), {
-                  auto: true,
-                  sourceMessageId: assistantMessageId,
-                  skipEditorFocus: true,
-                })
-              ).catch((error) => {
-                console.warn('[AI Chat] Failed to stage streamed tool edit:', error)
+              // Queue edits sequentially — wait for previous edit to complete
+              // before starting the next one to prevent race conditions that
+              // cause diff previews to flicker and disappear.
+              editChainPromise = editChainPromise.then(async () => {
+                try {
+                  await onInsertIntoEditor(JSON.stringify(edit), {
+                    auto: true,
+                    sourceMessageId: assistantMessageId,
+                    skipEditorFocus: true,
+                  })
+                } catch (error) {
+                  console.warn('[AI Chat] Failed to stage streamed tool edit:', error)
+                }
               })
             }
           }
@@ -889,6 +895,9 @@ export function useChatSession(opts: UseChatSessionOptions) {
             })
           }
         }
+
+        // Wait for all queued file edits to finish before finalizing
+        await editChainPromise
 
         streamingState.dispatch({ type: 'GENERATION_COMPLETE' })
 
@@ -959,15 +968,15 @@ export function useChatSession(opts: UseChatSessionOptions) {
         if (parsed.fileEdits.length > 0 && onInsertIntoEditor) {
           for (const edit of parsed.fileEdits) {
             collectedFileEdits.push(edit)
-            void Promise.resolve(
-              onInsertIntoEditor(JSON.stringify(edit), {
+            try {
+              await onInsertIntoEditor(JSON.stringify(edit), {
                 auto: true,
                 sourceMessageId: assistantMessageId,
                 skipEditorFocus: true,
               })
-            ).catch((error) => {
+            } catch (error) {
               console.warn('[AI Chat] Failed to stage parsed file edit:', error)
-            })
+            }
           }
         }
 
