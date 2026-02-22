@@ -23,6 +23,8 @@ function getStateLabel(state: AgentRunState, toolName?: string | null): string {
           return 'Reading file'
         case 'apply_file_edit':
           return 'Editing file'
+        case 'batch_apply_edits':
+          return 'Applying edits'
         case 'list_workspace_files':
           return 'Listing files'
         case 'search_workspace':

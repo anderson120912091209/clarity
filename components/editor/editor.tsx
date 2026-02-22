@@ -27,16 +27,12 @@ import { MonacoBinding } from 'y-monaco'
 import { getYjsProviderForRoom } from '@liveblocks/yjs'
 import type { Awareness as YjsAwareness } from 'y-protocols/awareness'
 import {
-  useOthers,
-  useRoom,
-  useUpdateMyPresence,
-} from '@/features/collaboration/liveblocks'
-import {
   markRoomHydrated,
   resolveCollaborationRoomKey,
   shouldBlockInitialHydration,
 } from '@/features/collaboration/editor-hydration'
 import type { CollaborationRole } from '@/features/collaboration/types'
+import type { CollaborationBridgeData } from './collaboration-editor-bridge'
 
 type MonacoInstance = typeof import('monaco-editor')
 type MonacoModel = MonacoEditorNamespace.ITextModel
@@ -81,6 +77,7 @@ interface CodeEditorProps {
     nonce: number
   } | null
   collaboration?: EditorCollaborationConfig | null
+  collaborationBridge?: CollaborationBridgeData | null
 }
 
 export interface EditorCollaborationConfig {
@@ -115,6 +112,8 @@ function sanitizeCssLabel(value: string): string {
 
 const COLLAB_HYDRATION_TIMEOUT_MS = 6000
 
+const noopUpdatePresence: CollaborationBridgeData['updateMyPresence'] = () => {}
+
 export const CodeEditor = ({
   onChange,
   value,
@@ -128,6 +127,7 @@ export const CodeEditor = ({
   onReady,
   gotoRequest,
   collaboration,
+  collaborationBridge,
 }: CodeEditorProps) => {
   const isAiChatEnabled = process.env.NEXT_PUBLIC_ENABLE_AI_CHAT === 'true'
   const activeLanguage = useMemo<EditorLanguageId>(
@@ -139,13 +139,14 @@ export const CodeEditor = ({
     value,
     activeLanguage
   )
-  const room = useRoom()
+  const room = collaborationBridge?.room ?? null
   const collaborationRoomKey = useMemo(
     () => resolveCollaborationRoomKey(room as { id?: string } | null),
     [room]
   )
-  const updateMyPresence = useUpdateMyPresence()
-  const others = useOthers()
+  const updateMyPresence = collaborationBridge?.updateMyPresence ?? noopUpdatePresence
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const others: any[] = (collaborationBridge?.others as any) ?? []
   const { handleAIAssist, triggerQuickEdit } = useAIAssist(onChange)
   const { setTheme } = useEditorTheme()
   const { theme, systemTheme } = useTheme()
@@ -455,7 +456,7 @@ export const CodeEditor = ({
           })
         }
         handleEditorDidMount(editor, monaco)
-        if (collaboration?.enabled) {
+        if (collaboration?.enabled && room) {
           const model = editor.getModel()
           const yProvider = getYjsProviderForRoom(room)
           const yDoc = yProvider.getYDoc()

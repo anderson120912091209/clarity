@@ -38,6 +38,7 @@ import { ChatInputArea, type ChatInputAreaHandle } from './chat-input-area'
 import { ChatMarkdown } from './chat-markdown'
 import { AssistantFileBlock } from './assistant-file-block'
 import { AssistantActionBlock } from './assistant-action-block'
+import { PlanApprovalBlock } from './plan-approval-block'
 import type { PendingFileAction } from '@/features/agent/services/file-action-manager'
 import type { FileActionDelta } from '@/services/agent/browser/chat/chatService'
 
@@ -281,6 +282,14 @@ export function ChatPanel({
     })
   }, [session])
 
+  const handleRevisePlan = useCallback(() => {
+    const originalPrompt = session.revisePlan()
+    if (originalPrompt && chatInputRef.current) {
+      chatInputRef.current.setValue(originalPrompt)
+      chatInputRef.current.focus()
+    }
+  }, [session])
+
   const handleCopy = useCallback((content: string) => {
     void navigator.clipboard.writeText(content).catch(() => {})
   }, [])
@@ -492,6 +501,17 @@ export function ChatPanel({
                         )}
                       />
                     </div>
+
+                    {/* Plan approval block */}
+                    {message.isPlan && message.planStatus && (
+                      <PlanApprovalBlock
+                        planStatus={message.planStatus}
+                        isExecuting={session.planPhase === 'executing'}
+                        disabled={session.isSubmitting && session.planPhase !== 'executing'}
+                        onApprove={() => void session.approvePlan()}
+                        onRevise={handleRevisePlan}
+                      />
+                    )}
 
                     {/* File edit blocks */}
                     {linkedChanges.length > 0 && (
@@ -724,7 +744,13 @@ export function ChatPanel({
             modelOptions={QUICK_EDIT_GEMINI_MODEL_OPTIONS}
             selectedModel={selectedModel}
             onModelChange={handleModelChange}
-            placeholder="Ask AI, use @ to mention specific PDFs or / to access saved prompts"
+            placeholder={
+              session.planPhase === 'awaiting_approval'
+                ? 'Review the plan above — click Approve to execute or Revise to modify'
+                : session.planPhase === 'planning'
+                  ? 'Generating plan…'
+                  : 'Ask AI, use @ to mention specific PDFs or / to access saved prompts'
+            }
           />
         </div>
 

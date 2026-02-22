@@ -9,10 +9,11 @@ import {
   shouldEnableTypstLibrary,
   isLikelyEditIntent,
 } from '@/lib/agent/context-normalizer'
-import { createAgentTools } from '@/lib/agent/tools'
+import { createAgentTools, createReadOnlyTools } from '@/lib/agent/tools'
 import type { ToolContext, ToolMutableState } from '@/lib/agent/tools'
 import { CheckpointManager } from '@/lib/agent/checkpoint-manager'
 import { buildAgentSystemPrompt } from '@/lib/server/chat-system-prompt'
+import { buildAgentPlanningPrompt } from '@/lib/server/system-prompts/planning-mode'
 import { shouldRetry, getRetryDelay, sleep, DEFAULT_RETRY_POLICY } from '@/lib/agent/retry-policy'
 import { getPostHogClient } from '@/lib/posthog-server'
 import { authorizeAgentRequest } from '@/lib/server/agent-auth'
@@ -26,6 +27,7 @@ interface ChatRequestBody {
   messages: Array<{ role: string; content: string }>
   model?: string
   context?: AgentChatContext
+  planningMode?: boolean
 }
 
 function normalizeConversationMessages(
@@ -132,6 +134,7 @@ export async function POST(req: Request) {
   // ── Feature Flags ──
   const typstLibraryEnabled = shouldEnableTypstLibrary(context, latestUserMessage)
   const forceStructuredEdits = isLikelyEditIntent(latestUserMessage)
+  const planningMode = payload.planningMode === true
 
   const extraInstructions: string[] = []
   if (context.compileError) {
@@ -141,13 +144,19 @@ export async function POST(req: Request) {
   }
 
   // ── System Prompt ──
-  const systemPrompt = buildAgentSystemPrompt({
-    context,
-    typstLibraryEnabled,
-    forceStructuredEdits,
-    extraInstructions,
-    latestUserMessage,
-  })
+  const systemPrompt = planningMode
+    ? buildAgentPlanningPrompt({
+        context,
+        typstLibraryEnabled,
+        latestUserMessage,
+      })
+    : buildAgentSystemPrompt({
+        context,
+        typstLibraryEnabled,
+        forceStructuredEdits,
+        extraInstructions,
+        latestUserMessage,
+      })
 
   // ── API Key & Model ──
   const apiKey = process.env.GOOGLE_GENERATIVE_AI_API_KEY || process.env.GOOGLE_GENERATION_AI_API_KEY
@@ -163,6 +172,7 @@ export async function POST(req: Request) {
     workspaceFiles: context.workspaceFiles.length,
     typstLibraryEnabled,
     forceStructuredEdits,
+    planningMode,
   })
 
   // ── Analytics ──
@@ -177,6 +187,7 @@ export async function POST(req: Request) {
       workspace_files_count: context.workspaceFiles.length,
       typst_library_enabled: typstLibraryEnabled,
       force_structured_edits: forceStructuredEdits,
+      planning_mode: planningMode,
       has_compile_error: Boolean(context.compileError),
       message_length: latestUserMessage.length,
       token_budget_used: tokenBudget.used,
@@ -205,6 +216,7 @@ export async function POST(req: Request) {
     const toolState: ToolMutableState = {
       hasWorkspaceSurvey: false,
       applyFileEditAttempts: 0,
+      batchEditAttempts: 0,
       filesReadInRun: new Set(),
       filesCreatedInRun: new Set(),
       filesDeletedInRun: new Set(),
@@ -215,9 +227,11 @@ export async function POST(req: Request) {
       system: systemPrompt,
       messages: conversation,
       temperature: 0.05,
-      maxSteps: 30,
+      maxSteps: planningMode ? 10 : 30,
       toolChoice: 'auto',
-      tools: createAgentTools(toolCtx, toolState),
+      tools: planningMode
+        ? createReadOnlyTools(toolCtx, toolState)
+        : createAgentTools(toolCtx, toolState),
       onStepFinish: (event) => {
         toolCtx.stepIndex += 1
         console.info(`[Agent Chat ${requestId}] step finished`, {

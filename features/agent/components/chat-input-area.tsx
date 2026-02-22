@@ -33,6 +33,7 @@ interface ChatInputAreaProps {
 export interface ChatInputAreaHandle {
   clear: () => void
   focus: () => void
+  setValue: (text: string) => void
 }
 
 const MAX_HEIGHT = 24 * 6
@@ -60,6 +61,9 @@ export const ChatInputArea = forwardRef<ChatInputAreaHandle, ChatInputAreaProps>
       },
       focus() {
         textareaRef.current?.focus()
+      },
+      setValue(text: string) {
+        setValue(text)
       },
     }))
 

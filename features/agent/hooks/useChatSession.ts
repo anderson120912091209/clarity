@@ -28,6 +28,7 @@ import {
   type FileEditDelta,
   type FileActionDelta,
 } from '@/services/agent/browser/chat/chatService'
+import { isLikelyEditIntent } from '@/lib/agent/context-normalizer'
 import { parseRawResponse } from '@/features/agent/services/response-parser'
 import { buildAgentRunIntro } from '@/lib/agent/chat-run-intro'
 import { changeManagerService, type StagedFileChange } from '@/features/agent/services/change-manager'
@@ -57,6 +58,8 @@ interface ToolCallInfo {
   detail?: string
 }
 
+export type PlanStatus = 'pending' | 'approved' | 'revised'
+
 export interface PanelMessage {
   id: string
   role: 'user' | 'assistant'
@@ -67,6 +70,9 @@ export interface PanelMessage {
   toolCalls?: ToolCallInfo[]
   fileEdits?: FileEditDelta[]
   fileActions?: FileActionDelta[]
+  isPlan?: boolean
+  planStatus?: PlanStatus
+  originalUserPrompt?: string
 }
 
 interface MessageTrace {
@@ -77,6 +83,9 @@ interface MessageTrace {
 
 interface SendPromptOptions {
   autoApplyStagedEdits?: boolean
+  planningMode?: boolean
+  isPlanExecution?: boolean
+  originalUserPrompt?: string
 }
 
 interface SendPromptResult {
@@ -90,8 +99,8 @@ const MAX_ACTIVE_FILE_CHARS = 36000
 const MAX_WORKSPACE_FILE_CHARS = 80000
 const MAX_WORKSPACE_TOTAL_CHARS = 900000
 const MAX_COMPILE_LOG_CHARS = 24000
-const AUTO_APPLY_POLL_TIMEOUT_MS = 2200
-const AUTO_APPLY_POLL_INTERVAL_MS = 120
+const AUTO_APPLY_POLL_TIMEOUT_MS = 5000
+const AUTO_APPLY_POLL_INTERVAL_MS = 150
 
 // ── Utility functions ──
 
@@ -234,6 +243,15 @@ export function useChatSession(opts: UseChatSessionOptions) {
   const [activeThreadId, setActiveThreadId] = useState<string | null>(initialActiveThreadId)
   const [liveAssistantMessage, setLiveAssistantMessage] = useState<PanelMessage | null>(null)
   const [messageTraceById, setMessageTraceById] = useState<Record<string, MessageTrace>>({})
+
+  // ── Plan mode state ──
+
+  type PlanPhase = 'idle' | 'planning' | 'awaiting_approval' | 'executing'
+  const [planPhase, setPlanPhase] = useState<PlanPhase>('idle')
+  const pendingPlanRef = useRef<{
+    messageId: string
+    userPrompt: string
+  } | null>(null)
 
   const streamingState = useStreamingState()
 
@@ -539,25 +557,46 @@ export function useChatSession(opts: UseChatSessionOptions) {
   // ── Combined messages ──
 
   const messages = useMemo<PanelMessage[]>(() => {
+    const pendingPlanId = pendingPlanRef.current?.messageId ?? null
+
     const persisted = persistedMessages
       .filter((message) => message.role === 'user' || message.role === 'assistant')
-      .map((message) => ({
-        id: message.id,
-        role: message.role as 'user' | 'assistant',
-        content: message.content ?? '',
-        thinking: undefined as string | undefined,
-        isStreaming: false,
-        isError: message.status === 'error',
-        toolCalls: messageTraceById[message.id]?.toolCalls,
-        fileEdits: messageTraceById[message.id]?.fileEdits,
-        fileActions: messageTraceById[message.id]?.fileActions,
-      }))
+      .map((message) => {
+        const isPlanMessage = message.id === pendingPlanId
+        return {
+          id: message.id,
+          role: message.role as 'user' | 'assistant',
+          content: message.content ?? '',
+          thinking: undefined as string | undefined,
+          isStreaming: false,
+          isError: message.status === 'error',
+          toolCalls: messageTraceById[message.id]?.toolCalls,
+          fileEdits: messageTraceById[message.id]?.fileEdits,
+          fileActions: messageTraceById[message.id]?.fileActions,
+          isPlan: isPlanMessage || undefined,
+          planStatus: isPlanMessage
+            ? (planPhase === 'awaiting_approval'
+                ? 'pending' as const
+                : planPhase === 'executing'
+                  ? 'approved' as const
+                  : 'revised' as const)
+            : undefined,
+          originalUserPrompt: isPlanMessage
+            ? pendingPlanRef.current?.userPrompt
+            : undefined,
+        }
+      })
 
     if (!liveAssistantMessage) return persisted
     if (persisted.some((message) => message.id === liveAssistantMessage.id)) return persisted
 
-    return [...persisted, liveAssistantMessage]
-  }, [liveAssistantMessage, messageTraceById, persistedMessages])
+    // Annotate the live message with plan fields if it's being streamed as a plan
+    const enrichedLive = planPhase === 'planning'
+      ? { ...liveAssistantMessage, isPlan: true, planStatus: 'pending' as const }
+      : liveAssistantMessage
+
+    return [...persisted, enrichedLive]
+  }, [liveAssistantMessage, messageTraceById, persistedMessages, planPhase])
 
   // ── Error message ──
 
@@ -663,6 +702,29 @@ export function useChatSession(opts: UseChatSessionOptions) {
         }
       }
 
+      // Auto-detect planning mode for edit-intent messages.
+      // Skip if this is already a plan execution or the caller explicitly set planningMode.
+      const shouldPlan =
+        options.planningMode ??
+        (isLikelyEditIntent(trimmedPrompt) &&
+          !options.isPlanExecution &&
+          planPhase === 'idle')
+
+      // If user sends a new message while awaiting plan approval, reset the old plan
+      if (planPhase === 'awaiting_approval' && !options.isPlanExecution) {
+        const oldPlanId = pendingPlanRef.current?.messageId
+        if (oldPlanId) {
+          setMessageTraceById((prev) => ({ ...prev })) // trigger re-render
+          // Mark old plan as revised in the messages memo
+          setLiveAssistantMessage(null)
+        }
+        pendingPlanRef.current = null
+      }
+
+      if (shouldPlan) {
+        setPlanPhase('planning')
+      }
+
       const threadId = await ensureActiveThread(trimmedPrompt)
 
       const conversationHistory: ChatMessage[] = persistedMessages
@@ -758,6 +820,7 @@ export function useChatSession(opts: UseChatSessionOptions) {
           abortSignal: controller.signal,
           model: selectedModel,
           context: requestContext,
+          planningMode: shouldPlan,
         })
 
         activeRequestIdRef.current = requestId
@@ -893,6 +956,37 @@ export function useChatSession(opts: UseChatSessionOptions) {
                 }
               })
             }
+          }
+
+          // Handle batch file edits (batch_apply_edits)
+          if (delta.fileEdits) {
+            for (const edit of delta.fileEdits) {
+              collectedFileEdits.push(edit)
+              streamingState.dispatch({
+                type: 'FILE_EDIT_APPLIED',
+                filePath: edit.filePath,
+                editType: edit.editType,
+              })
+
+              if (onInsertIntoEditor) {
+                editChainPromise = editChainPromise.then(async () => {
+                  try {
+                    await onInsertIntoEditor(JSON.stringify(edit), {
+                      auto: true,
+                      sourceMessageId: assistantMessageId,
+                      skipEditorFocus: true,
+                    })
+                  } catch (error) {
+                    console.warn('[AI Chat] Failed to stage batch tool edit:', error)
+                  }
+                })
+              }
+            }
+
+            setLiveAssistantMessage((prev) => {
+              if (!prev || prev.id !== assistantMessageId) return prev
+              return { ...prev, fileEdits: [...collectedFileEdits] }
+            })
           }
 
           if (delta.fileAction) {
@@ -1034,9 +1128,22 @@ export function useChatSession(opts: UseChatSessionOptions) {
           },
         }))
 
-        if (options.autoApplyStagedEdits) {
+        // Auto-apply all tool-generated file edits after streaming completes.
+        // Previously this was gated on options.autoApplyStagedEdits, but edits
+        // from apply_file_edit / batch_apply_edits should always be written
+        // to the file immediately — the user asked the AI to make changes.
+        if (collectedFileEdits.length > 0) {
           const editedPaths = collectedFileEdits.map((edit) => edit.filePath)
           await autoApplyLinkedToolEdits(assistantMessageId, editedPaths)
+        }
+
+        // If this was a planning request, mark the message as a plan
+        if (shouldPlan) {
+          setPlanPhase('awaiting_approval')
+          pendingPlanRef.current = {
+            messageId: assistantMessageId,
+            userPrompt: options.originalUserPrompt ?? trimmedPrompt,
+          }
         }
       } catch (error) {
         const aborted = manualStopRef.current || controller.signal.aborted
@@ -1096,6 +1203,12 @@ export function useChatSession(opts: UseChatSessionOptions) {
         activeRunIdRef.current = null
         abortControllerRef.current = null
         manualStopRef.current = false
+
+        // Reset plan phase on error/abort (but not on success — that's handled above)
+        if (shouldPlan && completionStatus !== 'completed') {
+          setPlanPhase('idle')
+          pendingPlanRef.current = null
+        }
       }
 
       return {
@@ -1112,6 +1225,7 @@ export function useChatSession(opts: UseChatSessionOptions) {
       onStageFileAction,
       persistedMessages,
       persistedMemoryItems,
+      planPhase,
       projectId,
       promptMemoryItems,
       requestContext,
@@ -1120,6 +1234,37 @@ export function useChatSession(opts: UseChatSessionOptions) {
       userId,
     ]
   )
+
+  // ── Plan mode actions ──
+
+  const approvePlan = useCallback(async () => {
+    if (planPhase !== 'awaiting_approval' || !pendingPlanRef.current) return
+
+    setPlanPhase('executing')
+
+    const executionPrompt =
+      'Plan approved. Execute it now, following the steps exactly as outlined in the plan above. Use the appropriate tools for each step.'
+
+    try {
+      await sendPrompt(executionPrompt, {
+        planningMode: false,
+        isPlanExecution: true,
+      })
+    } finally {
+      setPlanPhase('idle')
+      pendingPlanRef.current = null
+    }
+  }, [planPhase, sendPrompt])
+
+  const revisePlan = useCallback((): string => {
+    if (planPhase !== 'awaiting_approval') return ''
+
+    const originalPrompt = pendingPlanRef.current?.userPrompt ?? ''
+    setPlanPhase('idle')
+    pendingPlanRef.current = null
+
+    return originalPrompt
+  }, [planPhase])
 
   // ── External prompt handling ──
 
@@ -1238,6 +1383,11 @@ export function useChatSession(opts: UseChatSessionOptions) {
 
     // Memory
     memoryItems: persistedMemoryItems,
+
+    // Plan mode
+    planPhase,
+    approvePlan,
+    revisePlan,
 
     // Error
     submitError,

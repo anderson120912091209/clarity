@@ -55,6 +55,7 @@ import type { CollaborationRole } from '@/features/collaboration/types'
 import { CollaborationRoomProvider } from '@/features/collaboration/components/collaboration-room-provider'
 import { CollaborationHeaderControls } from '@/features/collaboration/components/collaboration-header-controls'
 import { CollaborationEventToasts } from '@/features/collaboration/components/collaboration-event-toasts'
+import { ShareButton } from '@/features/collaboration/components/share-button'
 import { useFileSystem } from '@/hooks/useFileSystem'
 import { fileActionManagerService } from '@/features/agent/services/file-action-manager'
 import { useFileActionManagerState } from '@/features/agent/hooks/useFileActionManagerState'
@@ -1223,8 +1224,15 @@ function EditorLayout() {
       try {
         await db.transact(operations)
       } catch (error) {
-        console.warn('Failed to apply staged assistant changes:', error)
-        return
+        console.error('[applyStagedEntries] db.transact failed — edits NOT saved:', error)
+        // Retry once after a short delay in case of transient network issues
+        try {
+          await new Promise((resolve) => setTimeout(resolve, 500))
+          await db.transact(operations)
+        } catch (retryError) {
+          console.error('[applyStagedEntries] Retry also failed:', retryError)
+          return
+        }
       }
 
       for (const entry of entries) {
@@ -1613,17 +1621,26 @@ function EditorLayout() {
     </div>
   )
   const collaborationControls = projectId && currentlyOpen?.id && user?.id ? (
-    <CollaborationHeaderControls
-      projectId={projectId}
-      fileId={currentlyOpen.id}
-      filePath={activeFilePathForCollaboration}
-      role={collaborationRole}
-      userId={user.id}
-      selection={activeSelectionForComments}
-      followConnectionId={followConnectionId}
-      onFollowConnectionIdChange={setFollowConnectionId}
-      onRealtimeCollaborationRequested={handleEnableRealtimeCollaboration}
-    />
+    isRealtimeCollaborationEnabled ? (
+      <CollaborationHeaderControls
+        projectId={projectId}
+        fileId={currentlyOpen.id}
+        filePath={activeFilePathForCollaboration}
+        role={collaborationRole}
+        userId={user.id}
+        selection={activeSelectionForComments}
+        followConnectionId={followConnectionId}
+        onFollowConnectionIdChange={setFollowConnectionId}
+        onRealtimeCollaborationRequested={handleEnableRealtimeCollaboration}
+      />
+    ) : (
+      <ShareButton
+        projectId={projectId}
+        fileId={currentlyOpen.id}
+        userId={user.id}
+        onShareCreated={handleEnableRealtimeCollaboration}
+      />
+    )
   ) : null
 
   // Header content for the PDF pane
@@ -1659,6 +1676,7 @@ function EditorLayout() {
 
   return (
     <CollaborationRoomProvider
+      enabled={isRealtimeCollaborationEnabled}
       projectId={projectId || 'unknown-project'}
       fileId={currentlyOpen?.id || null}
       filePath={activeFilePathForCollaboration}
@@ -1668,7 +1686,9 @@ function EditorLayout() {
       shareToken={collaborationShareToken}
       authToken={collaborationAuthToken}
     >
-      <CollaborationEventToasts currentUserId={user?.id || 'anonymous'} />
+      {isRealtimeCollaborationEnabled && (
+        <CollaborationEventToasts currentUserId={user?.id || 'anonymous'} />
+      )}
       <AppLayout
         sidebar={
           <EditorSidebar

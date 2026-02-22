@@ -56,6 +56,8 @@ export interface StreamDelta {
   error?: string
   done?: boolean
   fileEdit?: FileEditDelta
+  /** Multiple file edits from a batch_apply_edits tool call. */
+  fileEdits?: FileEditDelta[]
   fileAction?: FileActionDelta
   toolCall?: ToolCallDelta
   toolResult?: ToolResultDelta
@@ -78,6 +80,7 @@ export interface GenerateOptions {
   abortSignal?: AbortSignal
   model?: string
   context?: AgentChatContext
+  planningMode?: boolean
 }
 
 export interface GenerateResult {
@@ -274,22 +277,48 @@ function parseDataStreamLine(line: string): StreamDelta | null {
           },
         }
 
-        const extractedEditResult = extractStructuredFileEditResult(resultValue)
+        // Detect batch_apply_edits results (array of sub-edits)
         if (
-          (toolName === 'apply_file_edit' || Boolean(extractedEditResult)) &&
-          extractedEditResult &&
-          (extractedEditResult.applied === undefined || extractedEditResult.applied === true)
+          (toolName === 'batch_apply_edits' || resultValue.batchApplied === true) &&
+          Array.isArray(resultValue.results)
         ) {
-          result.fileEdit = {
-            fileId: typeof extractedEditResult.fileId === 'string' ? extractedEditResult.fileId : undefined,
-            filePath: extractedEditResult.filePath,
-            editType: extractedEditResult.editType,
-            searchContent:
-              typeof extractedEditResult.searchContent === 'string'
-                ? extractedEditResult.searchContent
-                : null,
-            replaceContent: extractedEditResult.replaceContent,
-            description: extractedEditResult.description ?? `Edit ${extractedEditResult.filePath}`,
+          const fileEdits: FileEditDelta[] = []
+          for (const subResult of resultValue.results as Record<string, unknown>[]) {
+            const extracted = extractStructuredFileEditResult(subResult)
+            if (extracted && extracted.applied !== false) {
+              fileEdits.push({
+                fileId: typeof extracted.fileId === 'string' ? extracted.fileId : undefined,
+                filePath: extracted.filePath,
+                editType: extracted.editType,
+                searchContent:
+                  typeof extracted.searchContent === 'string' ? extracted.searchContent : null,
+                replaceContent: extracted.replaceContent,
+                description: extracted.description ?? `Edit ${extracted.filePath}`,
+              })
+            }
+          }
+          if (fileEdits.length > 0) {
+            result.fileEdits = fileEdits
+          }
+        } else {
+          // Single apply_file_edit result
+          const extractedEditResult = extractStructuredFileEditResult(resultValue)
+          if (
+            (toolName === 'apply_file_edit' || Boolean(extractedEditResult)) &&
+            extractedEditResult &&
+            (extractedEditResult.applied === undefined || extractedEditResult.applied === true)
+          ) {
+            result.fileEdit = {
+              fileId: typeof extractedEditResult.fileId === 'string' ? extractedEditResult.fileId : undefined,
+              filePath: extractedEditResult.filePath,
+              editType: extractedEditResult.editType,
+              searchContent:
+                typeof extractedEditResult.searchContent === 'string'
+                  ? extractedEditResult.searchContent
+                  : null,
+              replaceContent: extractedEditResult.replaceContent,
+              description: extractedEditResult.description ?? `Edit ${extractedEditResult.filePath}`,
+            }
           }
         }
 
@@ -396,23 +425,48 @@ function parseDataStreamLine(line: string): StreamDelta | null {
           },
         }
 
-        // Special handling for apply_file_edit tool results.
-        // Some SDK/provider streams might omit the earlier toolName delta,
-        // so we also detect by payload shape.
-        const extractedEditResult = extractStructuredFileEditResult(data.result)
+        // Detect batch_apply_edits results (array of sub-edits)
         if (
-          (toolName === 'apply_file_edit' || Boolean(extractedEditResult)) &&
-          extractedEditResult &&
-          (extractedEditResult.applied === undefined || extractedEditResult.applied === true)
+          (toolName === 'batch_apply_edits' || data.result.batchApplied === true) &&
+          Array.isArray(data.result.results)
         ) {
-          const editResult = extractedEditResult
-          result.fileEdit = {
-            fileId: typeof editResult.fileId === 'string' ? editResult.fileId : undefined,
-            filePath: editResult.filePath,
-            editType: editResult.editType,
-            searchContent: typeof editResult.searchContent === 'string' ? editResult.searchContent : null,
-            replaceContent: editResult.replaceContent,
-            description: editResult.description ?? `Edit ${editResult.filePath}`,
+          const fileEdits: FileEditDelta[] = []
+          for (const subResult of data.result.results as Record<string, unknown>[]) {
+            const extracted = extractStructuredFileEditResult(subResult)
+            if (extracted && extracted.applied !== false) {
+              fileEdits.push({
+                fileId: typeof extracted.fileId === 'string' ? extracted.fileId : undefined,
+                filePath: extracted.filePath,
+                editType: extracted.editType,
+                searchContent:
+                  typeof extracted.searchContent === 'string' ? extracted.searchContent : null,
+                replaceContent: extracted.replaceContent,
+                description: extracted.description ?? `Edit ${extracted.filePath}`,
+              })
+            }
+          }
+          if (fileEdits.length > 0) {
+            result.fileEdits = fileEdits
+          }
+        } else {
+          // Special handling for apply_file_edit tool results.
+          // Some SDK/provider streams might omit the earlier toolName delta,
+          // so we also detect by payload shape.
+          const extractedEditResult = extractStructuredFileEditResult(data.result)
+          if (
+            (toolName === 'apply_file_edit' || Boolean(extractedEditResult)) &&
+            extractedEditResult &&
+            (extractedEditResult.applied === undefined || extractedEditResult.applied === true)
+          ) {
+            const editResult = extractedEditResult
+            result.fileEdit = {
+              fileId: typeof editResult.fileId === 'string' ? editResult.fileId : undefined,
+              filePath: editResult.filePath,
+              editType: editResult.editType,
+              searchContent: typeof editResult.searchContent === 'string' ? editResult.searchContent : null,
+              replaceContent: editResult.replaceContent,
+              description: editResult.description ?? `Edit ${editResult.filePath}`,
+            }
           }
         }
 
@@ -571,6 +625,7 @@ class DataStreamChatService implements IChatService {
           messages: opts.messages,
           model: opts.model,
           context: opts.context,
+          planningMode: opts.planningMode ?? false,
         }),
         signal: controller.signal,
       })

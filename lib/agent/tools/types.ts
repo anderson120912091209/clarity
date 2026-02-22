@@ -34,6 +34,7 @@ export interface ToolContext {
 export interface ToolMutableState {
   hasWorkspaceSurvey: boolean
   applyFileEditAttempts: number
+  batchEditAttempts: number
   filesReadInRun: Set<string>
   filesCreatedInRun: Set<string>
   filesDeletedInRun: Set<string>

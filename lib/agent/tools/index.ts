@@ -23,4 +23,16 @@ export function createAgentTools(ctx: ToolContext, state: ToolMutableState) {
   }
 }
 
+/**
+ * Read-only tools for planning mode.
+ * Excludes edit and filesystem tools so the agent can only read/analyze.
+ */
+export function createReadOnlyTools(ctx: ToolContext, state: ToolMutableState) {
+  return {
+    ...createWorkspaceTools(ctx, state),
+    ...createTypstTools(ctx, state),
+    ...createCompileTools(ctx),
+  }
+}
+
 export type { ToolContext, ToolMutableState } from './types'

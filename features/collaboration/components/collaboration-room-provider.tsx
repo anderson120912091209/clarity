@@ -11,6 +11,7 @@ import type {
 } from '../types'
 
 interface CollaborationRoomProviderProps {
+  enabled: boolean
   projectId: string
   fileId: string | null
   filePath: string | null
@@ -43,22 +44,30 @@ function CollaborationRoomLifecycle({
 
   useEffect(() => {
     const now = Date.now()
-    broadcastEvent({
-      type: 'join',
-      userId,
-      userName,
-      roomId,
-      at: now,
-    })
-
-    return () => {
+    try {
       broadcastEvent({
-        type: 'leave',
+        type: 'join',
         userId,
         userName,
         roomId,
-        at: Date.now(),
+        at: now,
       })
+    } catch (err) {
+      console.warn('[collab] Failed to broadcast join event:', err)
+    }
+
+    return () => {
+      try {
+        broadcastEvent({
+          type: 'leave',
+          userId,
+          userName,
+          roomId,
+          at: Date.now(),
+        })
+      } catch (err) {
+        console.warn('[collab] Failed to broadcast leave event:', err)
+      }
     }
   }, [broadcastEvent, roomId, userId, userName])
 
@@ -76,13 +85,17 @@ function CollaborationRoomLifecycle({
     previousStatusRef.current = status
 
     if (previousStatus === 'reconnecting' && status === 'connected') {
-      broadcastEvent({
-        type: 'reconnect',
-        userId,
-        userName,
-        roomId,
-        at: Date.now(),
-      })
+      try {
+        broadcastEvent({
+          type: 'reconnect',
+          userId,
+          userName,
+          roomId,
+          at: Date.now(),
+        })
+      } catch (err) {
+        console.warn('[collab] Failed to broadcast reconnect event:', err)
+      }
     }
   }, [broadcastEvent, roomId, status, userId, userName])
 
@@ -90,6 +103,7 @@ function CollaborationRoomLifecycle({
 }
 
 export function CollaborationRoomProvider({
+  enabled,
   projectId,
   fileId,
   filePath,
@@ -100,6 +114,38 @@ export function CollaborationRoomProvider({
   authToken,
   children,
 }: CollaborationRoomProviderProps) {
+  // When collaboration is disabled, pass children through without any Liveblocks setup.
+  if (!enabled) {
+    return <>{children}</>
+  }
+
+  return (
+    <CollaborationRoomProviderInner
+      projectId={projectId}
+      fileId={fileId}
+      filePath={filePath}
+      role={role}
+      userId={userId}
+      userInfo={userInfo}
+      shareToken={shareToken}
+      authToken={authToken}
+    >
+      {children}
+    </CollaborationRoomProviderInner>
+  )
+}
+
+function CollaborationRoomProviderInner({
+  projectId,
+  fileId,
+  filePath,
+  role,
+  userId,
+  userInfo,
+  shareToken,
+  authToken,
+  children,
+}: Omit<CollaborationRoomProviderProps, 'enabled'>) {
   const roomId = useMemo(() => buildCollaborationRoomId(projectId), [projectId])
   const roomProviderKey = useMemo(
     () => `${roomId}::${shareToken ?? 'no-share-token'}::${role}`,

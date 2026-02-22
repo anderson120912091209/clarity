@@ -5,6 +5,7 @@ import {
   type EditorSelectionPayload,
   type EditorCollaborationConfig,
 } from './editor'
+import { CollaborationEditorBridge } from './collaboration-editor-bridge'
 import { useTheme } from 'next-themes'
 import { db } from '@/lib/constants'
 import { tx } from '@instantdb/react'
@@ -383,21 +384,45 @@ const CursorEditorContainer: React.FC<CursorEditorContainerProps> = ({
                 </div>
               </div>
             )}
-            <CodeEditor
-              onChange={handleCodeChange}
-              setIsStreaming={handleIsStreamingChange}
-              value={localContent}
-              onCursorClick={onCursorClick}
-              syntaxTheme={syntaxTheme}
-              fileName={openFile?.name}
-              filePath={openFilePath}
-              onSelectionChange={handleSelectionChange}
-              onActionsReady={handleEditorActionsReady}
-              onReady={onEditorReady}
-              gotoRequest={activeGotoRequest}
-              collaboration={collaboration}
-              key={`${theme || systemTheme}-${openFile?.id}-${collaboration?.enabled ? 'collab' : 'solo'}`}
-            />
+            {collaboration?.enabled ? (
+              <CollaborationEditorBridge>
+                {(bridgeData) => (
+                  <CodeEditor
+                    onChange={handleCodeChange}
+                    setIsStreaming={handleIsStreamingChange}
+                    value={localContent}
+                    onCursorClick={onCursorClick}
+                    syntaxTheme={syntaxTheme}
+                    fileName={openFile?.name}
+                    filePath={openFilePath}
+                    onSelectionChange={handleSelectionChange}
+                    onActionsReady={handleEditorActionsReady}
+                    onReady={onEditorReady}
+                    gotoRequest={activeGotoRequest}
+                    collaboration={collaboration}
+                    collaborationBridge={bridgeData}
+                    key={`${theme || systemTheme}-${openFile?.id}-collab`}
+                  />
+                )}
+              </CollaborationEditorBridge>
+            ) : (
+              <CodeEditor
+                onChange={handleCodeChange}
+                setIsStreaming={handleIsStreamingChange}
+                value={localContent}
+                onCursorClick={onCursorClick}
+                syntaxTheme={syntaxTheme}
+                fileName={openFile?.name}
+                filePath={openFilePath}
+                onSelectionChange={handleSelectionChange}
+                onActionsReady={handleEditorActionsReady}
+                onReady={onEditorReady}
+                gotoRequest={activeGotoRequest}
+                collaboration={collaboration}
+                collaborationBridge={null}
+                key={`${theme || systemTheme}-${openFile?.id}-solo`}
+              />
+            )}
         </div>
       )}
     </div>
