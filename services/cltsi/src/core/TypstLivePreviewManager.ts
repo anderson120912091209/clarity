@@ -200,6 +200,8 @@ export class TypstLivePreviewManager {
         'watch',
         '--root',
         '/compile',
+        '--font-path',
+        '/compile',
         rootResourcePath,
         '/compile/output.pdf',
       ],

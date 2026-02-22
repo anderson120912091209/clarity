@@ -63,6 +63,8 @@ export class TypstRunner {
       'compile',
       '--root',
       '/compile',
+      '--font-path',
+      '/compile',
       options.mainFile,
       '/compile/output.pdf',
     ];
