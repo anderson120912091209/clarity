@@ -52,7 +52,7 @@ export const DEFAULT_DASHBOARD_SETTINGS: DashboardSettings = {
   defaultPdfBackgroundTheme: DEFAULT_PDF_BACKGROUND_THEME,
   defaultPdfDarkMode: false,
   defaultPdfCaretNavigation: true,
-  defaultTypstAutoCompile: false,
+  defaultTypstAutoCompile: true,
   defaultChatIncludeCurrentDocument: true,
   defaultChatModel: 'auto',
 }
