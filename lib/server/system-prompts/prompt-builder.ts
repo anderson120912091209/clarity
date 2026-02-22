@@ -13,6 +13,7 @@ import { getLatexExpertPrompt } from './latex-expert'
 import { getTypstExpertPrompt } from './typst-expert'
 import { getEditWorkflowPrompt } from './edit-workflow'
 import { getReasoningPrompt } from './reasoning-mode'
+import { getFilesystemToolsPrompt } from './filesystem-workflow'
 
 export class SystemPromptBuilder {
   private sections: string[] = []
@@ -61,6 +62,14 @@ export class SystemPromptBuilder {
    */
   addReasoningMode(): this {
     this.sections.push(getReasoningPrompt())
+    return this
+  }
+
+  /**
+   * Filesystem tools instructions (create/delete files and folders).
+   */
+  addFilesystemTools(): this {
+    this.sections.push(getFilesystemToolsPrompt())
     return this
   }
 

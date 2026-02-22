@@ -26,6 +26,7 @@ import {
   chatService,
   type ChatMessage,
   type FileEditDelta,
+  type FileActionDelta,
 } from '@/services/agent/browser/chat/chatService'
 import { parseRawResponse } from '@/features/agent/services/response-parser'
 import { buildAgentRunIntro } from '@/lib/agent/chat-run-intro'
@@ -65,11 +66,13 @@ export interface PanelMessage {
   isError?: boolean
   toolCalls?: ToolCallInfo[]
   fileEdits?: FileEditDelta[]
+  fileActions?: FileActionDelta[]
 }
 
 interface MessageTrace {
   toolCalls: ToolCallInfo[]
   fileEdits: FileEditDelta[]
+  fileActions: FileActionDelta[]
 }
 
 interface SendPromptOptions {
@@ -190,6 +193,7 @@ export interface UseChatSessionOptions {
   stagedChanges?: StagedFileChange[]
   anyStagedStreaming?: boolean
   onAcceptStagedFile?: (fileId: string) => void | Promise<void>
+  onStageFileAction?: (action: FileActionDelta & { sourceMessageId?: string }) => void
   externalPromptRequest?: ChatPanelExternalPromptRequest | null
   onExternalPromptConsumed?: (requestId: string) => void
   onExternalPromptSettled?: (result: ExternalPromptResult) => void
@@ -217,6 +221,7 @@ export function useChatSession(opts: UseChatSessionOptions) {
     stagedChanges = [],
     anyStagedStreaming = false,
     onAcceptStagedFile,
+    onStageFileAction,
     externalPromptRequest = null,
     onExternalPromptConsumed,
     onExternalPromptSettled,
@@ -545,6 +550,7 @@ export function useChatSession(opts: UseChatSessionOptions) {
         isError: message.status === 'error',
         toolCalls: messageTraceById[message.id]?.toolCalls,
         fileEdits: messageTraceById[message.id]?.fileEdits,
+        fileActions: messageTraceById[message.id]?.fileActions,
       }))
 
     if (!liveAssistantMessage) return persisted
@@ -695,6 +701,7 @@ export function useChatSession(opts: UseChatSessionOptions) {
       let runId: string | null = null
       let streamedResponse = initialAssistantContent
       const collectedFileEdits: FileEditDelta[] = []
+      const collectedFileActions: FileActionDelta[] = []
       const collectedToolCalls = new Map<string, ToolCallInfo>()
       let collectedThinking = ''
       let completionStatus: SendPromptResult['status'] = 'completed'
@@ -888,6 +895,28 @@ export function useChatSession(opts: UseChatSessionOptions) {
             }
           }
 
+          if (delta.fileAction) {
+            const action = delta.fileAction
+            collectedFileActions.push(action)
+
+            setLiveAssistantMessage((prev) => {
+              if (!prev || prev.id !== assistantMessageId) return prev
+              return { ...prev, fileActions: [...collectedFileActions] }
+            })
+
+            // Queue through the edit chain to keep operations sequential
+            editChainPromise = editChainPromise.then(async () => {
+              try {
+                onStageFileAction?.({
+                  ...action,
+                  sourceMessageId: assistantMessageId,
+                })
+              } catch (error) {
+                console.warn('[AI Chat] Failed to stage file action:', error)
+              }
+            })
+          }
+
           if (delta.stepMetadata) {
             streamingState.dispatch({
               type: 'STEP_COMPLETE',
@@ -1001,6 +1030,7 @@ export function useChatSession(opts: UseChatSessionOptions) {
           [assistantMessageId]: {
             toolCalls: toolCallsList,
             fileEdits: [...collectedFileEdits],
+            fileActions: [...collectedFileActions],
           },
         }))
 
@@ -1052,6 +1082,7 @@ export function useChatSession(opts: UseChatSessionOptions) {
           [assistantMessageId]: {
             toolCalls: Array.from(collectedToolCalls.values()),
             fileEdits: [...collectedFileEdits],
+            fileActions: [...collectedFileActions],
           },
         }))
 
@@ -1078,6 +1109,7 @@ export function useChatSession(opts: UseChatSessionOptions) {
       isSubmitting,
       memorySystemMessage,
       onInsertIntoEditor,
+      onStageFileAction,
       persistedMessages,
       persistedMemoryItems,
       projectId,

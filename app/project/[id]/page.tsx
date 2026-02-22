@@ -55,6 +55,10 @@ import type { CollaborationRole } from '@/features/collaboration/types'
 import { CollaborationRoomProvider } from '@/features/collaboration/components/collaboration-room-provider'
 import { CollaborationHeaderControls } from '@/features/collaboration/components/collaboration-header-controls'
 import { CollaborationEventToasts } from '@/features/collaboration/components/collaboration-event-toasts'
+import { useFileSystem } from '@/hooks/useFileSystem'
+import { fileActionManagerService } from '@/features/agent/services/file-action-manager'
+import { useFileActionManagerState } from '@/features/agent/hooks/useFileActionManagerState'
+import type { FileActionDelta } from '@/services/agent/browser/chat/chatService'
 
 export const maxDuration = 30
 const AI_CHAT_ENABLED = process.env.NEXT_PUBLIC_ENABLE_AI_CHAT === 'true'
@@ -298,6 +302,8 @@ function EditorLayout() {
     shareToken: projectShareToken,
   } = useProject()
   const { files: stagedChanges, anyStreaming: anyStagedStreaming } = useChangeManagerState()
+  const { actions: pendingFileActions } = useFileActionManagerState()
+  const fileSystem = useFileSystem(projectId, user?.id ?? '')
   const isPdfNavigationEnabled =
     project?.isPdfCaretNavigationEnabled ?? settings.defaultPdfCaretNavigation
   const pdfScrollNonceRef = useRef(0)
@@ -749,6 +755,7 @@ function EditorLayout() {
       syncFromPdfAbortRef.current?.abort()
       syncSelectionAbortRef.current?.abort()
       changeManagerService.clear()
+      fileActionManagerService.clear()
     }
   }, [])
 
@@ -1288,6 +1295,83 @@ function EditorLayout() {
     await rejectStagedEntries(entries)
   }, [rejectStagedEntries])
 
+  // ── File action handlers (create/delete staging) ──
+
+  const handleStageFileAction = useCallback(
+    (action: FileActionDelta & { sourceMessageId?: string }) => {
+      fileActionManagerService.stageAction({
+        actionType: action.actionType,
+        filePath: action.filePath,
+        fileId: action.fileId,
+        content: action.content,
+        description: action.description,
+        reason: action.reason,
+        sourceMessageId: action.sourceMessageId,
+      })
+    },
+    []
+  )
+
+  const handleAcceptFileAction = useCallback(
+    async (actionId: string) => {
+      const action = fileActionManagerService.acceptAction(actionId)
+      if (!action) return
+
+      try {
+        if (action.actionType === 'create_file') {
+          const parts = action.filePath.split('/')
+          const fileName = parts.pop() ?? action.filePath
+          // Resolve parent folder ID from the path
+          let parentId: string | null = null
+          if (parts.length > 0) {
+            // Walk down the folder hierarchy to find or create parent folders
+            for (const folderName of parts) {
+              const existing = (projectFiles as Array<{ id: string; name: string; type: string; parent_id: string | null }>)
+                .find((f) => f.type === 'folder' && f.name === folderName && f.parent_id === parentId)
+              if (existing) {
+                parentId = existing.id
+              } else {
+                parentId = await fileSystem.createFolder(folderName, parentId)
+              }
+            }
+          }
+          await fileSystem.createFile(fileName, action.content ?? '', parentId)
+        } else if (action.actionType === 'create_folder') {
+          const parts = action.filePath.split('/')
+          let parentId: string | null = null
+          for (const folderName of parts) {
+            const existing = (projectFiles as Array<{ id: string; name: string; type: string; parent_id: string | null }>)
+              .find((f) => f.type === 'folder' && f.name === folderName && f.parent_id === parentId)
+            if (existing) {
+              parentId = existing.id
+            } else {
+              parentId = await fileSystem.createFolder(folderName, parentId)
+            }
+          }
+        } else if (action.actionType === 'delete_file') {
+          if (action.fileId) {
+            await fileSystem.deleteNode(action.fileId)
+          } else {
+            // Resolve file ID from path
+            const target = findFileByPath(action.filePath)
+            if (target?.id) {
+              await fileSystem.deleteNode(target.id)
+            } else {
+              console.warn(`[File Action] Cannot find file to delete: ${action.filePath}`)
+            }
+          }
+        }
+      } catch (error) {
+        console.warn(`[File Action] Failed to execute ${action.actionType}:`, error)
+      }
+    },
+    [fileSystem, findFileByPath, projectFiles]
+  )
+
+  const handleRejectFileAction = useCallback((actionId: string) => {
+    fileActionManagerService.rejectAction(actionId)
+  }, [])
+
   const handleJumpToStagedFile = useCallback(
     async (fileId: string) => {
       const entry = changeManagerService.getChange(fileId)
@@ -1698,6 +1782,10 @@ function EditorLayout() {
                   onExternalPromptConsumed={handleChatExternalPromptConsumed}
                   onExternalPromptSettled={handleChatExternalPromptSettled}
                   onOpenWorkspaceFile={setActiveFile}
+                  pendingFileActions={pendingFileActions}
+                  onStageFileAction={handleStageFileAction}
+                  onAcceptFileAction={handleAcceptFileAction}
+                  onRejectFileAction={handleRejectFileAction}
                   onToggleFloat={handleToggleChatViewMode}
                 />
               </ResizablePanel>
@@ -1765,6 +1853,10 @@ function EditorLayout() {
               onExternalPromptConsumed={handleChatExternalPromptConsumed}
               onExternalPromptSettled={handleChatExternalPromptSettled}
               onOpenWorkspaceFile={setActiveFile}
+              pendingFileActions={pendingFileActions}
+              onStageFileAction={handleStageFileAction}
+              onAcceptFileAction={handleAcceptFileAction}
+              onRejectFileAction={handleRejectFileAction}
               isFloating={true}
               onToggleFloat={handleToggleChatViewMode}
             />

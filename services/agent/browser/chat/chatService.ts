@@ -27,6 +27,17 @@ export interface FileEditDelta {
   description: string
 }
 
+export type FileActionType = 'create_file' | 'create_folder' | 'delete_file'
+
+export interface FileActionDelta {
+  actionType: FileActionType
+  filePath: string
+  fileId?: string
+  content?: string
+  description?: string
+  reason?: string
+}
+
 export interface ToolCallDelta {
   toolCallId: string
   toolName: string
@@ -45,6 +56,7 @@ export interface StreamDelta {
   error?: string
   done?: boolean
   fileEdit?: FileEditDelta
+  fileAction?: FileActionDelta
   toolCall?: ToolCallDelta
   toolResult?: ToolResultDelta
   stateTransition?: string
@@ -157,6 +169,48 @@ function extractStructuredFileEditResult(value: unknown): {
   return null
 }
 
+const FILE_ACTION_TOOL_NAMES = new Set(['create_file', 'create_folder', 'delete_file'])
+
+function extractFileActionResult(
+  toolName: string,
+  resultValue: Record<string, unknown>
+): FileActionDelta | null {
+  // Check by tool name first
+  if (!FILE_ACTION_TOOL_NAMES.has(toolName)) {
+    // Also check by result shape (actionType field)
+    const actionType = resultValue.actionType
+    if (
+      typeof actionType !== 'string' ||
+      !FILE_ACTION_TOOL_NAMES.has(actionType)
+    ) {
+      return null
+    }
+  }
+
+  const actionType = (resultValue.actionType as string) ?? toolName
+  if (!FILE_ACTION_TOOL_NAMES.has(actionType)) return null
+
+  const filePath =
+    typeof resultValue.filePath === 'string'
+      ? resultValue.filePath
+      : typeof resultValue.folderPath === 'string'
+        ? resultValue.folderPath
+        : null
+  if (!filePath) return null
+
+  // Only extract successful actions
+  if (resultValue.created === false && resultValue.deleted === false) return null
+
+  return {
+    actionType: actionType as FileActionType,
+    filePath,
+    fileId: typeof resultValue.fileId === 'string' ? resultValue.fileId : undefined,
+    content: typeof resultValue.content === 'string' ? resultValue.content : undefined,
+    description: typeof resultValue.description === 'string' ? resultValue.description : undefined,
+    reason: typeof resultValue.reason === 'string' ? resultValue.reason : undefined,
+  }
+}
+
 function parseDataStreamLine(line: string): StreamDelta | null {
   const normalizedLine = normalizeStreamLine(line)
   if (!normalizedLine || normalizedLine.length < 2) return null
@@ -237,6 +291,12 @@ function parseDataStreamLine(line: string): StreamDelta | null {
             replaceContent: extractedEditResult.replaceContent,
             description: extractedEditResult.description ?? `Edit ${extractedEditResult.filePath}`,
           }
+        }
+
+        // Detect file creation/deletion tool results
+        const extractedAction = extractFileActionResult(toolName, resultValue)
+        if (extractedAction) {
+          result.fileAction = extractedAction
         }
 
         return result
@@ -354,6 +414,12 @@ function parseDataStreamLine(line: string): StreamDelta | null {
             replaceContent: editResult.replaceContent,
             description: editResult.description ?? `Edit ${editResult.filePath}`,
           }
+        }
+
+        // Detect file creation/deletion tool results
+        const extractedAction = extractFileActionResult(toolName, data.result)
+        if (extractedAction) {
+          result.fileAction = extractedAction
         }
 
         return result

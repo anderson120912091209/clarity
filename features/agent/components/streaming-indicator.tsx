@@ -27,6 +27,12 @@ function getStateLabel(state: AgentRunState, toolName?: string | null): string {
           return 'Listing files'
         case 'search_workspace':
           return 'Searching'
+        case 'create_file':
+          return 'Creating file'
+        case 'create_folder':
+          return 'Creating folder'
+        case 'delete_file':
+          return 'Deleting file'
         case 'run_terminal_command':
           return 'Running command'
         default:

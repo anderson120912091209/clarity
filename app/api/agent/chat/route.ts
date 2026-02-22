@@ -206,6 +206,8 @@ export async function POST(req: Request) {
       hasWorkspaceSurvey: false,
       applyFileEditAttempts: 0,
       filesReadInRun: new Set(),
+      filesCreatedInRun: new Set(),
+      filesDeletedInRun: new Set(),
     }
 
     return streamText({

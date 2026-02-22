@@ -10,6 +10,7 @@ import { createWorkspaceTools } from './workspace-tools'
 import { createTypstTools } from './typst-tools'
 import { createCompileTools } from './compile-tools'
 import { createEditTools } from './edit-tools'
+import { createFilesystemTools } from './filesystem-tools'
 import type { ToolContext, ToolMutableState } from './types'
 
 export function createAgentTools(ctx: ToolContext, state: ToolMutableState) {
@@ -18,6 +19,7 @@ export function createAgentTools(ctx: ToolContext, state: ToolMutableState) {
     ...createTypstTools(ctx, state),
     ...createCompileTools(ctx),
     ...createEditTools(ctx, state),
+    ...createFilesystemTools(ctx, state),
   }
 }
 

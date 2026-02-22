@@ -79,6 +79,9 @@ export function buildAgentSystemPrompt(opts: {
     })
   }
 
+  // 4b. Filesystem tools (create/delete files and folders)
+  builder.addFilesystemTools()
+
   // 5. Workspace snapshot
   builder.addWorkspaceContext(context)
 

@@ -37,6 +37,9 @@ import { ChatMessageList } from './chat-message-list'
 import { ChatInputArea, type ChatInputAreaHandle } from './chat-input-area'
 import { ChatMarkdown } from './chat-markdown'
 import { AssistantFileBlock } from './assistant-file-block'
+import { AssistantActionBlock } from './assistant-action-block'
+import type { PendingFileAction } from '@/features/agent/services/file-action-manager'
+import type { FileActionDelta } from '@/services/agent/browser/chat/chatService'
 
 // Re-export for backwards compat
 export type { ChatPanelExternalPromptRequest }
@@ -73,6 +76,10 @@ interface ChatPanelProps {
   onExternalPromptConsumed?: (requestId: string) => void
   onExternalPromptSettled?: (result: ExternalPromptResult) => void
   onOpenWorkspaceFile?: (fileId: string) => void
+  pendingFileActions?: PendingFileAction[]
+  onStageFileAction?: (action: FileActionDelta & { sourceMessageId?: string }) => void
+  onAcceptFileAction?: (actionId: string) => void | Promise<void>
+  onRejectFileAction?: (actionId: string) => void
   isFloating?: boolean
   onToggleFloat?: () => void
 }
@@ -106,6 +113,10 @@ export function ChatPanel({
   onExternalPromptConsumed,
   onExternalPromptSettled,
   onOpenWorkspaceFile,
+  pendingFileActions = [],
+  onStageFileAction,
+  onAcceptFileAction,
+  onRejectFileAction,
   isFloating = false,
   onToggleFloat,
 }: ChatPanelProps) {
@@ -203,6 +214,7 @@ export function ChatPanel({
     stagedChanges,
     anyStagedStreaming,
     onAcceptStagedFile,
+    onStageFileAction,
     externalPromptRequest,
     onExternalPromptConsumed,
     onExternalPromptSettled,
@@ -238,6 +250,21 @@ export function ChatPanel({
 
     return { linkedStagedChangesByMessageId: linked, unlinkedStagedChanges: unlinked }
   }, [stagedChanges])
+
+  const linkedFileActionsByMessageId = useMemo(() => {
+    const linked = new Map<string, PendingFileAction[]>()
+    for (const action of pendingFileActions) {
+      const messageId = action.sourceMessageId?.trim()
+      if (!messageId) continue
+      const list = linked.get(messageId)
+      if (list) {
+        list.push(action)
+      } else {
+        linked.set(messageId, [action])
+      }
+    }
+    return linked
+  }, [pendingFileActions])
 
   // ── Handlers ──
 
@@ -502,6 +529,33 @@ export function ChatPanel({
                         })}
                       </div>
                     )}
+
+                    {/* File action blocks (create/delete) */}
+                    {(() => {
+                      const linkedActions = linkedFileActionsByMessageId.get(message.id) ?? []
+                      if (linkedActions.length === 0) return null
+                      return (
+                        <div className="space-y-1.5">
+                          {linkedActions.map((action) => (
+                            <AssistantActionBlock
+                              key={action.id}
+                              action={action}
+                              disabled={stagedActionsDisabled}
+                              onAccept={
+                                onAcceptFileAction
+                                  ? () => void onAcceptFileAction(action.id)
+                                  : undefined
+                              }
+                              onReject={
+                                onRejectFileAction
+                                  ? () => onRejectFileAction(action.id)
+                                  : undefined
+                              }
+                            />
+                          ))}
+                        </div>
+                      )
+                    })()}
 
                     {/* Streaming indicator with interrupt */}
                     {message.isStreaming && (

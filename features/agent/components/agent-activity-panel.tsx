@@ -8,10 +8,13 @@ import {
   Clock,
   Eye,
   FileEdit,
+  FilePlus,
+  FolderPlus,
   FolderSearch,
   Loader2,
   Search,
   Terminal,
+  Trash2,
   Wrench,
 } from 'lucide-react'
 import { useCallback, useState } from 'react'
@@ -28,6 +31,9 @@ const TOOL_NAME_LABELS: Record<string, { label: string; icon: typeof Wrench }> =
   apply_file_edit: { label: 'Edit file', icon: FileEdit },
   list_workspace_files: { label: 'List files', icon: FolderSearch },
   search_workspace: { label: 'Search workspace', icon: Search },
+  create_file: { label: 'Create file', icon: FilePlus },
+  create_folder: { label: 'Create folder', icon: FolderPlus },
+  delete_file: { label: 'Delete file', icon: Trash2 },
   run_terminal_command: { label: 'Run command', icon: Terminal },
 }
 
