@@ -391,3 +391,8 @@ code, kbd, samp, pre {
 .monaco-editor [class*='yRemoteSelectionHead-']::after {
   z-index: 41;
 }
+
+/* Hide Liveblocks branding badge */
+#liveblocks-badge {
+  display: none !important;
+}
