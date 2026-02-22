@@ -147,9 +147,27 @@ function CollaborationRoomProviderInner({
   children,
 }: Omit<CollaborationRoomProviderProps, 'enabled'>) {
   const roomId = useMemo(() => buildCollaborationRoomId(projectId), [projectId])
+
+  // Stabilise the key so that only a *meaningful* credential change forces a
+  // full RoomProvider remount (disconnect → reconnect).  Previously the raw
+  // shareToken string was part of the key, so every time the token was
+  // re-fetched from the DB (same room, same role, just a different JWT string)
+  // React would destroy and recreate the provider – causing the spurious
+  // userLeft / userEntered churn visible in the Liveblocks dashboard.
+  //
+  // We now derive a short fingerprint: same (room + role + projectId) keeps
+  // the same key, so the WebSocket stays alive.  A genuine role change (e.g.
+  // viewer → editor) still triggers the remount we actually need.
+  const shareTokenFingerprint = useMemo(() => {
+    if (!shareToken) return 'no-share-token'
+    // Use just projectId + role as the identity – all tokens for the same
+    // project & role are functionally equivalent.
+    return `${projectId}::${role}`
+  }, [projectId, role, shareToken])
+
   const roomProviderKey = useMemo(
-    () => `${roomId}::${shareToken ?? 'no-share-token'}::${role}`,
-    [roomId, role, shareToken]
+    () => `${roomId}::${shareTokenFingerprint}`,
+    [roomId, shareTokenFingerprint]
   )
   const authContext = useMemo(
     () => ({

@@ -18,6 +18,7 @@ type CollaborationStorage = Record<string, never>
 const collaborationClient = createClient<CollaborationUserMeta>({
   throttle: 16,
   lostConnectionTimeout: 5000,
+  backgroundKeepAliveTimeout: 15 * 60 * 1000, // 15 min – disconnect idle background tabs
   authEndpoint: async (room) => {
     const authContext = getCollaborationAuthContext(room)
     if (!authContext) {
