@@ -95,7 +95,8 @@ const FileTree = ({ projectId, query = '' }) => {
       const newItemId = id()
       const parentPath = filesData?.files.find((file) => file.id === parentId)?.pathname || ''
       
-      const newName = type === 'file' ? 'untitled.tex' : 'New Folder'
+      const isTypst = filesData?.files?.some((f) => f.name === 'main.typ')
+      const newName = type === 'file' ? (isTypst ? 'untitled.typ' : 'untitled.tex') : 'New Folder'
       const newItemPath = parentPath ? `${parentPath}/${newName}` : newName
       
       const newItem = {

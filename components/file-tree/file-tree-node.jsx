@@ -30,7 +30,7 @@ const FileTreeNode = ({ node, style, dragHandle }) => {
   useEffect(() => {
       // Basic heuristic: if it's 'untitled.tex' or 'New Folder', assume it's new and trigger rename
       // ideally the Tree component passes 'editingId'
-      if (node.data.name === 'untitled.tex' || node.data.name === 'New Folder') {
+      if (node.data.name === 'untitled.tex' || node.data.name === 'untitled.typ' || node.data.name === 'New Folder') {
           // Check if this node was just added (timestamp check could help but let's just trigger)
           // We can't unconditionally set this or it loops.
           // We rely on the parent creation logic to have set a flag, OR we detect it once.
