@@ -215,7 +215,7 @@ export async function POST(req: Request) {
       system: systemPrompt,
       messages: conversation,
       temperature: 0.05,
-      maxSteps: forceStructuredEdits ? 30 : 16,
+      maxSteps: 30,
       toolChoice: 'auto',
       tools: createAgentTools(toolCtx, toolState),
       onStepFinish: (event) => {

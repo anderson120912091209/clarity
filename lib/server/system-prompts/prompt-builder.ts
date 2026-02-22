@@ -30,6 +30,18 @@ export class SystemPromptBuilder {
         'Never fabricate file contents or tool outputs.',
       ].join('\n')
     )
+    this.sections.push(
+      [
+        'Tool Execution Policy (mandatory — always follow):',
+        '- You have tools for reading, editing, creating, and deleting files. Text output alone does NOT modify files.',
+        '- When the user requests a change, you MUST call the appropriate tool (apply_file_edit, create_file, delete_file, etc.). Never just describe what you would do.',
+        '- NEVER claim a file was edited, created, or deleted unless the corresponding tool call was executed and returned a successful result.',
+        '- After each tool call, check its result. If it failed, report the failure honestly — do not pretend it succeeded.',
+        '- Always read a file before editing it so your searchContent matches the actual content.',
+        '- If you need multiple tool calls (e.g. read then edit), make them across multiple steps. Do NOT skip the tool call and jump straight to a summary.',
+        '- Your workflow must be: use tools → check results → then summarize what happened. Never summarize first.',
+      ].join('\n')
+    )
     return this
   }
 

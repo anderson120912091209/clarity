@@ -44,7 +44,7 @@ export function buildAgentSystemPrompt(opts: {
     return `${decodeEnvPrompt(fromEnv)}\n\n${getPromptNonDisclosurePolicy()}`
   }
 
-  const { context, typstLibraryEnabled, forceStructuredEdits, extraInstructions } = opts
+  const { context, typstLibraryEnabled, extraInstructions } = opts
 
   const hasTypstFiles = context.workspaceFiles.some((f) =>
     f.path.toLowerCase().endsWith('.typ')
@@ -71,13 +71,11 @@ export function buildAgentSystemPrompt(opts: {
   // 3. Reasoning mode (always useful for structured thinking)
   builder.addReasoningMode()
 
-  // 4. Edit workflow when the user wants edits
-  if (forceStructuredEdits) {
-    builder.addEditWorkflow({
-      hasCompileError,
-      isMultiFile: context.workspaceFiles.length > 1,
-    })
-  }
+  // 4. Edit workflow — always include so the agent knows how to use edit tools
+  builder.addEditWorkflow({
+    hasCompileError,
+    isMultiFile: context.workspaceFiles.length > 1,
+  })
 
   // 4b. Filesystem tools (create/delete files and folders)
   builder.addFilesystemTools()
