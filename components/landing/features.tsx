@@ -171,9 +171,9 @@ export function Features() {
             <div className="absolute inset-x-0 top-0 bottom-24 flex items-center justify-center pointer-events-none overflow-hidden z-[1]">
               <NodesSyncSvg
                 className="-translate-y-4"
-                translateX={20}
-                translateY={40}
-                scale={1.8}
+                translateX={300}
+                translateY={80}
+                scale={2.0}
               />
             </div>
             <div className="relative z-10 w-full p-6 md:p-8 mt-auto pointer-events-none bg-gradient-to-t from-[#0a0a0c] via-[#0a0a0c]/80 to-transparent pt-16">

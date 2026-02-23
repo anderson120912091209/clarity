@@ -3,24 +3,20 @@
 import { motion } from 'framer-motion'
 
 interface NodesSyncSvgProps {
-  /** Controls external Tailwind styling, e.g. for nudging the SVG using translate-y-4 */
-  className?: string;
-  /** Internal scaling of the vector graphic */
-  scale?: number;
-  /** Internal X position of the vector graphic */
-  translateX?: number;
-  /** Internal Y position of the vector graphic */
-  translateY?: number;
+  className?: string
+  scale?: number
+  translateX?: number
+  translateY?: number
 }
 
-export function NodesSyncSvg({ 
+export function NodesSyncSvg({
   className = "-translate-y-4",
   scale = 1.4,
   translateX = 150,
   translateY = 100
 }: NodesSyncSvgProps = {}) {
   return (
-    <motion.div 
+    <motion.div
       initial={{ opacity: 0, scale: 0.95 }}
       whileInView={{ opacity: 1, scale: 1 }}
       viewport={{ once: true, amount: 0.3 }}
@@ -29,67 +25,99 @@ export function NodesSyncSvg({
     >
       <svg viewBox="0 0 600 500" className={`w-full h-full ${className}`}>
         <g transform={`translate(${translateX}, ${translateY}) scale(${scale})`}>
-          {/* Main Central Hub */}
+
+          {/* ── Document surface ── */}
           <motion.g
-            initial={{ scale: 0.8, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            transition={{ duration: 1, ease: 'easeOut' }}
+            initial={{ y: 8, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            transition={{ duration: 0.7 }}
           >
-            <rect x="230" y="120" width="100" height="60" rx="12" fill="#121214" stroke="rgba(255,255,255,0.15)" strokeWidth="1" />
-            {/* Document icon abstraction inside hub */}
-            <rect x="260" y="135" width="40" height="30" rx="4" fill="#1c1d1f" stroke="rgba(255,255,255,0.1)" strokeWidth="1" />
-            <path d="M 268 145 L 292 145" stroke="rgba(255,255,255,0.3)" strokeWidth="2" strokeLinecap="round" />
-            <path d="M 268 152 L 285 152" stroke="rgba(255,255,255,0.3)" strokeWidth="2" strokeLinecap="round" />
+            <rect x="45" y="35" width="230" height="175" rx="8"
+              fill="#121214" stroke="rgba(255,255,255,0.07)" strokeWidth="1" />
+
+            {/* Presence dots — top-right corner */}
+            <circle cx="244" cy="48" r="3" fill="#f87171" opacity="0.7" />
+            <circle cx="254" cy="48" r="3" fill="#60a5fa" opacity="0.7" />
+            <circle cx="264" cy="48" r="3" fill="#34d399" opacity="0.7" />
           </motion.g>
 
-          {/* Incoming Connection Lines (Curved Dashed) */}
-          <path d="M 120 70 C 180 70, 180 140, 230 140" fill="none" stroke="rgba(109,120,231,0.3)" strokeWidth="1" strokeDasharray="4 4" />
-          <path d="M 100 150 C 160 150, 170 150, 230 150" fill="none" stroke="rgba(109,120,231,0.3)" strokeWidth="1" strokeDasharray="4 4" />
-          <path d="M 120 230 C 180 230, 180 160, 230 160" fill="none" stroke="rgba(109,120,231,0.3)" strokeWidth="1" strokeDasharray="4 4" />
+          {/* ── Text lines ── */}
+          <motion.g
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.6, delay: 0.15 }}
+          >
+            <rect x="65" y="68"  width="90"  height="3" rx="1.5" fill="rgba(255,255,255,0.12)" />
+            <rect x="160" y="68" width="55"  height="3" rx="1.5" fill="rgba(255,255,255,0.07)" />
 
-          {/* Animated Data Packets traveling along the paths */}
-          <motion.circle r="3" fill="#6d78e7" style={{ filter: 'drop-shadow(0 0 4px #6d78e7)' }}>
-            <animateMotion
-              dur="2s"
-              repeatCount="indefinite"
-              path="M 120 70 C 180 70, 180 140, 230 140"
-            />
-          </motion.circle>
-          
-          <motion.circle r="3" fill="#8b95f0" style={{ filter: 'drop-shadow(0 0 4px #8b95f0)' }}>
-            <animateMotion
-              dur="2.5s"
-              repeatCount="indefinite"
-              path="M 100 150 C 160 150, 170 150, 230 150"
-            />
-          </motion.circle>
+            <rect x="65" y="84"  width="42"  height="3" rx="1.5" fill="rgba(255,255,255,0.12)" />
+            <rect x="112" y="84" width="75"  height="3" rx="1.5" fill="rgba(255,255,255,0.07)" />
 
-          <motion.circle r="3" fill="#6d78e7" style={{ filter: 'drop-shadow(0 0 4px #6d78e7)' }}>
-            <animateMotion
-              dur="2.2s"
-              repeatCount="indefinite"
-              path="M 120 230 C 180 230, 180 160, 230 160"
-            />
-          </motion.circle>
+            <rect x="65" y="100" width="125" height="3" rx="1.5" fill="rgba(255,255,255,0.07)" />
 
-          {/* Source Nodes */}
-          <motion.g initial={{ x: -20, opacity: 0 }} animate={{ x: 0, opacity: 1 }} transition={{ delay: 0.2, duration: 0.8 }}>
-            <rect x="40" y="55" width="80" height="30" rx="6" fill="#121214" stroke="rgba(255,255,255,0.1)" strokeWidth="1" />
-            <circle cx="55" cy="70" r="5" fill="#f87171" className="opacity-80" />
-            <text x="68" y="74" fill="rgba(255,255,255,0.6)" fontSize="10" fontFamily="sans-serif">User 1</text>
+            <rect x="65" y="116" width="50"  height="3" rx="1.5" fill="rgba(255,255,255,0.12)" />
+            <rect x="120" y="116" width="45" height="3" rx="1.5" fill="rgba(255,255,255,0.07)" />
+            <rect x="170" y="116" width="30" height="3" rx="1.5" fill="rgba(255,255,255,0.05)" />
+
+            <rect x="65" y="132" width="105" height="3" rx="1.5" fill="rgba(255,255,255,0.06)" />
+
+            <rect x="65" y="148" width="70"  height="3" rx="1.5" fill="rgba(255,255,255,0.10)" />
+
+            <rect x="65" y="164" width="140" height="3" rx="1.5" fill="rgba(255,255,255,0.04)" />
+
+            <rect x="65" y="180" width="85"  height="3" rx="1.5" fill="rgba(255,255,255,0.03)" />
+            <rect x="65" y="196" width="110" height="3" rx="1.5" fill="rgba(255,255,255,0.03)" />
           </motion.g>
 
-          <motion.g initial={{ x: -20, opacity: 0 }} animate={{ x: 0, opacity: 1 }} transition={{ delay: 0.4, duration: 0.8 }}>
-            <rect x="20" y="135" width="80" height="30" rx="6" fill="#121214" stroke="rgba(255,255,255,0.1)" strokeWidth="1" />
-            <circle cx="35" cy="150" r="5" fill="#60a5fa" className="opacity-80" />
-            <text x="48" y="154" fill="rgba(255,255,255,0.6)" fontSize="10" fontFamily="sans-serif">User 2</text>
+          {/* ── Selection highlight (blue user) ── */}
+          <rect x="120" y="113" width="45" height="10" rx="2" fill="rgba(96,165,250,0.10)" />
+
+          {/* ── Cursor 1 — red ── */}
+          <motion.g
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.5, delay: 0.3 }}
+          >
+            <rect x="107" y="80" width="1.5" height="11" rx="0.75" fill="#f87171">
+              <animate attributeName="opacity" values="1;1;0;0" keyTimes="0;0.5;0.51;1" dur="1.1s" repeatCount="indefinite" />
+            </rect>
+            <rect x="105" y="74" width="20" height="7" rx="2" fill="#f87171" opacity="0.75" />
+            <rect x="108" y="76.5" width="12" height="2.5" rx="1" fill="rgba(255,255,255,0.7)" />
           </motion.g>
 
-          <motion.g initial={{ x: -20, opacity: 0 }} animate={{ x: 0, opacity: 1 }} transition={{ delay: 0.6, duration: 0.8 }}>
-            <rect x="40" y="215" width="80" height="30" rx="6" fill="#121214" stroke="rgba(255,255,255,0.1)" strokeWidth="1" />
-            <circle cx="55" cy="230" r="5" fill="#34d399" className="opacity-80" />
-            <text x="68" y="234" fill="rgba(255,255,255,0.6)" fontSize="10" fontFamily="sans-serif">User 3</text>
+          {/* ── Cursor 2 — blue ── */}
+          <motion.g
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.5, delay: 0.45 }}
+          >
+            <rect x="165" y="112" width="1.5" height="11" rx="0.75" fill="#60a5fa">
+              <animate attributeName="opacity" values="1;1;0;0" keyTimes="0;0.5;0.51;1" dur="1s" repeatCount="indefinite" begin="0.3s" />
+            </rect>
+            <rect x="163" y="106" width="20" height="7" rx="2" fill="#60a5fa" opacity="0.75" />
+            <rect x="166" y="108.5" width="12" height="2.5" rx="1" fill="rgba(255,255,255,0.7)" />
           </motion.g>
+
+          {/* ── Cursor 3 — green (typing) ── */}
+          <motion.g
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.5, delay: 0.6 }}
+          >
+            {/* Cursor blink */}
+            <rect x="140" y="144" width="1.5" height="11" rx="0.75" fill="#34d399">
+              <animate attributeName="opacity" values="1;1;0;0" keyTimes="0;0.5;0.51;1" dur="0.9s" repeatCount="indefinite" begin="0.6s" />
+            </rect>
+            {/* Name tag */}
+            <rect x="138" y="138" width="20" height="7" rx="2" fill="#34d399" opacity="0.75" />
+            <rect x="141" y="140.5" width="12" height="2.5" rx="1" fill="rgba(255,255,255,0.7)" />
+
+            {/* Typing text growing */}
+            <rect x="145" y="148" width="0" height="3" rx="1.5" fill="rgba(52,211,153,0.25)">
+              <animate attributeName="width" values="0;50;50;0" keyTimes="0;0.35;0.85;1" dur="4s" repeatCount="indefinite" />
+            </rect>
+          </motion.g>
+
         </g>
       </svg>
     </motion.div>

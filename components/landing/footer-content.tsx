@@ -27,6 +27,12 @@ export function FooterContent() {
         {/* Right: Nav columns */}
         <div className="flex items-center gap-8">
           <Link
+            href="/docs"
+            className="text-sm text-zinc-500 hover:text-zinc-300 transition-colors"
+          >
+            {t('nav.docs')}
+          </Link>
+          <Link
             href="/blogs"
             className="text-sm text-zinc-500 hover:text-zinc-300 transition-colors"
           >

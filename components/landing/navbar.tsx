@@ -9,8 +9,9 @@ export function Navbar({ minimal = false }: { minimal?: boolean }) {
   const { t } = useLocale()
 
   return (
-    <header className="fixed top-0 w-full z-50 px-4 md:px-6 py-4 bg-[#0c0c0e]/80 backdrop-blur-md border-b border-white/5 relative">
-      <div className="max-w-5xl mx-auto flex items-center justify-between">
+    <header className="fixed top-0 w-full z-50 px-4 md:px-6 py-4 bg-zinc-950/70 backdrop-blur-md
+     border-b border-xs border-zinc-300/5">
+      <div className="max-w-5xl mx-auto flex items-center justify-between relative">
         <Link href="/" className="flex items-center gap-2.5">
            <img
               src="/landing/claritylogopurple.png"
@@ -21,8 +22,14 @@ export function Navbar({ minimal = false }: { minimal?: boolean }) {
 
         {!minimal && (
           <>
-            {/* Center — Blog link */}
-            <nav className="absolute left-1/2 -translate-x-1/2 hidden md:block">
+            {/* Center — Blog + Docs links */}
+            <nav className="absolute left-1/2 -translate-x-1/2 hidden md:flex items-center gap-6">
+              <Link
+                href="/docs"
+                className="text-sm font-medium text-zinc-400 transition-colors hover:text-white"
+              >
+                {t('nav.docs')}
+              </Link>
               <Link
                 href="/blogs"
                 className="text-sm font-medium text-zinc-400 transition-colors hover:text-white"
@@ -33,6 +40,12 @@ export function Navbar({ minimal = false }: { minimal?: boolean }) {
 
             {/* Right — Discord, Language, Auth */}
             <div className="flex items-center gap-4">
+              <Link
+                href="/docs"
+                className="text-sm font-medium text-zinc-400 transition-colors hover:text-white md:hidden"
+              >
+                {t('nav.docs')}
+              </Link>
               <Link
                 href="/blogs"
                 className="text-sm font-medium text-zinc-400 transition-colors hover:text-white md:hidden"

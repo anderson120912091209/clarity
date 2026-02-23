@@ -1,4 +1,5 @@
 {
+  "nav.docs": "Docs",
   "nav.blogs": "Blogs",
   "nav.discord_aria": "Join our Discord",
   "nav.signin": "Sign in",
@@ -41,7 +42,7 @@
   "pricing.free_desc": "For drafting and previews.",
   "pricing.free_feature_1": "Editor & LaTeX/Typst",
   "pricing.free_feature_2": "Cloud preview",
-  "pricing.free_feature_3": "One project",
+  "pricing.free_feature_3": "One shared project",
   "pricing.free_cta": "Start free",
   "pricing.pro_label": "Supporter",
   "pricing.pro_price": "$9",
