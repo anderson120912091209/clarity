@@ -428,9 +428,7 @@ export const CodeEditor = ({
 
   const editorTheme =
     syntaxTheme === 'shiki' && !isShikiReady
-      ? isDark
-        ? 'vs-dark'
-        : 'vs'
+      ? 'vs-dark'
       : resolveMonacoThemeForSyntaxTheme(syntaxTheme, isDark)
 
   return (

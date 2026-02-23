@@ -61,7 +61,7 @@ function getSetupPromise(): Promise<ShikiSetupResult> {
       const { shikiToMonaco } = shikiMonacoModule
 
       const highlighter = await createHighlighter({
-        themes: ['vitesse-dark', 'vitesse-light'],
+        themes: ['vitesse-dark'],
         langs: SUPPORTED_EDITOR_LANGUAGES.map((languageId) =>
           getShikiLanguageId(languageId)
         ),
@@ -102,13 +102,13 @@ export async function setupShikiMonaco(monacoInstance: typeof monaco): Promise<v
   const editorWithAlias = monacoInstance.editor as MonacoEditorWithShikiAlias
   const currentSetTheme = monacoInstance.editor.setTheme
   if (editorWithAlias.__shikiThemeAliasBase !== currentSetTheme) {
+    // All theme aliases map to vitesse-dark — editor is always dark.
     monacoInstance.editor.setTheme = (themeName: string) => {
       const mapped =
         themeName === 'light' || themeName === 'vs'
-          ? 'vitesse-light'
-          : themeName === 'dark' || themeName === 'vs-dark' || themeName === 'cursor-dark'
-            ? 'vitesse-dark'
-            : themeName
+        || themeName === 'dark' || themeName === 'vs-dark' || themeName === 'cursor-dark'
+          ? 'vitesse-dark'
+          : themeName
       return currentSetTheme.call(monacoInstance.editor, mapped)
     }
     editorWithAlias.__shikiThemeAliasBase = currentSetTheme

@@ -17,7 +17,8 @@ export function resolveMonacoThemeForSyntaxTheme(
   isDark: boolean
 ): string {
   if (syntaxTheme === 'shiki') {
-    return isDark ? 'vitesse-dark' : 'vitesse-light'
+    // Shiki is always dark — no light mode variant.
+    return 'vitesse-dark'
   }
 
   return isDark ? 'vs-dark' : 'vs'
