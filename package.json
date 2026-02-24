@@ -3,9 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "NODE_OPTIONS='--max-http-header-size=65536' next dev",
     "build": "next build",
-    "start": "next start",
+    "start": "NODE_OPTIONS='--max-http-header-size=65536' next start",
     "lint": "next lint",
     "test:collab": "vitest run features/collaboration/__tests__",
     "test:eval": "vitest run lib/agent/__tests__/eval",

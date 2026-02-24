@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 595 842" width="595" height="842">
+  <rect width="595" height="842" fill="white"/>
+
+  <!-- Header block -->
+  <rect x="60" y="50" width="475" height="90" fill="#f8f9fa" stroke="#e0e0e0" stroke-width="0.5" rx="4"/>
+
+  <text x="297" y="78" font-family="Georgia, 'Linux Libertine', serif" font-size="18" font-weight="bold" fill="#1a1a1a" text-anchor="middle">Assignment Title</text>
+  <text x="297" y="98" font-family="Georgia, 'Linux Libertine', serif" font-size="12" fill="#555" text-anchor="middle">Course Subtitle</text>
+
+  <line x1="200" y1="108" x2="395" y2="108" stroke="#ddd" stroke-width="0.5"/>
+
+  <text x="180" y="128" font-family="Georgia, 'Linux Libertine', serif" font-size="9" fill="#666">Your Name</text>
+  <text x="280" y="128" font-family="Georgia, 'Linux Libertine', serif" font-size="9" fill="#666">CS 101</text>
+  <text x="380" y="128" font-family="Georgia, 'Linux Libertine', serif" font-size="9" fill="#666">Prof. Smith</text>
+
+  <!-- Problem 1 -->
+  <text x="72" y="180" font-family="Georgia, 'Linux Libertine', serif" font-size="15" font-weight="bold" fill="#1a1a1a">Problem 1</text>
+  <line x1="72" y1="187" x2="523" y2="187" stroke="#ddd" stroke-width="0.5"/>
+
+  <text x="72" y="210" font-family="Georgia, 'Linux Libertine', serif" font-size="10" fill="#333">Your solution goes here.</text>
+
+  <!-- Math equation -->
+  <text x="297" y="248" font-family="Georgia, 'Linux Libertine', serif" font-size="13" font-style="italic" fill="#333" text-anchor="middle">f(x) = x</text>
+  <text x="337" y="242" font-family="Georgia, 'Linux Libertine', serif" font-size="9" fill="#333">2</text>
+  <text x="345" y="248" font-family="Georgia, 'Linux Libertine', serif" font-size="13" fill="#333">+ 2x + 1</text>
+
+  <!-- Problem 2 -->
+  <text x="72" y="292" font-family="Georgia, 'Linux Libertine', serif" font-size="15" font-weight="bold" fill="#1a1a1a">Problem 2</text>
+  <line x1="72" y1="299" x2="523" y2="299" stroke="#ddd" stroke-width="0.5"/>
+
+  <text x="72" y="322" font-family="Georgia, 'Linux Libertine', serif" font-size="10" fill="#333">Describe your approach and solution.</text>
+
+  <text x="72" y="352" font-family="Georgia, 'Linux Libertine', serif" font-size="12" font-weight="bold" fill="#333">Part A</text>
+  <text x="72" y="372" font-family="Georgia, 'Linux Libertine', serif" font-size="10" fill="#333">Solution for Part A.</text>
+
+  <text x="72" y="402" font-family="Georgia, 'Linux Libertine', serif" font-size="12" font-weight="bold" fill="#333">Part B</text>
+  <text x="72" y="422" font-family="Georgia, 'Linux Libertine', serif" font-size="10" fill="#333">Solution for Part B.</text>
+
+  <!-- Problem 3 -->
+  <text x="72" y="462" font-family="Georgia, 'Linux Libertine', serif" font-size="15" font-weight="bold" fill="#1a1a1a">Problem 3</text>
+  <line x1="72" y1="469" x2="523" y2="469" stroke="#ddd" stroke-width="0.5"/>
+
+  <text x="72" y="492" font-family="Georgia, 'Linux Libertine', serif" font-size="10" fill="#333">Final problem solution.</text>
+
+  <text x="523" y="820" font-family="'Helvetica Neue', Arial, sans-serif" font-size="7" fill="#bbb" text-anchor="end">academic-alt</text>
+</svg>

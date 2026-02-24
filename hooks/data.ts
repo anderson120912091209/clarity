@@ -174,3 +174,81 @@ export function updateProject(projectId: string, fields: ProjectFields) {
 
   return db.transact([tx.projects[projectId].update(updateObject)])
 }
+
+export function getFolderProjects(folderId: string, userId?: string) {
+  return db.useQuery(
+    userId && folderId
+      ? {
+          projects: {
+            $: {
+              where: {
+                user_id: userId,
+                folder_id: folderId,
+              },
+            },
+          },
+        }
+      : null
+  )
+}
+
+// ── Folders ──────────────────────────────────────────────────────
+
+export function getAllFolders(userId?: string) {
+  return db.useQuery(
+    userId
+      ? {
+          folders: {
+            $: {
+              where: {
+                user_id: userId,
+              },
+            },
+          },
+        }
+      : null
+  )
+}
+
+export function createFolder(userId: string, name: string, color?: string) {
+  const folderId = crypto.randomUUID()
+  return db.transact([
+    tx.folders[folderId].update({
+      user_id: userId,
+      name,
+      color: color || '#6D78E7',
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    }),
+  ]).then(() => folderId)
+}
+
+export function renameFolder(folderId: string, name: string) {
+  return db.transact([
+    tx.folders[folderId].update({
+      name,
+      updated_at: new Date().toISOString(),
+    }),
+  ])
+}
+
+export function deleteFolder(folderId: string) {
+  return db.transact([tx.folders[folderId].delete()])
+}
+
+export function addProjectsToFolder(projectIds: string[], folderId: string) {
+  // Single batched transaction – InstantDB applies all ops atomically
+  return db.transact(
+    projectIds.map((pid) => tx.projects[pid].update({ folder_id: folderId }))
+  )
+}
+
+export function removeProjectsFromFolder(projectIds: string[]) {
+  return db.transact(
+    projectIds.map((pid) => tx.projects[pid].update({ folder_id: '' }))
+  )
+}
+
+export function removeProjectFromFolder(projectId: string) {
+  return removeProjectsFromFolder([projectId])
+}

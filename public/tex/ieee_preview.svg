@@ -1,0 +1,71 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 612 792" width="612" height="792">
+  <rect width="612" height="792" fill="white"/>
+
+  <!-- Two-column IEEE layout -->
+
+  <!-- Title -->
+  <text x="306" y="70" font-family="'Times New Roman', Georgia, serif" font-size="20" font-weight="bold" fill="#1a1a1a" text-anchor="middle">Conference Paper Title</text>
+
+  <!-- Author block -->
+  <text x="306" y="100" font-family="'Times New Roman', Georgia, serif" font-size="10" fill="#333" text-anchor="middle">Given Name Surname</text>
+  <text x="306" y="114" font-family="'Times New Roman', Georgia, serif" font-size="8" font-style="italic" fill="#555" text-anchor="middle">dept. name of organization</text>
+  <text x="306" y="126" font-family="'Times New Roman', Georgia, serif" font-size="8" font-style="italic" fill="#555" text-anchor="middle">City, Country</text>
+
+  <!-- Divider -->
+  <line x1="48" y1="142" x2="564" y2="142" stroke="#ddd" stroke-width="0.5"/>
+
+  <!-- Abstract -->
+  <text x="48" y="165" font-family="'Times New Roman', Georgia, serif" font-size="9" font-weight="bold" font-style="italic" fill="#1a1a1a">Abstract</text>
+  <text x="48" y="180" font-family="'Times New Roman', Georgia, serif" font-size="8" fill="#333">—This document is a model and instructions for</text>
+  <text x="48" y="192" font-family="'Times New Roman', Georgia, serif" font-size="8" fill="#333">LaTeX. This and the IEEEtran.cls file define the</text>
+  <text x="48" y="204" font-family="'Times New Roman', Georgia, serif" font-size="8" fill="#333">components of your paper.</text>
+
+  <!-- Keywords -->
+  <text x="48" y="224" font-family="'Times New Roman', Georgia, serif" font-size="8" font-weight="bold" font-style="italic" fill="#1a1a1a">Index Terms</text>
+  <text x="48" y="236" font-family="'Times New Roman', Georgia, serif" font-size="8" fill="#333">—component, formatting, style, styling, insert</text>
+
+  <!-- Column divider -->
+  <line x1="306" y1="256" x2="306" y2="750" stroke="#eee" stroke-width="0.5"/>
+
+  <!-- Left column -->
+  <!-- Section I -->
+  <text x="150" y="276" font-family="'Times New Roman', Georgia, serif" font-size="10" font-weight="bold" fill="#1a1a1a" text-anchor="middle">I. INTRODUCTION</text>
+
+  <rect x="48" y="290" width="246" height="8" rx="1" fill="#e0e0e0"/>
+  <rect x="48" y="304" width="246" height="8" rx="1" fill="#e0e0e0"/>
+  <rect x="48" y="318" width="246" height="8" rx="1" fill="#e0e0e0"/>
+  <rect x="48" y="332" width="180" height="8" rx="1" fill="#e0e0e0"/>
+
+  <!-- Section II -->
+  <text x="150" y="368" font-family="'Times New Roman', Georgia, serif" font-size="10" font-weight="bold" fill="#1a1a1a" text-anchor="middle">II. EASE OF USE</text>
+
+  <rect x="48" y="382" width="246" height="8" rx="1" fill="#e0e0e0"/>
+  <rect x="48" y="396" width="246" height="8" rx="1" fill="#e0e0e0"/>
+  <rect x="48" y="410" width="246" height="8" rx="1" fill="#e0e0e0"/>
+  <rect x="48" y="424" width="246" height="8" rx="1" fill="#e0e0e0"/>
+  <rect x="48" y="438" width="200" height="8" rx="1" fill="#e0e0e0"/>
+
+  <rect x="48" y="460" width="246" height="8" rx="1" fill="#e0e0e0"/>
+  <rect x="48" y="474" width="246" height="8" rx="1" fill="#e0e0e0"/>
+  <rect x="48" y="488" width="160" height="8" rx="1" fill="#e0e0e0"/>
+
+  <!-- Right column -->
+  <rect x="318" y="290" width="246" height="8" rx="1" fill="#e0e0e0"/>
+  <rect x="318" y="304" width="246" height="8" rx="1" fill="#e0e0e0"/>
+  <rect x="318" y="318" width="246" height="8" rx="1" fill="#e0e0e0"/>
+  <rect x="318" y="332" width="246" height="8" rx="1" fill="#e0e0e0"/>
+  <rect x="318" y="346" width="190" height="8" rx="1" fill="#e0e0e0"/>
+
+  <!-- Section III on right -->
+  <text x="441" y="382" font-family="'Times New Roman', Georgia, serif" font-size="10" font-weight="bold" fill="#1a1a1a" text-anchor="middle">III. PREPARE YOUR PAPER</text>
+
+  <rect x="318" y="396" width="246" height="8" rx="1" fill="#e0e0e0"/>
+  <rect x="318" y="410" width="246" height="8" rx="1" fill="#e0e0e0"/>
+  <rect x="318" y="424" width="246" height="8" rx="1" fill="#e0e0e0"/>
+  <rect x="318" y="438" width="246" height="8" rx="1" fill="#e0e0e0"/>
+  <rect x="318" y="452" width="246" height="8" rx="1" fill="#e0e0e0"/>
+  <rect x="318" y="466" width="170" height="8" rx="1" fill="#e0e0e0"/>
+
+  <!-- Branding -->
+  <text x="564" y="775" font-family="'Helvetica Neue', Arial, sans-serif" font-size="7" fill="#bbb" text-anchor="end">IEEE</text>
+</svg>

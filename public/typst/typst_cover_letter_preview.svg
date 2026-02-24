@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 595 842" width="595" height="842">
+  <rect width="595" height="842" fill="white"/>
+
+  <!-- Header with name -->
+  <text x="297" y="70" font-family="'PT Serif', Georgia, serif" font-size="24" font-weight="bold" fill="#1a1a1a" text-anchor="middle">Your Name</text>
+
+  <!-- Contact info row -->
+  <text x="297" y="92" font-family="'PT Serif', Georgia, serif" font-size="9" fill="#666" text-anchor="middle">City, State  |  123-456-7890  |  your.email@example.com  |  github.com/yourusername</text>
+
+  <line x1="72" y1="106" x2="523" y2="106" stroke="#ddd" stroke-width="0.5"/>
+
+  <!-- Recipient block -->
+  <text x="72" y="140" font-family="'PT Serif', Georgia, serif" font-size="12" font-weight="bold" fill="#1a1a1a">Application for Software Engineer</text>
+
+  <text x="72" y="168" font-family="'PT Serif', Georgia, serif" font-size="10" fill="#444">Department of Engineering</text>
+  <text x="72" y="184" font-family="'PT Serif', Georgia, serif" font-size="10" fill="#444">Company Name</text>
+  <text x="72" y="200" font-family="'PT Serif', Georgia, serif" font-size="10" fill="#444">City, State</text>
+
+  <!-- Greeting -->
+  <text x="72" y="240" font-family="'PT Serif', Georgia, serif" font-size="11" fill="#333">Dear Hiring Manager,</text>
+
+  <!-- Body paragraphs -->
+  <text x="72" y="274" font-family="'PT Serif', Georgia, serif" font-size="10" fill="#333">I am writing to express my interest in the Software Engineer position at</text>
+  <text x="72" y="290" font-family="'PT Serif', Georgia, serif" font-size="10" fill="#333">Company Name. With my background in computer science and experience in</text>
+  <text x="72" y="306" font-family="'PT Serif', Georgia, serif" font-size="10" fill="#333">software development, I believe I would be a valuable addition to your team.</text>
+
+  <text x="72" y="334" font-family="'PT Serif', Georgia, serif" font-size="10" fill="#333">In my current role, I have gained extensive experience in developing and</text>
+  <text x="72" y="350" font-family="'PT Serif', Georgia, serif" font-size="10" fill="#333">maintaining web applications. I have worked with modern technologies</text>
+  <text x="72" y="366" font-family="'PT Serif', Georgia, serif" font-size="10" fill="#333">including React, Node.js, and cloud platforms, delivering high-quality</text>
+  <text x="72" y="382" font-family="'PT Serif', Georgia, serif" font-size="10" fill="#333">solutions that serve thousands of users daily.</text>
+
+  <text x="72" y="410" font-family="'PT Serif', Georgia, serif" font-size="10" fill="#333">I am particularly drawn to Company Name because of your commitment to</text>
+  <text x="72" y="426" font-family="'PT Serif', Georgia, serif" font-size="10" fill="#333">innovation and the opportunity to work on impactful projects.</text>
+
+  <text x="72" y="454" font-family="'PT Serif', Georgia, serif" font-size="10" fill="#333">Thank you for considering my application. I look forward to the opportunity</text>
+  <text x="72" y="470" font-family="'PT Serif', Georgia, serif" font-size="10" fill="#333">to discuss how my experience and skills align with your needs.</text>
+
+  <!-- Closing -->
+  <text x="72" y="510" font-family="'PT Serif', Georgia, serif" font-size="11" fill="#333">Best regards,</text>
+  <text x="72" y="546" font-family="'PT Serif', Georgia, serif" font-size="11" fill="#333">Your Name</text>
+
+  <text x="523" y="820" font-family="'Helvetica Neue', Arial, sans-serif" font-size="7" fill="#bbb" text-anchor="end">modernpro-coverletter</text>
+</svg>

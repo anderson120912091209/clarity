@@ -1,0 +1,55 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 595 842" width="595" height="842">
+  <rect width="595" height="842" fill="#1a1f2e"/>
+
+  <!-- Title slide centered in portrait frame -->
+  <rect x="32" y="60" width="531" height="299" rx="6" fill="white"/>
+
+  <!-- Madrid top bar -->
+  <rect x="32" y="60" width="531" height="32" rx="6" fill="#2c3e6b"/>
+  <rect x="32" y="80" width="531" height="12" fill="#2c3e6b"/>
+
+  <!-- Title block -->
+  <rect x="100" y="120" width="395" height="150" rx="5" fill="#2c3e6b"/>
+  <text x="297" y="168" font-family="'Helvetica Neue', Arial, sans-serif" font-size="18" font-weight="bold" fill="white" text-anchor="middle">Presentation Title</text>
+  <text x="297" y="192" font-family="'Helvetica Neue', Arial, sans-serif" font-size="11" fill="rgba(255,255,255,0.8)" text-anchor="middle">A Subtitle</text>
+  <line x1="160" y1="202" x2="435" y2="202" stroke="rgba(255,255,255,0.25)" stroke-width="0.5"/>
+  <text x="297" y="222" font-family="'Helvetica Neue', Arial, sans-serif" font-size="10" fill="rgba(255,255,255,0.85)" text-anchor="middle">Author Name</text>
+  <text x="297" y="238" font-family="'Helvetica Neue', Arial, sans-serif" font-size="9" fill="rgba(255,255,255,0.55)" text-anchor="middle">Institute Name</text>
+  <text x="297" y="256" font-family="'Helvetica Neue', Arial, sans-serif" font-size="8" fill="rgba(255,255,255,0.45)" text-anchor="middle">February 25, 2026</text>
+
+  <!-- Navigation dots -->
+  <circle cx="275" cy="310" r="2" fill="#2c3e6b"/>
+  <circle cx="288" cy="310" r="2" fill="#2c3e6b" opacity="0.3"/>
+  <circle cx="301" cy="310" r="2" fill="#2c3e6b" opacity="0.3"/>
+  <circle cx="314" cy="310" r="2" fill="#2c3e6b" opacity="0.3"/>
+
+  <!-- Madrid bottom bar -->
+  <rect x="32" y="327" width="531" height="32" rx="6" fill="#2c3e6b"/>
+  <rect x="32" y="327" width="531" height="12" fill="#2c3e6b"/>
+  <text x="297" y="349" font-family="'Helvetica Neue', Arial, sans-serif" font-size="7" fill="rgba(255,255,255,0.5)" text-anchor="middle">Author Name — Presentation Title</text>
+
+  <!-- Second slide: content -->
+  <rect x="32" y="395" width="531" height="299" rx="6" fill="white"/>
+
+  <!-- Madrid top bar slide 2 -->
+  <rect x="32" y="395" width="531" height="32" rx="6" fill="#2c3e6b"/>
+  <rect x="32" y="415" width="531" height="12" fill="#2c3e6b"/>
+  <text x="52" y="416" font-family="'Helvetica Neue', Arial, sans-serif" font-size="13" font-weight="bold" fill="white">Introduction</text>
+
+  <!-- Bullet items -->
+  <text x="72" y="460" font-family="'Helvetica Neue', Arial, sans-serif" font-size="11" fill="#333">&#x2022;  Item 1</text>
+  <text x="72" y="484" font-family="'Helvetica Neue', Arial, sans-serif" font-size="11" fill="#333">&#x2022;  Item 2</text>
+  <text x="72" y="508" font-family="'Helvetica Neue', Arial, sans-serif" font-size="11" fill="#333">&#x2022;  Item 3</text>
+
+  <!-- Madrid bottom bar slide 2 -->
+  <rect x="32" y="662" width="531" height="32" rx="6" fill="#2c3e6b"/>
+  <rect x="32" y="662" width="531" height="12" fill="#2c3e6b"/>
+  <text x="297" y="684" font-family="'Helvetica Neue', Arial, sans-serif" font-size="7" fill="rgba(255,255,255,0.5)" text-anchor="middle">Author Name — Presentation Title</text>
+  <text x="540" y="684" font-family="'Helvetica Neue', Arial, sans-serif" font-size="7" fill="rgba(255,255,255,0.5)" text-anchor="end">2 / 5</text>
+
+  <!-- Third slide hint -->
+  <rect x="32" y="730" width="531" height="60" rx="6" fill="#2c3e6b" opacity="0.2"/>
+
+  <!-- Branding -->
+  <text x="530" y="818" font-family="'Helvetica Neue', Arial, sans-serif" font-size="8" fill="rgba(255,255,255,0.25)" text-anchor="end">Madrid</text>
+</svg>

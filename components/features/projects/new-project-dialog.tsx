@@ -10,8 +10,8 @@ import { useFrontend } from '@/contexts/FrontendContext'
 import { useDashboardSettings } from '@/contexts/DashboardSettingsContext'
 import { db } from '@/lib/constants'
 import { tx, id } from '@instantdb/react'
-import { templateContent, typstTemplateContent } from '@/lib/constants/templates'
-import { latexTemplates, typstTemplates } from '@/lib/constants/templates'
+import { templateContent, typstTemplateContent, latexTemplates, typstTemplates } from '@/lib/constants/templates'
+import { uploadTemplatePlaceholders } from '@/lib/utils/upload-template-placeholders'
 import TemplateCard from '@/components/projects/template-card'
 import { FileText, Loader2, ArrowRight, LayoutTemplate, Command, CheckIcon } from 'lucide-react'
 import { getWorkspaceName, cn } from '@/lib/utils'
@@ -104,7 +104,14 @@ export function NewProjectDialog({ children, open: controlledOpen, onOpenChange:
         }
     
         const fileStructure = createFileStructure()
-    
+
+        // Upload placeholder images referenced by the template (e.g. fig1.png)
+        const placeholderOps = await uploadTemplatePlaceholders(
+          selectedTemplate,
+          user.id,
+          newProjectId,
+        )
+
         await db.transact([
           tx.projects[newProjectId].update({
             user_id: user.id,
@@ -136,6 +143,7 @@ export function NewProjectDialog({ children, open: controlledOpen, onOpenChange:
               pathname: node.pathname,
             })
           ),
+          ...placeholderOps,
         ])
 
         // Track quick project creation event

@@ -117,6 +117,13 @@ const _schema = i.schema({
       role: i.string().optional(),
       token: i.string().optional(),
     }),
+    folders: i.entity({
+      user_id: i.string(),
+      name: i.string(),
+      color: i.string().optional(),
+      created_at: i.string(),
+      updated_at: i.string().optional(),
+    }),
     projects: i.entity({
       activeChatThreadId: i.string().optional(),
       activeFileId: i.string().optional(),
@@ -126,6 +133,7 @@ const _schema = i.schema({
       cachedPreviewUrl: i.string().optional(),
       created_at: i.string().optional(),
       document_class: i.string().optional(),
+      folder_id: i.string().optional(),
       isAutoFetching: i.boolean().optional(),
       isPdfCaretNavigationEnabled: i.boolean().optional(),
       last_compiled: i.string().optional(),

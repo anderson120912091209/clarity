@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 595 842" width="595" height="842">
+  <rect width="595" height="842" fill="white"/>
+
+  <!-- Title Page - Centered -->
+  <text x="297" y="380" font-family="Georgia, 'Linux Libertine', serif" font-size="28" font-weight="bold" fill="#1a1a1a" text-anchor="middle">Report Title</text>
+
+  <line x1="200" y1="400" x2="395" y2="400" stroke="#ddd" stroke-width="0.8"/>
+
+  <text x="297" y="440" font-family="Georgia, 'Linux Libertine', serif" font-size="13" fill="#444" text-anchor="middle">Author Name</text>
+
+  <text x="297" y="470" font-family="Georgia, 'Linux Libertine', serif" font-size="12" fill="#666" text-anchor="middle">February 25, 2026</text>
+
+  <!-- Page number -->
+  <text x="297" y="810" font-family="Georgia, 'Linux Libertine', serif" font-size="10" fill="#888" text-anchor="middle">1</text>
+
+  <!-- Subtle Typst branding -->
+  <text x="523" y="820" font-family="'Helvetica Neue', Arial, sans-serif" font-size="7" fill="#bbb" text-anchor="end">Typst</text>
+</svg>

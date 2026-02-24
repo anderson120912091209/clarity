@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 595 842" width="595" height="842">
+  <rect width="595" height="842" fill="white"/>
+
+  <!-- Title -->
+  <text x="72" y="90" font-family="Georgia, 'Linux Libertine', serif" font-size="22" font-weight="bold" fill="#1a1a1a">Document Title</text>
+  <line x1="72" y1="98" x2="523" y2="98" stroke="#1a1a1a" stroke-width="1.2"/>
+
+  <!-- Section: Introduction -->
+  <text x="72" y="140" font-family="Georgia, 'Linux Libertine', serif" font-size="16" font-weight="bold" fill="#1a1a1a">Introduction</text>
+  <line x1="72" y1="147" x2="523" y2="147" stroke="#cccccc" stroke-width="0.5"/>
+
+  <text x="72" y="170" font-family="Georgia, 'Linux Libertine', serif" font-size="11" fill="#333">This is a blank Typst document. You can start typing your</text>
+  <text x="72" y="186" font-family="Georgia, 'Linux Libertine', serif" font-size="11" fill="#333">content here.</text>
+
+  <!-- Section -->
+  <text x="72" y="226" font-family="Georgia, 'Linux Libertine', serif" font-size="16" font-weight="bold" fill="#1a1a1a">Section</text>
+  <line x1="72" y1="233" x2="523" y2="233" stroke="#cccccc" stroke-width="0.5"/>
+
+  <text x="72" y="256" font-family="Georgia, 'Linux Libertine', serif" font-size="11" fill="#333">Math is simple: </text>
+  <text x="185" y="256" font-family="Georgia, 'Linux Libertine', serif" font-size="11" font-style="italic" fill="#333">E = mc</text>
+  <text x="232" y="250" font-family="Georgia, 'Linux Libertine', serif" font-size="8" fill="#333">2</text>
+  <text x="238" y="256" font-family="Georgia, 'Linux Libertine', serif" font-size="11" fill="#333">.</text>
+
+  <!-- Subtle Typst branding -->
+  <text x="523" y="820" font-family="'Helvetica Neue', Arial, sans-serif" font-size="7" fill="#bbb" text-anchor="end">Typst</text>
+</svg>

@@ -1,0 +1,67 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 612 792" width="612" height="792">
+  <rect width="612" height="792" fill="white"/>
+
+  <!-- Header -->
+  <text x="306" y="48" font-family="'Computer Modern', Georgia, serif" font-size="22" font-weight="bold" fill="#26428b" text-anchor="middle">Your Name</text>
+  <text x="306" y="68" font-family="'Computer Modern', Georgia, serif" font-size="8.5" fill="#555" text-anchor="middle">City, State | your.email@example.com | 123-456-7890 | github.com/yourusername</text>
+
+  <!-- Education Section -->
+  <text x="36" y="100" font-family="'Computer Modern', Georgia, serif" font-size="13" font-weight="bold" fill="#26428b">EDUCATION</text>
+  <line x1="36" y1="106" x2="576" y2="106" stroke="#26428b" stroke-width="1"/>
+
+  <text x="36" y="126" font-family="'Computer Modern', Georgia, serif" font-size="10" font-weight="bold" fill="#1a1a1a">University Name</text>
+  <text x="576" y="126" font-family="'Computer Modern', Georgia, serif" font-size="10" fill="#333" text-anchor="end">Aug 2023 - May 2027</text>
+  <text x="36" y="142" font-family="'Computer Modern', Georgia, serif" font-size="10" font-style="italic" fill="#444">Bachelor's of Science, Computer Science</text>
+  <text x="576" y="142" font-family="'Computer Modern', Georgia, serif" font-size="10" font-style="italic" fill="#444" text-anchor="end">City, State</text>
+
+  <circle cx="46" cy="160" r="1.5" fill="#444"/>
+  <text x="54" y="164" font-family="'Computer Modern', Georgia, serif" font-size="9" fill="#444">Cumulative GPA: 4.0/4.0 | Dean's List, Merit Scholarship</text>
+  <circle cx="46" cy="178" r="1.5" fill="#444"/>
+  <text x="54" y="182" font-family="'Computer Modern', Georgia, serif" font-size="9" fill="#444">Relevant Coursework: Data Structures, Algorithms, Linear Algebra</text>
+
+  <!-- Work Experience Section -->
+  <text x="36" y="214" font-family="'Computer Modern', Georgia, serif" font-size="13" font-weight="bold" fill="#26428b">WORK EXPERIENCE</text>
+  <line x1="36" y1="220" x2="576" y2="220" stroke="#26428b" stroke-width="1"/>
+
+  <text x="36" y="240" font-family="'Computer Modern', Georgia, serif" font-size="10" font-weight="bold" fill="#1a1a1a">Software Engineer</text>
+  <text x="576" y="240" font-family="'Computer Modern', Georgia, serif" font-size="10" fill="#333" text-anchor="end">May 2024 - Present</text>
+  <text x="36" y="256" font-family="'Computer Modern', Georgia, serif" font-size="10" font-style="italic" fill="#444">Company Name</text>
+  <text x="576" y="256" font-family="'Computer Modern', Georgia, serif" font-size="10" font-style="italic" fill="#444" text-anchor="end">City, State</text>
+
+  <circle cx="46" cy="274" r="1.5" fill="#444"/>
+  <text x="54" y="278" font-family="'Computer Modern', Georgia, serif" font-size="9" fill="#444">Developed and maintained key features for the flagship product</text>
+  <circle cx="46" cy="292" r="1.5" fill="#444"/>
+  <text x="54" y="296" font-family="'Computer Modern', Georgia, serif" font-size="9" fill="#444">Optimized database queries reducing response time by 40%</text>
+  <circle cx="46" cy="310" r="1.5" fill="#444"/>
+  <text x="54" y="314" font-family="'Computer Modern', Georgia, serif" font-size="9" fill="#444">Collaborated with cross-functional teams to deliver projects on schedule</text>
+
+  <text x="36" y="342" font-family="'Computer Modern', Georgia, serif" font-size="10" font-weight="bold" fill="#1a1a1a">Software Engineering Intern</text>
+  <text x="576" y="342" font-family="'Computer Modern', Georgia, serif" font-size="10" fill="#333" text-anchor="end">Jun 2023 - Aug 2023</text>
+  <text x="36" y="358" font-family="'Computer Modern', Georgia, serif" font-size="10" font-style="italic" fill="#444">Another Company</text>
+
+  <circle cx="46" cy="376" r="1.5" fill="#444"/>
+  <text x="54" y="380" font-family="'Computer Modern', Georgia, serif" font-size="9" fill="#444">Built RESTful APIs serving 10,000+ daily requests</text>
+  <circle cx="46" cy="394" r="1.5" fill="#444"/>
+  <text x="54" y="398" font-family="'Computer Modern', Georgia, serif" font-size="9" fill="#444">Implemented automated testing pipeline increasing coverage to 85%</text>
+
+  <!-- Projects Section -->
+  <text x="36" y="430" font-family="'Computer Modern', Georgia, serif" font-size="13" font-weight="bold" fill="#26428b">PROJECTS</text>
+  <line x1="36" y1="436" x2="576" y2="436" stroke="#26428b" stroke-width="1"/>
+
+  <text x="36" y="456" font-family="'Computer Modern', Georgia, serif" font-size="10" font-weight="bold" fill="#1a1a1a">Project Name</text>
+  <text x="576" y="456" font-family="'Computer Modern', Georgia, serif" font-size="10" fill="#333" text-anchor="end">Nov 2023 - Present</text>
+
+  <circle cx="46" cy="474" r="1.5" fill="#444"/>
+  <text x="54" y="478" font-family="'Computer Modern', Georgia, serif" font-size="9" fill="#444">Built a full-stack web application with TypeScript, React, and PostgreSQL</text>
+
+  <!-- Skills Section -->
+  <text x="36" y="510" font-family="'Computer Modern', Georgia, serif" font-size="13" font-weight="bold" fill="#26428b">SKILLS</text>
+  <line x1="36" y1="516" x2="576" y2="516" stroke="#26428b" stroke-width="1"/>
+
+  <circle cx="46" cy="534" r="1.5" fill="#444"/>
+  <text x="54" y="538" font-family="'Computer Modern', Georgia, serif" font-size="9" fill="#444">Programming Languages: JavaScript, Python, TypeScript, Java, C++, SQL</text>
+  <circle cx="46" cy="552" r="1.5" fill="#444"/>
+  <text x="54" y="556" font-family="'Computer Modern', Georgia, serif" font-size="9" fill="#444">Technologies: React, Node.js, PostgreSQL, Docker, Git, AWS, Linux</text>
+
+  <text x="576" y="775" font-family="'Helvetica Neue', Arial, sans-serif" font-size="7" fill="#bbb" text-anchor="end">basic-resume</text>
+</svg>

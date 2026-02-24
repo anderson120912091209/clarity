@@ -82,6 +82,17 @@ const rules = {
     bind: ["isOwner", "auth.id != null && auth.id == data.user_id"],
   },
 
+  // Folders are user-owned organizational containers for projects.
+  folders: {
+    allow: {
+      view: "isOwner",
+      create: "isOwner",
+      update: "isOwner",
+      delete: "isOwner",
+    },
+    bind: ["isOwner", "auth.id != null && auth.id == data.user_id"],
+  },
+
   // Subscription rows are user-owned and determine entitlement limits.
   account_plans: {
     allow: {

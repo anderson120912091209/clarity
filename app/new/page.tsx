@@ -9,6 +9,7 @@ import { tx, id } from '@instantdb/react'
 import { CheckIcon, FileText, LayoutTemplate, Command, FileCode2, FileType2, ArrowLeft, Loader2 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { templateContent, typstTemplateContent, latexTemplates, typstTemplates, Template } from '@/lib/constants/templates'
+import { uploadTemplatePlaceholders } from '@/lib/utils/upload-template-placeholders'
 import TemplateCard from '@/components/projects/template-card'
 import { useFrontend } from '@/contexts/FrontendContext'
 import { useDashboardSettings } from '@/contexts/DashboardSettingsContext'
@@ -117,6 +118,13 @@ export default function NewDocument() {
             },
         ]
 
+        // Upload placeholder images referenced by the template (e.g. fig1.png)
+        const placeholderOps = await uploadTemplatePlaceholders(
+            selectedTemplate.id,
+            userId,
+            newProjectId,
+        )
+
         await db.transact([
             tx.projects[newProjectId].update({
                 user_id: userId,
@@ -148,6 +156,7 @@ export default function NewDocument() {
                 pathname: node.pathname,
                 })
             ),
+            ...placeholderOps,
         ])
 
         // Track project creation event

@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 595 842" width="595" height="842">
+  <rect width="595" height="842" fill="white"/>
+
+  <!-- Sender address -->
+  <text x="72" y="80" font-family="Georgia, 'Linux Libertine', serif" font-size="11" fill="#333">Your Name</text>
+  <text x="72" y="96" font-family="Georgia, 'Linux Libertine', serif" font-size="11" fill="#333">123 Your Street</text>
+  <text x="72" y="112" font-family="Georgia, 'Linux Libertine', serif" font-size="11" fill="#333">Your City, ST 12345</text>
+  <text x="72" y="128" font-family="Georgia, 'Linux Libertine', serif" font-size="11" fill="#333">your.email@example.com</text>
+
+  <!-- Date -->
+  <text x="72" y="164" font-family="Georgia, 'Linux Libertine', serif" font-size="11" fill="#333">February 25, 2026</text>
+
+  <!-- Recipient address -->
+  <text x="72" y="204" font-family="Georgia, 'Linux Libertine', serif" font-size="11" fill="#333">Recipient Name</text>
+  <text x="72" y="220" font-family="Georgia, 'Linux Libertine', serif" font-size="11" fill="#333">Recipient Title</text>
+  <text x="72" y="236" font-family="Georgia, 'Linux Libertine', serif" font-size="11" fill="#333">Company Name</text>
+  <text x="72" y="252" font-family="Georgia, 'Linux Libertine', serif" font-size="11" fill="#333">123 Company Street</text>
+  <text x="72" y="268" font-family="Georgia, 'Linux Libertine', serif" font-size="11" fill="#333">Company City, ST 67890</text>
+
+  <!-- Greeting -->
+  <text x="72" y="320" font-family="Georgia, 'Linux Libertine', serif" font-size="11" fill="#333">Dear Recipient Name,</text>
+
+  <!-- Body -->
+  <text x="72" y="360" font-family="Georgia, 'Linux Libertine', serif" font-size="11" fill="#333">I am writing to you today to...</text>
+
+  <!-- Closing -->
+  <text x="72" y="420" font-family="Georgia, 'Linux Libertine', serif" font-size="11" fill="#333">Sincerely,</text>
+
+  <!-- Signature -->
+  <text x="72" y="480" font-family="Georgia, 'Linux Libertine', serif" font-size="11" fill="#333">Your Name</text>
+
+  <!-- Subtle Typst branding -->
+  <text x="523" y="820" font-family="'Helvetica Neue', Arial, sans-serif" font-size="7" fill="#bbb" text-anchor="end">Typst</text>
+</svg>

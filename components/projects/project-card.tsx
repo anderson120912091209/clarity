@@ -22,7 +22,7 @@ import { formatRelativeTime } from '@/lib/utils/time'
 import { useDashboardSettings } from '@/contexts/DashboardSettingsContext'
 import { fetchPdf } from '@/lib/utils/pdf-utils'
 
-export default function ProjectCard({ project, detailed = false, loading = false }: { project?: any; detailed?: boolean; loading?: boolean }) {
+export default function ProjectCard({ project, detailed = false, loading = false, isSelected = false }: { project?: any; detailed?: boolean; loading?: boolean; isSelected?: boolean }) {
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [newTitle, setNewTitle] = useState(project?.title || '')
   const [isDropdownOpen, setIsDropdownOpen] = useState(false)
@@ -291,7 +291,7 @@ export default function ProjectCard({ project, detailed = false, loading = false
         className="group relative block outline-none"
       >
         {/* Card Cover */}
-        <div className="relative aspect-[3/4] w-full overflow-hidden rounded-md border border-white/[0.1] bg-gradient-to-br from-[#131314] to-[#0a0a0b] shadow-[0_2px_8px_rgba(0,0,0,0.4)] transition-all duration-300 group-hover:shadow-[0_8px_24px_rgba(0,0,0,0.5)] group-hover:border-white/[0.18] group-focus-visible:ring-2 group-focus-visible:ring-white/30 group-focus-visible:ring-offset-2 group-focus-visible:ring-offset-[#090909]">
+        <div className={`relative aspect-[3/4] w-full overflow-hidden rounded-md border bg-gradient-to-br from-[#131314] to-[#0a0a0b] shadow-[0_2px_8px_rgba(0,0,0,0.4)] transition-all duration-300 group-hover:shadow-[0_8px_24px_rgba(0,0,0,0.5)] group-hover:border-white/[0.18] group-focus-visible:ring-2 group-focus-visible:ring-white/30 group-focus-visible:ring-offset-2 group-focus-visible:ring-offset-[#090909] ${isSelected ? 'ring-2 ring-[#6D78E7] border-[#6D78E7]/40' : 'border-white/[0.1]'}`}>
           {/* Document Preview */}
           <Image
             src={!imageError && imageURL ? imageURL : '/placeholder.svg'}

@@ -1,0 +1,53 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 595 842" width="595" height="842">
+  <rect width="595" height="842" fill="white"/>
+
+  <!-- Slide 1 (Title) -->
+  <rect x="40" y="40" width="515" height="290" fill="#fafafa" stroke="#e0e0e0" stroke-width="0.8" rx="3"/>
+  <rect x="40" y="40" width="515" height="5" fill="#4a6fa5" rx="3"/>
+
+  <text x="297" y="170" font-family="'Helvetica Neue', Arial, sans-serif" font-size="22" font-weight="bold" fill="#1a1a1a" text-anchor="middle">Welcome</text>
+  <line x1="220" y1="182" x2="375" y2="182" stroke="#4a6fa5" stroke-width="1.5"/>
+  <text x="297" y="208" font-family="'Helvetica Neue', Arial, sans-serif" font-size="11" fill="#555" text-anchor="middle">A presentation built with Touying</text>
+  <text x="297" y="228" font-family="'Helvetica Neue', Arial, sans-serif" font-size="9" fill="#888" text-anchor="middle">Author Name</text>
+
+  <!-- Slide indicator -->
+  <circle cx="285" cy="316" r="3" fill="#4a6fa5"/>
+  <circle cx="297" cy="316" r="3" fill="#ddd"/>
+  <circle cx="309" cy="316" r="3" fill="#ddd"/>
+
+  <!-- Slide 2 (Key Features) -->
+  <rect x="40" y="360" width="515" height="290" fill="#fafafa" stroke="#e0e0e0" stroke-width="0.8" rx="3"/>
+  <rect x="40" y="360" width="515" height="5" fill="#4a6fa5" rx="3"/>
+
+  <text x="297" y="400" font-family="'Helvetica Neue', Arial, sans-serif" font-size="16" font-weight="bold" fill="#1a1a1a" text-anchor="middle">Key Features</text>
+  <line x1="220" y1="410" x2="375" y2="410" stroke="#4a6fa5" stroke-width="1"/>
+
+  <circle cx="148" cy="440" r="2" fill="#4a6fa5"/>
+  <text x="158" y="444" font-family="'Helvetica Neue', Arial, sans-serif" font-size="10" fill="#333">Simple and clean slides</text>
+
+  <circle cx="148" cy="464" r="2" fill="#4a6fa5"/>
+  <text x="158" y="468" font-family="'Helvetica Neue', Arial, sans-serif" font-size="10" fill="#333">Support for animations</text>
+
+  <circle cx="148" cy="488" r="2" fill="#4a6fa5"/>
+  <text x="158" y="492" font-family="'Helvetica Neue', Arial, sans-serif" font-size="10" fill="#333">Multiple built-in themes</text>
+
+  <circle cx="148" cy="512" r="2" fill="#4a6fa5"/>
+  <text x="158" y="516" font-family="'Helvetica Neue', Arial, sans-serif" font-size="10" fill="#333">Easy to customize</text>
+
+  <!-- Slide indicator -->
+  <circle cx="285" cy="636" r="3" fill="#ddd"/>
+  <circle cx="297" cy="636" r="3" fill="#4a6fa5"/>
+  <circle cx="309" cy="636" r="3" fill="#ddd"/>
+
+  <!-- Slide 3 (Math, partial) -->
+  <rect x="40" y="680" width="515" height="140" fill="#fafafa" stroke="#e0e0e0" stroke-width="0.8" rx="3"/>
+  <rect x="40" y="680" width="515" height="5" fill="#4a6fa5" rx="3"/>
+
+  <text x="297" y="720" font-family="'Helvetica Neue', Arial, sans-serif" font-size="16" font-weight="bold" fill="#1a1a1a" text-anchor="middle">Math Support</text>
+  <line x1="220" y1="730" x2="375" y2="730" stroke="#4a6fa5" stroke-width="1"/>
+
+  <text x="297" y="762" font-family="Georgia, serif" font-size="13" font-style="italic" fill="#333" text-anchor="middle">E = mc</text>
+  <text x="330" y="755" font-family="Georgia, serif" font-size="9" fill="#333">2</text>
+
+  <text x="523" y="820" font-family="'Helvetica Neue', Arial, sans-serif" font-size="7" fill="#bbb" text-anchor="end">touying</text>
+</svg>

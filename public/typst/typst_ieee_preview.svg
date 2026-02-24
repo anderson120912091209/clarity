@@ -1,0 +1,54 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 612 792" width="612" height="792">
+  <rect width="612" height="792" fill="white"/>
+
+  <!-- IEEE Paper Title -->
+  <text x="306" y="60" font-family="Georgia, 'Times New Roman', serif" font-size="20" font-weight="bold" fill="#1a1a1a" text-anchor="middle">Your Paper Title</text>
+
+  <!-- Author -->
+  <text x="306" y="86" font-family="Georgia, 'Times New Roman', serif" font-size="10" fill="#333" text-anchor="middle">Author Name</text>
+  <text x="306" y="100" font-family="Georgia, 'Times New Roman', serif" font-size="9" font-style="italic" fill="#555" text-anchor="middle">Department, Organization</text>
+  <text x="306" y="114" font-family="Georgia, 'Times New Roman', serif" font-size="9" fill="#555" text-anchor="middle">City, Country</text>
+  <text x="306" y="128" font-family="Georgia, 'Times New Roman', serif" font-size="9" fill="#555" text-anchor="middle">author@example.com</text>
+
+  <line x1="40" y1="142" x2="572" y2="142" stroke="#ccc" stroke-width="0.5"/>
+
+  <!-- Abstract -->
+  <text x="306" y="162" font-family="Georgia, 'Times New Roman', serif" font-size="10" font-weight="bold" font-style="italic" fill="#1a1a1a" text-anchor="middle">Abstract</text>
+  <text x="72" y="180" font-family="Georgia, 'Times New Roman', serif" font-size="8.5" fill="#333">Your abstract goes here. Briefly describe the problem you are</text>
+  <text x="72" y="194" font-family="Georgia, 'Times New Roman', serif" font-size="8.5" fill="#333">addressing, your approach, and your key findings.</text>
+
+  <!-- Index Terms -->
+  <text x="72" y="218" font-family="Georgia, 'Times New Roman', serif" font-size="8.5" font-weight="bold" font-style="italic" fill="#1a1a1a">Index Terms</text>
+  <text x="145" y="218" font-family="Georgia, 'Times New Roman', serif" font-size="8.5" fill="#333">- First term, Second term, Third term</text>
+
+  <!-- Two column divider -->
+  <line x1="306" y1="238" x2="306" y2="720" stroke="#eee" stroke-width="0.5"/>
+
+  <!-- Left Column -->
+  <text x="48" y="258" font-family="Georgia, 'Times New Roman', serif" font-size="11" font-weight="bold" fill="#1a1a1a" text-transform="uppercase">I. INTRODUCTION</text>
+  <text x="48" y="276" font-family="Georgia, 'Times New Roman', serif" font-size="8.5" fill="#333">Your introduction goes here. Describe the</text>
+  <text x="48" y="290" font-family="Georgia, 'Times New Roman', serif" font-size="8.5" fill="#333">problem, motivation, and contributions of</text>
+  <text x="48" y="304" font-family="Georgia, 'Times New Roman', serif" font-size="8.5" fill="#333">your work.</text>
+
+  <text x="48" y="334" font-family="Georgia, 'Times New Roman', serif" font-size="11" font-weight="bold" fill="#1a1a1a">II. RELATED WORK</text>
+  <text x="48" y="352" font-family="Georgia, 'Times New Roman', serif" font-size="8.5" fill="#333">Discuss relevant prior work and how</text>
+  <text x="48" y="366" font-family="Georgia, 'Times New Roman', serif" font-size="8.5" fill="#333">your approach differs from existing</text>
+  <text x="48" y="380" font-family="Georgia, 'Times New Roman', serif" font-size="8.5" fill="#333">solutions.</text>
+
+  <text x="48" y="410" font-family="Georgia, 'Times New Roman', serif" font-size="11" font-weight="bold" fill="#1a1a1a">III. METHODOLOGY</text>
+  <text x="48" y="428" font-family="Georgia, 'Times New Roman', serif" font-size="8.5" fill="#333">Describe your approach in detail.</text>
+  <text x="48" y="442" font-family="Georgia, 'Times New Roman', serif" font-size="8.5" fill="#333">Include any algorithms, models, or</text>
+  <text x="48" y="456" font-family="Georgia, 'Times New Roman', serif" font-size="8.5" fill="#333">frameworks used.</text>
+
+  <!-- Right Column -->
+  <text x="320" y="258" font-family="Georgia, 'Times New Roman', serif" font-size="11" font-weight="bold" fill="#1a1a1a">IV. RESULTS</text>
+  <text x="320" y="276" font-family="Georgia, 'Times New Roman', serif" font-size="8.5" fill="#333">Present your findings and experimental</text>
+  <text x="320" y="290" font-family="Georgia, 'Times New Roman', serif" font-size="8.5" fill="#333">results. Use tables and figures to</text>
+  <text x="320" y="304" font-family="Georgia, 'Times New Roman', serif" font-size="8.5" fill="#333">illustrate key points.</text>
+
+  <text x="320" y="334" font-family="Georgia, 'Times New Roman', serif" font-size="11" font-weight="bold" fill="#1a1a1a">V. CONCLUSION</text>
+  <text x="320" y="352" font-family="Georgia, 'Times New Roman', serif" font-size="8.5" fill="#333">Summarize your work and discuss</text>
+  <text x="320" y="366" font-family="Georgia, 'Times New Roman', serif" font-size="8.5" fill="#333">future directions.</text>
+
+  <text x="572" y="775" font-family="'Helvetica Neue', Arial, sans-serif" font-size="7" fill="#bbb" text-anchor="end">charged-ieee</text>
+</svg>

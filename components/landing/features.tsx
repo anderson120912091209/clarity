@@ -82,15 +82,9 @@ export function Features() {
     <section id="features" className="py-24 md:py-32 px-6 bg-[#0c0c0e]">
       <div className="max-w-5xl mx-auto">
 
-        {/* Section Label */}
-        <div className="flex items-center justify-between mb-16 md:mb-20">
-          <span className="section-label">{t('features.label')}</span>
-          <span className="section-label">/ {t('features.label_suffix')}</span>
-        </div>
-
         {/* Section Header */}
         <div className="mb-16 md:mb-20">
-          <h2 className="text-3xl md:text-5xl lg:text-6xl font-bold text-zinc-100 mb-6 tracking-tight leading-[1.1]">
+          <h2 className="text-2xl md:text-4xl lg:text-5xl font-bold text-zinc-100 mb-6 tracking-tight leading-[1.1]">
             {t('features.section_title')}
           </h2>
           <p className="text-zinc-400 max-w-2xl text-base md:text-lg leading-relaxed">

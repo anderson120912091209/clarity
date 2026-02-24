@@ -14,24 +14,14 @@ export function Hero() {
 
   return (
     <section className="relative pt-28 md:pt-44 pb-0 px-6 overflow-hidden">
-      <div className="max-w-5xl mx-auto flex flex-col items-center text-center">
-
-        {/* Section Label */}
-        <motion.span
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 0.1 }}
-          className="section-label mb-6 block"
-        >
-          {t('hero.section_label')}
-        </motion.span>
+      <div className="max-w-5xl mx-auto flex flex-col items-start text-left">
 
         {/* Headline */}
         <motion.h1
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.7, delay: 0.2 }}
-          className="text-3xl md:text-6xl lg:text-7xl leading-[1.08] font-bold tracking-tight text-zinc-100 mb-6 max-w-5xl md:[word-break:keep-all]"
+          className="text-3xl md:text-5xl lg:text-6xl leading-[1.08] font-bold tracking-tight text-zinc-200 mb-6 max-w-3xl md:[word-break:keep-all]"
         >
           {t('hero.headline')}
         </motion.h1>
@@ -41,7 +31,7 @@ export function Hero() {
           initial={{ opacity: 0, y: 15 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.7, delay: 0.35 }}
-          className="max-w-2xl text-base md:text-lg text-zinc-400 mb-10 leading-relaxed md:[word-break:keep-all]"
+          className="max-w-xl text-base md:text-lg text-zinc-400 mb-10 leading-relaxed md:[word-break:keep-all]"
         >
           {t('hero.subtext')}
         </motion.p>
@@ -110,7 +100,7 @@ export function Hero() {
           target="_blank"
           rel="noopener noreferrer"
           aria-label={t('hero.product_hunt_aria')}
-          className="cursor-crosshair mx-auto mt-8 block sm:hidden"
+          className="cursor-crosshair mt-8 block sm:hidden"
         >
           <img
             src={productHuntBadgeSrc}
