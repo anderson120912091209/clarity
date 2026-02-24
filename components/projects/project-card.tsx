@@ -1,8 +1,8 @@
 'use client'
 import { useEffect, useRef } from 'react'
 import { Button } from '@/components/ui/button'
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
-import { CopyIcon, DownloadIcon, Edit2Icon, MoreHorizontal, Trash2 } from 'lucide-react'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSub, DropdownMenuSubTrigger, DropdownMenuSubContent } from '@/components/ui/dropdown-menu'
+import { CopyIcon, DownloadIcon, Edit2Icon, FolderIcon, MoreHorizontal, PlusIcon, Trash2 } from 'lucide-react'
 import { db } from '@/lib/constants'
 import { tx } from '@instantdb/react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
@@ -22,7 +22,13 @@ import { formatRelativeTime } from '@/lib/utils/time'
 import { useDashboardSettings } from '@/contexts/DashboardSettingsContext'
 import { fetchPdf } from '@/lib/utils/pdf-utils'
 
-export default function ProjectCard({ project, detailed = false, loading = false, isSelected = false }: { project?: any; detailed?: boolean; loading?: boolean; isSelected?: boolean }) {
+interface FolderOption {
+  id: string
+  name: string
+  color?: string
+}
+
+export default function ProjectCard({ project, detailed = false, loading = false, isSelected = false, folders = [], onMoveToFolder }: { project?: any; detailed?: boolean; loading?: boolean; isSelected?: boolean; folders?: FolderOption[]; onMoveToFolder?: (projectId: string, folderId: string) => void }) {
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [newTitle, setNewTitle] = useState(project?.title || '')
   const [isDropdownOpen, setIsDropdownOpen] = useState(false)
@@ -334,6 +340,34 @@ export default function ProjectCard({ project, detailed = false, loading = false
                     <DownloadIcon className="mr-2 h-3 w-3" />
                     <span>Download PDF</span>
                   </DropdownMenuItem>
+                  {folders.length > 0 && onMoveToFolder && (
+                    <DropdownMenuSub>
+                      <DropdownMenuSubTrigger className="focus:bg-white/10 focus:text-white rounded-md cursor-pointer text-[12px] font-medium py-1.5 px-2">
+                        <FolderIcon className="mr-2 h-3 w-3" />
+                        <span>Move to Folder</span>
+                      </DropdownMenuSubTrigger>
+                      <DropdownMenuSubContent className="bg-[#0F0F0F] border border-white/10 text-zinc-400 p-1 shadow-xl min-w-[140px]">
+                        {folders.map((f) => (
+                          <DropdownMenuItem
+                            key={f.id}
+                            className="focus:bg-white/10 focus:text-white rounded-md cursor-pointer text-[12px] font-medium py-1.5 px-2"
+                            onClick={(e) => {
+                              e.preventDefault()
+                              e.stopPropagation()
+                              onMoveToFolder(project.id, f.id)
+                              setIsDropdownOpen(false)
+                            }}
+                          >
+                            <div
+                              className="mr-2 h-2.5 w-2.5 rounded-sm shrink-0"
+                              style={{ backgroundColor: f.color || '#6D78E7' }}
+                            />
+                            <span className="truncate">{f.name}</span>
+                          </DropdownMenuItem>
+                        ))}
+                      </DropdownMenuSubContent>
+                    </DropdownMenuSub>
+                  )}
                   <div className="h-[1px] bg-white/5 my-1" />
                   <DropdownMenuItem className="focus:bg-red-500/10 focus:text-red-400 text-red-400/80 rounded-md cursor-pointer text-[12px] font-medium py-1.5 px-2" onClick={handleDelete}>
                     <Trash2 className="mr-2 h-3 w-3" />

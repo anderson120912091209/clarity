@@ -28,11 +28,11 @@ function useHasSeenOnboarding() {
 // Step 3: cursor clicks button, cards fly into folder
 
 const CARD_POSITIONS = [
-  { left: 10, top: 50 },
-  { left: 24, top: 50 },
-  { left: 38, top: 50 },
-  { left: 52, top: 50 },
-  { left: 66, top: 50 },
+  { left: 22, top: 50 },
+  { left: 36, top: 50 },
+  { left: 50, top: 50 },
+  { left: 64, top: 50 },
+  { left: 78, top: 50 },
 ]
 
 function AnimatedIllustration({ step }: { step: number }) {
@@ -68,21 +68,21 @@ function AnimatedIllustration({ step }: { step: number }) {
   const showFolder = step === 3 && phase >= 2
   const toolbarClicked = step === 3 && phase >= 1
 
-  // Selection box — covers cards 1-3 (left 24% to 52%, each ~12% wide)
-  // Box starts at ~17% and spans ~44% to wrap cards at 24/38/52 with padding
-  const selBoxOrigin = { left: 17, top: 24 }
-  const selBoxEnd = { left: 17, top: 24, width: 44, height: 56 }
+  // Selection box — covers cards 1-3 (at 36%, 50%, 64%, each ~12% wide)
+  // Box starts at ~29% and spans ~44% to wrap cards with padding
+  const selBoxOrigin = { left: 29, top: 24 }
+  const selBoxEnd = { left: 29, top: 24, width: 44, height: 56 }
 
   // Cursor positions for each step
   const cursorPos = (() => {
-    if (step === 0) return { left: 17, top: 28 }
-    if (step === 1) return { left: 59, top: 76 }
+    if (step === 0) return { left: 29, top: 28 }
+    if (step === 1) return { left: 71, top: 76 }
     if (step === 2) {
       if (phase >= 1) return { left: 58, top: 89 } // moving to button
-      return { left: 59, top: 76 }
+      return { left: 71, top: 76 }
     }
     if (step === 3) return { left: 58, top: 89 }
-    return { left: 17, top: 28 }
+    return { left: 29, top: 28 }
   })()
 
   return (

@@ -194,6 +194,22 @@ export default function ProjectsPage() {
     }
   }, [user, pushUndo, showToast])
 
+  const handleMoveProjectToFolder = useCallback(async (projectId: string, folderId: string) => {
+    const proj = allProjects.find((p: any) => p.id === projectId)
+    const prevFolderId = proj?.folder_id || ''
+    await addProjectsToFolder([projectId], folderId)
+    showToast('Moved to folder')
+    pushUndo({
+      label: 'move project',
+      undo: async () => {
+        const { tx: txn } = await import('@instantdb/react')
+        const { db: database } = await import('@/lib/constants')
+        await database.transact([txn.projects[projectId].update({ folder_id: prevFolderId })])
+      },
+      redo: () => addProjectsToFolder([projectId], folderId),
+    })
+  }, [allProjects, pushUndo, showToast])
+
   const gridClasses =
     settings.density === 'compact'
       ? 'grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3'
@@ -324,7 +340,7 @@ export default function ProjectsPage() {
                     key={project.id}
                     data-selectable-id={project.id}
                   >
-                    <ProjectCard project={project} isSelected={selectedIds.has(project.id)} />
+                    <ProjectCard project={project} isSelected={selectedIds.has(project.id)} folders={folders as { id: string; name: string; color?: string }[]} onMoveToFolder={handleMoveProjectToFolder} />
                   </div>
                 ))}
 

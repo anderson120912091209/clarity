@@ -70,6 +70,7 @@ export function buildWelcomeProjectTransactions(userId: string, timestampISO: st
       created_at: timestampISO,
       activeFileId: typstFileId,
       isAutoFetching: true,
+      folder_id: defaultFolderId,
     }),
     tx.files[typstFileId].update({
       user_id: userId,
@@ -98,6 +99,7 @@ export function buildWelcomeProjectTransactions(userId: string, timestampISO: st
       created_at: timestampISO,
       activeFileId: latexFileId,
       isAutoFetching: true,
+      folder_id: defaultFolderId,
     }),
     tx.files[latexFileId].update({
       user_id: userId,
