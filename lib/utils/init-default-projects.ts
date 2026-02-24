@@ -45,8 +45,18 @@ export function buildWelcomeProjectTransactions(userId: string, timestampISO: st
     },
   ]
 
-  // Create transactions for both projects
+  // Default "New!" folder
+  const defaultFolderId = id()
+
+  // Create transactions for both projects + default folder
   const transactions = [
+    tx.folders[defaultFolderId].update({
+      user_id: userId,
+      name: 'New!',
+      color: '#6D78E7',
+      created_at: timestampISO,
+      updated_at: timestampISO,
+    }),
     // Typst Project
     tx.projects[typstProjectId].update({
       user_id: userId,

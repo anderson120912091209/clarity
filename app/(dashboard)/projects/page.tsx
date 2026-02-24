@@ -18,6 +18,7 @@ import { DragSelect } from '@/components/projects/drag-select'
 import { SelectionToolbar } from '@/components/projects/selection-toolbar'
 import { CreateFolderDialog } from '@/components/features/projects/create-folder-dialog'
 import { useUndoRedo } from '@/hooks/use-undo-redo'
+import { FolderOnboardingModal } from '@/components/features/projects/folder-onboarding-modal'
 
 export default function ProjectsPage() {
   const { user, isLoading: userLoading } = useFrontend()
@@ -58,6 +59,17 @@ export default function ProjectsPage() {
   useEffect(() => {
     setSortOrder(settings.defaultSort)
   }, [settings.defaultSort])
+
+  // Seed default "New!" folder for existing users who don't have it yet
+  const defaultFolderSeeded = useRef(false)
+  useEffect(() => {
+    if (defaultFolderSeeded.current || !user?.id || !foldersData) return
+    const hasNewFolder = (foldersData.folders || []).some((f: any) => f.name === 'New!')
+    if (!hasNewFolder) {
+      defaultFolderSeeded.current = true
+      void createFolder(user.id, 'New!', '#6D78E7')
+    }
+  }, [user?.id, foldersData])
 
   // Clear selection on Escape
   useEffect(() => {
@@ -372,6 +384,9 @@ export default function ProjectsPage() {
               </div>
             </div>
           )}
+
+          {/* Folder onboarding modal */}
+          <FolderOnboardingModal />
         </>
       )}
     </>
