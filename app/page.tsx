@@ -2,7 +2,6 @@ import type { Metadata } from 'next'
 import { Navbar } from '@/components/landing/navbar'
 import { Hero } from '@/components/landing/hero'
 import { Features } from '@/components/landing/features'
-import { Pricing } from '@/components/landing/pricing'
 import { CtaSection } from '@/components/landing/cta-section'
 import { FooterContent } from '@/components/landing/footer-content'
 import { getLocale } from '@/lib/i18n/get-locale'
@@ -38,7 +37,6 @@ export default function Home() {
       <main className="relative z-10 w-full">
         <Hero />
         <Features />
-        <Pricing />
         <CtaSection />
       </main>
 
