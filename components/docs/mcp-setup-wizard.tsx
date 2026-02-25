@@ -87,9 +87,9 @@ function configPath(client: Client) {
   return null
 }
 
-const kbd = "rounded bg-white/[0.06] border border-white/[0.08] px-1.5 py-0.5 font-medium text-zinc-200 text-[12px]"
-const file = "rounded bg-purple-500/10 border border-purple-500/15 px-1.5 py-0.5 font-mono text-[11px] text-purple-300"
-const key = "rounded bg-amber-500/10 border border-amber-500/15 px-1.5 py-0.5 font-mono text-[11px] text-amber-300"
+const kbd = "inline-block rounded bg-white/[0.06] border border-white/[0.08] px-1 sm:px-1.5 py-0.5 font-medium text-zinc-200 text-[11px] sm:text-[12px]"
+const file = "inline-block rounded bg-purple-500/10 border border-purple-500/15 px-1 sm:px-1.5 py-0.5 font-mono text-[10px] sm:text-[11px] text-purple-300 break-all"
+const key = "inline-block rounded bg-amber-500/10 border border-amber-500/15 px-1 sm:px-1.5 py-0.5 font-mono text-[10px] sm:text-[11px] text-amber-300"
 
 function steps(client: Client): React.ReactNode[] {
   if (client === 'Claude Desktop') {
@@ -166,51 +166,51 @@ export function McpSetupWizard() {
   }
 
   return (
-    <div className="my-8 space-y-5">
+    <div className="my-6 sm:my-8 space-y-4 sm:space-y-5">
       {/* Step 1: Get API Key */}
       <div className="rounded-xl border border-white/[0.08] bg-[#0f0f13] overflow-hidden">
-        <div className="flex items-center gap-3 border-b border-white/[0.06] bg-white/[0.02] px-5 py-3">
-          <span className="flex h-6 w-6 items-center justify-center rounded-full bg-purple-500/15 text-[12px] font-bold text-purple-400">1</span>
-          <span className="text-[13.5px] font-semibold text-zinc-200">Get your API key</span>
+        <div className="flex items-center gap-2.5 sm:gap-3 border-b border-white/[0.06] bg-white/[0.02] px-3.5 sm:px-5 py-2.5 sm:py-3">
+          <span className="flex h-6 w-6 items-center justify-center rounded-full bg-purple-500/15 text-[12px] font-bold text-purple-400 shrink-0">1</span>
+          <span className="text-[13px] sm:text-[13.5px] font-semibold text-zinc-200">Get your API key</span>
         </div>
-        <div className="px-5 py-4">
-          <p className="text-[13px] text-zinc-400 mb-3">
+        <div className="px-3.5 sm:px-5 py-3.5 sm:py-4">
+          <p className="text-[12.5px] sm:text-[13px] text-zinc-400 mb-3">
             Generate an API key in your Clarity settings. You'll paste it into the config below.
           </p>
           <Link
             href="/settings/mcp"
-            className="inline-flex items-center gap-2 rounded-lg bg-purple-500/15 border border-purple-500/20 px-4 py-2 text-[13px] font-medium text-purple-300 transition-all hover:bg-purple-500/25 hover:border-purple-500/30 hover:text-purple-200"
+            className="inline-flex items-center gap-2 rounded-lg bg-purple-500/15 border border-purple-500/20 px-3.5 sm:px-4 py-2 text-[12.5px] sm:text-[13px] font-medium text-purple-300 transition-all hover:bg-purple-500/25 hover:border-purple-500/30 hover:text-purple-200"
           >
-            <Key className="h-3.5 w-3.5" />
+            <Key className="h-3.5 w-3.5 shrink-0" />
             Create API key in Settings
-            <ExternalLink className="h-3 w-3 opacity-50" />
+            <ExternalLink className="h-3 w-3 opacity-50 shrink-0" />
           </Link>
         </div>
       </div>
 
       {/* Step 2: Choose client & config */}
       <div className="rounded-xl border border-white/[0.08] bg-[#0f0f13] overflow-hidden">
-        <div className="flex items-center gap-3 border-b border-white/[0.06] bg-white/[0.02] px-5 py-3">
-          <span className="flex h-6 w-6 items-center justify-center rounded-full bg-purple-500/15 text-[12px] font-bold text-purple-400">2</span>
-          <span className="text-[13.5px] font-semibold text-zinc-200">Configure your client</span>
+        <div className="flex items-center gap-2.5 sm:gap-3 border-b border-white/[0.06] bg-white/[0.02] px-3.5 sm:px-5 py-2.5 sm:py-3">
+          <span className="flex h-6 w-6 items-center justify-center rounded-full bg-purple-500/15 text-[12px] font-bold text-purple-400 shrink-0">2</span>
+          <span className="text-[13px] sm:text-[13.5px] font-semibold text-zinc-200">Configure your client</span>
         </div>
-        <div className="px-5 py-4 space-y-4">
+        <div className="px-3.5 sm:px-5 py-3.5 sm:py-4 space-y-3 sm:space-y-4">
           {/* Client tabs */}
-          <div className="flex gap-1 rounded-lg bg-white/[0.03] p-1">
+          <div className="flex gap-0.5 sm:gap-1 rounded-lg bg-white/[0.03] p-0.5 sm:p-1">
             {CLIENTS.map((c) => {
               const meta = CLIENT_META[c]
               return (
                 <button
                   key={c}
                   onClick={() => setClient(c)}
-                  className={`flex-1 flex items-center justify-center gap-2 rounded-md px-3 py-2 text-[12px] font-medium transition-all ${
+                  className={`flex-1 flex items-center justify-center gap-1 sm:gap-2 rounded-md px-1.5 sm:px-3 py-1.5 sm:py-2 text-[11px] sm:text-[12px] font-medium transition-all ${
                     client === c
                       ? 'bg-white/[0.08] text-white shadow-sm'
                       : 'text-zinc-500 hover:text-zinc-300'
                   }`}
                 >
-                  {meta.icon}
-                  {meta.label}
+                  <span className="shrink-0">{meta.icon}</span>
+                  <span className="truncate">{meta.label}</span>
                 </button>
               )
             })}
@@ -218,16 +218,16 @@ export function McpSetupWizard() {
 
           {/* Config file path */}
           {paths && (
-            <div className="flex flex-col gap-1 text-[12px]">
+            <div className="flex flex-col gap-1.5 text-[11px] sm:text-[12px]">
               <span className="text-zinc-500">Config file location:</span>
-              <div className="space-y-0.5">
-                <div className="flex items-center gap-2">
-                  <span className="text-zinc-600 w-12 shrink-0">macOS</span>
-                  <code className="rounded bg-[#1a1a2e] border border-white/[0.06] px-2 py-0.5 font-mono text-[11px] text-zinc-400">{paths.mac}</code>
+              <div className="space-y-1 overflow-hidden">
+                <div className="flex items-start gap-2">
+                  <span className="text-zinc-600 w-10 sm:w-12 shrink-0 pt-0.5">macOS</span>
+                  <code className="rounded bg-[#1a1a2e] border border-white/[0.06] px-2 py-0.5 font-mono text-[10px] sm:text-[11px] text-zinc-400 break-all">{paths.mac}</code>
                 </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-zinc-600 w-12 shrink-0">Win</span>
-                  <code className="rounded bg-[#1a1a2e] border border-white/[0.06] px-2 py-0.5 font-mono text-[11px] text-zinc-400">{paths.win}</code>
+                <div className="flex items-start gap-2">
+                  <span className="text-zinc-600 w-10 sm:w-12 shrink-0 pt-0.5">Win</span>
+                  <code className="rounded bg-[#1a1a2e] border border-white/[0.06] px-2 py-0.5 font-mono text-[10px] sm:text-[11px] text-zinc-400 break-all">{paths.win}</code>
                 </div>
               </div>
             </div>
@@ -235,7 +235,7 @@ export function McpSetupWizard() {
 
           {/* Config snippet */}
           <div className="relative rounded-lg border border-white/[0.06] bg-[#0a0a0e] overflow-hidden">
-            <div className="flex items-center justify-between border-b border-white/[0.04] bg-white/[0.02] px-4 py-1.5">
+            <div className="flex items-center justify-between border-b border-white/[0.04] bg-white/[0.02] px-3 sm:px-4 py-1.5">
               <span className="text-[10px] font-mono uppercase tracking-wider text-zinc-600">json</span>
               <button
                 onClick={handleCopy}
@@ -254,19 +254,19 @@ export function McpSetupWizard() {
                 )}
               </button>
             </div>
-            <pre className="p-4 overflow-x-auto text-[12.5px] leading-[1.7]">
+            <pre className="p-3 sm:p-4 overflow-x-auto text-[11px] sm:text-[12.5px] leading-[1.7]">
               <code className="font-mono"><HighlightedJson code={config} /></code>
             </pre>
           </div>
 
           {/* Steps */}
-          <ol className="space-y-1.5">
+          <ol className="space-y-2 sm:space-y-1.5">
             {stepList.map((step, idx) => (
-              <li key={idx} className="flex gap-2.5 text-[13px] text-zinc-400">
+              <li key={idx} className="flex gap-2 sm:gap-2.5 text-[12px] sm:text-[13px] text-zinc-400">
                 <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-white/[0.04] text-[10px] font-semibold text-zinc-500 mt-0.5">
                   {idx + 1}
                 </span>
-                <span>{step}</span>
+                <span className="leading-relaxed">{step}</span>
               </li>
             ))}
           </ol>
@@ -275,19 +275,19 @@ export function McpSetupWizard() {
 
       {/* Step 3: Verify */}
       <div className="rounded-xl border border-white/[0.08] bg-[#0f0f13] overflow-hidden">
-        <div className="flex items-center gap-3 border-b border-white/[0.06] bg-white/[0.02] px-5 py-3">
-          <span className="flex h-6 w-6 items-center justify-center rounded-full bg-purple-500/15 text-[12px] font-bold text-purple-400">3</span>
-          <span className="text-[13.5px] font-semibold text-zinc-200">Verify the connection</span>
+        <div className="flex items-center gap-2.5 sm:gap-3 border-b border-white/[0.06] bg-white/[0.02] px-3.5 sm:px-5 py-2.5 sm:py-3">
+          <span className="flex h-6 w-6 items-center justify-center rounded-full bg-purple-500/15 text-[12px] font-bold text-purple-400 shrink-0">3</span>
+          <span className="text-[13px] sm:text-[13.5px] font-semibold text-zinc-200">Verify the connection</span>
         </div>
-        <div className="px-5 py-4">
-          <p className="text-[13px] text-zinc-400 mb-2">
+        <div className="px-3.5 sm:px-5 py-3.5 sm:py-4">
+          <p className="text-[12.5px] sm:text-[13px] text-zinc-400 mb-2">
             Ask your AI assistant:
           </p>
-          <div className="rounded-lg bg-[#1a1a2e] border border-white/[0.06] px-4 py-2.5 text-[13px] italic text-zinc-300">
-            "List my Clarity projects"
+          <div className="rounded-lg bg-[#1a1a2e] border border-white/[0.06] px-3 sm:px-4 py-2.5 text-[12.5px] sm:text-[13px] italic text-zinc-300">
+            &ldquo;List my Clarity projects&rdquo;
           </div>
-          <p className="mt-2 text-[12px] text-zinc-600">
-            If configured correctly, it will call the <code className="rounded bg-white/[0.04] px-1 py-0.5 font-mono text-[11px] text-[#e2b3ff]">list_projects</code> tool and return your workspace.
+          <p className="mt-2 text-[11px] sm:text-[12px] text-zinc-600">
+            If configured correctly, it will call the <code className="rounded bg-white/[0.04] px-1 py-0.5 font-mono text-[10px] sm:text-[11px] text-[#e2b3ff]">list_projects</code> tool and return your workspace.
           </p>
         </div>
       </div>

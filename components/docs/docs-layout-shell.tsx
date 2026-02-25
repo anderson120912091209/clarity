@@ -42,7 +42,7 @@ export function DocsLayoutShell({ children }: { children: React.ReactNode }) {
 
         {/* Main content — centered */}
         <main className="flex-1 min-w-0 flex justify-center">
-          <div className="w-full max-w-[980px] px-6 md:px-10 lg:px-14 py-10 lg:py-14">
+          <div className="w-full max-w-[980px] px-4 sm:px-6 md:px-10 lg:px-14 py-6 sm:py-10 lg:py-14">
             {children}
           </div>
         </main>

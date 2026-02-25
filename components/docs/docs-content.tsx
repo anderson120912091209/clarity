@@ -227,9 +227,9 @@ function renderMarkdown(raw: string) {
       const IconComp = variant === 'tip' ? Lightbulb : variant === 'warning' ? AlertTriangle : Info
 
       elements.push(
-        <div key={key++} className={`my-6 flex items-start gap-3 rounded-xl ${s.bg} border ${s.border} px-4 py-3.5`}>
-          <IconComp className={`h-[18px] w-[18px] mt-[1px] shrink-0 ${s.icon}`} />
-          <p className="text-[13.5px] leading-relaxed text-zinc-300">{inline(cleanContent)}</p>
+        <div key={key++} className={`my-4 sm:my-6 flex items-start gap-2.5 sm:gap-3 rounded-xl ${s.bg} border ${s.border} px-3 sm:px-4 py-3 sm:py-3.5`}>
+          <IconComp className={`h-4 w-4 sm:h-[18px] sm:w-[18px] mt-[1px] shrink-0 ${s.icon}`} />
+          <p className="text-[12.5px] sm:text-[13.5px] leading-relaxed text-zinc-300">{inline(cleanContent)}</p>
         </div>
       )
       continue
@@ -246,18 +246,18 @@ function renderMarkdown(raw: string) {
       }
       i++
       elements.push(
-        <div key={key++} className="my-5 rounded-xl border border-white/[0.08] bg-[#0f0f13] overflow-hidden shadow-lg shadow-black/20">
+        <div key={key++} className="my-4 sm:my-5 rounded-xl border border-white/[0.08] bg-[#0f0f13] overflow-hidden shadow-lg shadow-black/20">
           {lang && (
-            <div className="flex items-center justify-between px-4 py-2 border-b border-white/[0.06] bg-white/[0.02]">
-              <span className="text-[11px] font-mono text-zinc-500 uppercase tracking-wider">{lang}</span>
-              <div className="flex gap-1.5">
+            <div className="flex items-center justify-between px-3 sm:px-4 py-2 border-b border-white/[0.06] bg-white/[0.02]">
+              <span className="text-[10px] sm:text-[11px] font-mono text-zinc-500 uppercase tracking-wider">{lang}</span>
+              <div className="hidden sm:flex gap-1.5">
                 <span className="h-2.5 w-2.5 rounded-full bg-white/[0.06]" />
                 <span className="h-2.5 w-2.5 rounded-full bg-white/[0.06]" />
                 <span className="h-2.5 w-2.5 rounded-full bg-white/[0.06]" />
               </div>
             </div>
           )}
-          <pre className="p-4 overflow-x-auto text-[13px] leading-[1.7]">
+          <pre className="p-3 sm:p-4 overflow-x-auto text-[11.5px] sm:text-[13px] leading-[1.7]">
             <code className="font-mono text-zinc-300">{codeLines.join('\n')}</code>
           </pre>
         </div>
@@ -284,14 +284,14 @@ function renderMarkdown(raw: string) {
         const bodyRows = tableLines.slice(2).map(parseRow)
 
         elements.push(
-          <div key={key++} className="my-6 overflow-x-auto rounded-xl border border-white/[0.08] bg-[#0c0c10]">
-            <table className="w-full text-[13.5px]">
+          <div key={key++} className="my-4 sm:my-6 -mx-3.5 sm:mx-0 overflow-x-auto rounded-none sm:rounded-xl border-y sm:border border-white/[0.08] bg-[#0c0c10]">
+            <table className="w-full text-[12px] sm:text-[13.5px]">
               <thead>
                 <tr className="border-b border-white/[0.08]">
                   {headers.map((h, hi) => (
                     <th
                       key={hi}
-                      className="px-4 py-3 text-left text-[12px] font-semibold uppercase tracking-wider text-zinc-400 bg-white/[0.02]"
+                      className="px-3 sm:px-4 py-2.5 sm:py-3 text-left text-[11px] sm:text-[12px] font-semibold uppercase tracking-wider text-zinc-400 bg-white/[0.02] whitespace-nowrap"
                     >
                       {inline(h)}
                     </th>
@@ -302,7 +302,7 @@ function renderMarkdown(raw: string) {
                 {bodyRows.map((row, ri) => (
                   <tr key={ri} className="border-b border-white/[0.04] last:border-0 hover:bg-white/[0.02] transition-colors">
                     {row.map((cell, ci) => (
-                      <td key={ci} className="px-4 py-2.5 text-zinc-400">
+                      <td key={ci} className="px-3 sm:px-4 py-2 sm:py-2.5 text-zinc-400">
                         {inline(cell)}
                       </td>
                     ))}
@@ -325,10 +325,10 @@ function renderMarkdown(raw: string) {
 
       const Tag = `h${level}` as 'h1' | 'h2' | 'h3' | 'h4'
       const classes: Record<number, string> = {
-        1: 'text-[26px] md:text-[32px] font-bold tracking-tight text-white mt-0 mb-5',
-        2: 'group text-[20px] md:text-[24px] font-semibold tracking-tight text-white mt-12 mb-4 pb-3 border-b border-white/[0.06] scroll-mt-20',
-        3: 'group text-[17px] font-semibold text-zinc-100 mt-9 mb-3 scroll-mt-20',
-        4: 'group text-[15px] font-medium text-zinc-200 mt-7 mb-2 scroll-mt-20',
+        1: 'text-[22px] sm:text-[26px] md:text-[32px] font-bold tracking-tight text-white mt-0 mb-4 sm:mb-5',
+        2: 'group text-[18px] sm:text-[20px] md:text-[24px] font-semibold tracking-tight text-white mt-8 sm:mt-12 mb-3 sm:mb-4 pb-2.5 sm:pb-3 border-b border-white/[0.06] scroll-mt-20',
+        3: 'group text-[15px] sm:text-[17px] font-semibold text-zinc-100 mt-6 sm:mt-9 mb-2.5 sm:mb-3 scroll-mt-20',
+        4: 'group text-[14px] sm:text-[15px] font-medium text-zinc-200 mt-5 sm:mt-7 mb-2 scroll-mt-20',
       }
 
       elements.push(
@@ -357,10 +357,10 @@ function renderMarkdown(raw: string) {
         i++
       }
       elements.push(
-        <ul key={key++} className="my-4 space-y-2 pl-0">
+        <ul key={key++} className="my-3 sm:my-4 space-y-1.5 sm:space-y-2 pl-0">
           {items.map((item, idx) => (
-            <li key={idx} className="flex gap-3 text-[14.5px] leading-relaxed text-zinc-400">
-              <span className="mt-2 h-1.5 w-1.5 rounded-full bg-purple-400/60 shrink-0" />
+            <li key={idx} className="flex gap-2.5 sm:gap-3 text-[13px] sm:text-[14.5px] leading-relaxed text-zinc-400">
+              <span className="mt-[7px] sm:mt-2 h-1.5 w-1.5 rounded-full bg-purple-400/60 shrink-0" />
               <span>{inline(item)}</span>
             </li>
           ))}
@@ -377,10 +377,10 @@ function renderMarkdown(raw: string) {
         i++
       }
       elements.push(
-        <ol key={key++} className="my-4 space-y-3 pl-0 counter-reset-list">
+        <ol key={key++} className="my-3 sm:my-4 space-y-2.5 sm:space-y-3 pl-0 counter-reset-list">
           {items.map((item, idx) => (
-            <li key={idx} className="flex gap-3 text-[14.5px] leading-relaxed text-zinc-400">
-              <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-white/[0.06] text-[12px] font-semibold text-zinc-300 mt-0.5">
+            <li key={idx} className="flex gap-2.5 sm:gap-3 text-[13px] sm:text-[14.5px] leading-relaxed text-zinc-400">
+              <span className="flex h-5 w-5 sm:h-6 sm:w-6 shrink-0 items-center justify-center rounded-full bg-white/[0.06] text-[11px] sm:text-[12px] font-semibold text-zinc-300 mt-0.5">
                 {idx + 1}
               </span>
               <span className="pt-0.5">{inline(item)}</span>
@@ -393,7 +393,7 @@ function renderMarkdown(raw: string) {
 
     // Horizontal rule
     if (line.match(/^---+$/)) {
-      elements.push(<hr key={key++} className="my-10 border-white/[0.06]" />)
+      elements.push(<hr key={key++} className="my-6 sm:my-10 border-white/[0.06]" />)
       i++
       continue
     }
@@ -431,7 +431,7 @@ function renderMarkdown(raw: string) {
       const alt = imgMatch[1]
       const src = imgMatch[2]
       elements.push(
-        <figure key={key++} className="my-8">
+        <figure key={key++} className="my-5 sm:my-8">
           <img
             src={src}
             alt={alt}
@@ -469,7 +469,7 @@ function renderMarkdown(raw: string) {
     }
     if (paraLines.length > 0) {
       elements.push(
-        <p key={key++} className="my-4 text-[14.5px] leading-[1.8] text-zinc-400">
+        <p key={key++} className="my-3 sm:my-4 text-[13.5px] sm:text-[14.5px] leading-[1.75] sm:leading-[1.8] text-zinc-400">
           {inline(paraLines.join(' '))}
         </p>
       )
@@ -488,8 +488,8 @@ function WasThisHelpful() {
   const { ui } = useDocsLocale()
 
   return (
-    <div className="mt-12 flex items-center gap-4 rounded-lg border border-white/[0.06] bg-white/[0.02] px-5 py-3.5">
-      <span className="text-[13px] text-zinc-500">{ui.wasThisHelpful}</span>
+    <div className="mt-8 sm:mt-12 flex items-center gap-3 sm:gap-4 rounded-lg border border-white/[0.06] bg-white/[0.02] px-3.5 sm:px-5 py-3 sm:py-3.5">
+      <span className="text-[12px] sm:text-[13px] text-zinc-500">{ui.wasThisHelpful}</span>
       <div className="flex gap-2">
         <button
           onClick={() => setFeedback('yes')}
@@ -550,7 +550,7 @@ export function DocsContent({ slug, page }: { slug: string; page: DocPage }) {
       {/* Main content */}
       <article className="flex-1 min-w-0 max-w-3xl">
         {/* Breadcrumb */}
-        <nav className="mb-8 flex items-center gap-2 text-[12px] text-zinc-500">
+        <nav className="mb-5 sm:mb-8 flex items-center gap-1.5 sm:gap-2 text-[11px] sm:text-[12px] text-zinc-500 overflow-x-auto">
           <Link href="/docs" className="hover:text-zinc-300 transition-colors">
             {ui.docs}
           </Link>
@@ -577,13 +577,13 @@ export function DocsContent({ slug, page }: { slug: string; page: DocPage }) {
         )}
 
         {/* Title */}
-        <h1 className="text-[28px] md:text-[36px] font-bold tracking-tight text-white mb-3 leading-tight">
+        <h1 className="text-[24px] sm:text-[28px] md:text-[36px] font-bold tracking-tight text-white mb-2 sm:mb-3 leading-tight">
           {page.title}
         </h1>
-        <p className="text-[15px] text-zinc-400 mb-10 leading-relaxed max-w-2xl">{page.description}</p>
+        <p className="text-[13.5px] sm:text-[15px] text-zinc-400 mb-6 sm:mb-10 leading-relaxed max-w-2xl">{page.description}</p>
 
         {/* Divider */}
-        <div className="h-px bg-gradient-to-r from-white/[0.08] via-white/[0.04] to-transparent mb-10" />
+        <div className="h-px bg-gradient-to-r from-white/[0.08] via-white/[0.04] to-transparent mb-6 sm:mb-10" />
 
         {/* Content */}
         <div className="docs-prose">{renderMarkdown(page.content)}</div>
@@ -592,7 +592,7 @@ export function DocsContent({ slug, page }: { slug: string; page: DocPage }) {
         <WasThisHelpful />
 
         {/* Prev / Next nav */}
-        <div className="mt-10 grid grid-cols-2 gap-4 border-t border-white/[0.06] pt-8 pb-8">
+        <div className="mt-8 sm:mt-10 grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 border-t border-white/[0.06] pt-6 sm:pt-8 pb-6 sm:pb-8">
           {prev ? (
             <Link
               href={`/docs/${prev.slug}`}
