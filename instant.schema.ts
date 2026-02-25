@@ -117,6 +117,14 @@ const _schema = i.schema({
       role: i.string().optional(),
       token: i.string().optional(),
     }),
+    mcp_api_keys: i.entity({
+      user_id: i.string().indexed(),
+      key_hash: i.string().unique().indexed(),
+      label: i.string().optional(),
+      active: i.boolean(),
+      created_at: i.string(),
+      last_used_at: i.string().optional(),
+    }),
     folders: i.entity({
       user_id: i.string(),
       name: i.string(),
