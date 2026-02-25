@@ -40,6 +40,8 @@
     "services/cltsi",
     "services/cltsi/**",
     "railway-api",
-    "railway-api/**"
+    "railway-api/**",
+    "mcp-server",
+    "mcp-server/**"
   ]
 }
