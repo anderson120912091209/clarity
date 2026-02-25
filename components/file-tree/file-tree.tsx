@@ -182,7 +182,7 @@ export function FileTree({
   }, [canEdit, files])
 
   const isTypstProject = useMemo(
-    () => files?.some(f => f.name === 'main.typ') ?? false,
+    () => files?.some(f => f.type === 'file' && f.name.toLowerCase().endsWith('.typ')) ?? false,
     [files]
   )
 

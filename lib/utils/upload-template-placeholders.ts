@@ -65,7 +65,25 @@ export async function uploadTemplatePlaceholders(
     const file = await createPlaceholderPng(fileName)
     const storagePath = `${userId}/projects/${projectId}/${Date.now()}-${fileName}`
     await db.storage.upload(storagePath, file)
-    const url = await db.storage.getDownloadUrl(storagePath)
+    let url: string | undefined
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        const result = await db.storage.getDownloadUrl(storagePath)
+        if (result) {
+          url = result
+          break
+        }
+      } catch {
+        // retry
+      }
+      if (attempt < 2) {
+        await new Promise((r) => setTimeout(r, 500 * (attempt + 1)))
+      }
+    }
+    if (!url) {
+      console.warn(`[template] Failed to get download URL for placeholder "${fileName}", skipping`)
+      continue
+    }
     const fileId = id()
     ops.push(
       tx.files[fileId].update({

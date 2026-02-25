@@ -6,10 +6,43 @@ import logger from '../utils/logger.js';
 
 /**
  * ResourceManager - Handles file synchronization to compile directory
- * 
+ *
  * Security: Validates all paths to prevent directory traversal attacks
  */
 export class ResourceManager {
+  /**
+   * Download a file from a URL with retries.
+   * Runs server-side so there are no CORS restrictions.
+   */
+  private async downloadUrl(
+    url: string,
+    resourcePath: string,
+    retries = 2
+  ): Promise<Buffer> {
+    let lastError: Error | undefined;
+    for (let attempt = 0; attempt <= retries; attempt++) {
+      try {
+        const response = await fetch(url);
+        if (!response.ok) {
+          throw new Error(
+            `Storage responded ${response.status} ${response.statusText} for "${resourcePath}"`
+          );
+        }
+        const arrayBuffer = await response.arrayBuffer();
+        if (arrayBuffer.byteLength === 0) {
+          throw new Error(`Storage returned empty file for "${resourcePath}"`);
+        }
+        return Buffer.from(arrayBuffer);
+      } catch (err) {
+        lastError = err instanceof Error ? err : new Error(String(err));
+        if (attempt < retries) {
+          await new Promise((r) => setTimeout(r, 300 * (attempt + 1)));
+        }
+      }
+    }
+    throw lastError!;
+  }
+
   /**
    * Sync resources (files, URLs) to disk
    */
@@ -28,8 +61,8 @@ export class ResourceManager {
       // Create parent directories
       await fs.mkdir(path.dirname(safePath), { recursive: true });
 
-      // Write content (URL support can be added later)
       if (resource.content) {
+        // Content-based: inline text or base64 binary
         if (resource.encoding === 'base64') {
           await fs.writeFile(safePath, Buffer.from(resource.content, 'base64'));
         } else {
@@ -37,11 +70,24 @@ export class ResourceManager {
         }
         resourceList.push(resource.path);
       } else if (resource.url) {
-        // TODO: Implement URL downloading with caching
-        logger.warn(
-          { path: resource.path, url: resource.url },
-          'URL resources not yet implemented, skipping'
-        );
+        // URL-based: download from storage (server-side, no CORS)
+        try {
+          const buffer = await this.downloadUrl(resource.url, resource.path);
+          await fs.writeFile(safePath, buffer);
+          resourceList.push(resource.path);
+          logger.info(
+            { path: resource.path, bytes: buffer.byteLength },
+            'Downloaded URL resource'
+          );
+        } catch (err) {
+          logger.error(
+            { path: resource.path, url: resource.url, err },
+            'Failed to download URL resource'
+          );
+          throw new ValidationError(
+            `Failed to download file "${resource.path}" from storage: ${err instanceof Error ? err.message : String(err)}`
+          );
+        }
       }
     }
 

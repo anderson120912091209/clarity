@@ -11,9 +11,11 @@ function parseLatexError(error: string): { summary: string; details?: string } {
 
   const knownMessages: { [key: string]: string } = {
     'Missing File: No main.tex file found':
-      'No main.tex file found. Add a main.tex file to compile a LaTeX project.',
+      'No compilable document found. Add a .tex file with \\documentclass{...} or a .typ file.',
     'Missing File: No main.tex or main.typ file found':
-      'No main.tex or main.typ file found. Add one of them to compile.',
+      'No compilable document found. Add a .tex file with \\documentclass{...} or a .typ file.',
+    'No compilable document found.':
+      'No compilable document found. Add a .tex file with \\documentclass{...} or a .typ file.',
   }
 
   const mapped = knownMessages[normalized]

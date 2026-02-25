@@ -21,7 +21,7 @@ import { useProject } from '@/contexts/ProjectContext'
 import { useDashboardSettings } from '@/contexts/DashboardSettingsContext'
 import { createPathname } from '@/lib/utils/client-utils'
 import { useFrontend } from '@/contexts/FrontendContext'
-import { fetchPdf, type SynctexContext, type LatexCompiler } from '@/lib/utils/pdf-utils'
+import { fetchPdf, detectRootFile, type SynctexContext, type LatexCompiler } from '@/lib/utils/pdf-utils'
 import LatexLoading from './latex-loading'
 import LatexCanvas from './latex-canvas'
 import { cn } from '@/lib/utils'
@@ -94,13 +94,42 @@ export function useLatex(liveFileContentOverrides: Record<string, string> = {}) 
       return { ...file, content: overrideContent }
     })
   }, [files, liveFileContentOverrides])
-  const hasMainTyp = effectiveFiles?.some((f: any) => f.name === 'main.typ') ?? false
+  // Detect project type and root file using the same logic as the compiler
+  const detectedRoot = useMemo(() => {
+    if (!Array.isArray(effectiveFiles) || effectiveFiles.length === 0) return null
+    const fileMap = new Map<string, any>()
+    effectiveFiles.forEach((f: any) => fileMap.set(f.id, f))
+    const getFullPath = (file: any): string => {
+      const parts = [file.name]
+      let current = file
+      while (current.parent_id && fileMap.has(current.parent_id)) {
+        current = fileMap.get(current.parent_id)
+        parts.unshift(current.name)
+      }
+      return parts.join('/')
+    }
+    return detectRootFile(effectiveFiles, getFullPath, latexCompiler)
+  }, [effectiveFiles, latexCompiler])
+  const hasMainTyp = detectedRoot?.label === 'Typst'
   const shouldAutoPreview = hasMainTyp
     ? settings.defaultTypstAutoCompile
     : autoFetch
-  const compileSourceContent =
-    effectiveFiles?.find((f: any) => f.name === 'main.tex')?.content ??
-    effectiveFiles?.find((f: any) => f.name === 'main.typ')?.content
+  const compileSourceContent = useMemo(() => {
+    if (!detectedRoot || !Array.isArray(effectiveFiles)) return undefined
+    const rootPath = detectedRoot.rootResourcePath
+    const fileMap = new Map<string, any>()
+    effectiveFiles.forEach((f: any) => fileMap.set(f.id, f))
+    const getFullPath = (file: any): string => {
+      const parts = [file.name]
+      let current = file
+      while (current.parent_id && fileMap.has(current.parent_id)) {
+        current = fileMap.get(current.parent_id)
+        parts.unshift(current.name)
+      }
+      return parts.join('/')
+    }
+    return effectiveFiles.find((f: any) => f?.type === 'file' && getFullPath(f) === rootPath)?.content
+  }, [detectedRoot, effectiveFiles])
   const autoCompileFingerprint = useMemo(() => {
     if (!Array.isArray(effectiveFiles)) return ''
 

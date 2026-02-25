@@ -20,7 +20,7 @@ import { startNavJourney } from '@/lib/perf/nav-trace';
 import { moveProjectToTrash } from '@/lib/utils/project-trash'
 import { formatRelativeTime } from '@/lib/utils/time'
 import { useDashboardSettings } from '@/contexts/DashboardSettingsContext'
-import { fetchPdf } from '@/lib/utils/pdf-utils'
+import { fetchPdf, detectRootFile } from '@/lib/utils/pdf-utils'
 
 interface FolderOption {
   id: string
@@ -91,7 +91,7 @@ export default function ProjectCard({ project, detailed = false, loading = false
       typeof project?.title === 'string' && project.title.startsWith('Welcome to Clarity -')
     if (!isWelcomeProject) return
 
-    const canCompile = files.files.some((file: any) => file?.type === 'file' && (file?.name === 'main.tex' || file?.name === 'main.typ'))
+    const canCompile = detectRootFile(files.files, (f: any) => f.name) !== null
     if (!canCompile) return
 
     previewWarmupStartedRef.current = true

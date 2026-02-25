@@ -173,6 +173,75 @@ function getByteSignature(buffer: ArrayBuffer, maxBytes = 8): string {
     .join(' ')
 }
 
+/**
+ * Detect the root document file for compilation.
+ *
+ * Priority:
+ *  1. Explicit `main.tex` or `main.typ` at the project root (backwards compat)
+ *  2. Any `.tex` file whose content contains `\documentclass` (Overleaf-style)
+ *     — prefer root-level files over nested ones
+ *  3. Any root-level `.typ` file (Typst)
+ *  4. null (no compilable root found)
+ */
+export function detectRootFile(
+  filesArray: any[],
+  getFullPath: (file: any) => string,
+  latexCompiler?: LatexCompiler
+): { compiler: string; rootResourcePath: string; label: string } | null {
+  // Helper: true when a file sits at the project root (no parent)
+  const isRootLevel = (f: any) => !f.parent_id
+  const onlyFiles = filesArray.filter((f: any) => f?.type === 'file')
+
+  // 1. Explicit main.tex / main.typ at root — fast path, preserves old behaviour
+  const mainTex = onlyFiles.find((f: any) => f.name === 'main.tex' && isRootLevel(f))
+  if (mainTex) {
+    return {
+      compiler: latexCompiler || 'pdflatex',
+      rootResourcePath: getFullPath(mainTex),
+      label: 'LaTeX',
+    }
+  }
+  const mainTyp = onlyFiles.find((f: any) => f.name === 'main.typ' && isRootLevel(f))
+  if (mainTyp) {
+    return {
+      compiler: 'typst',
+      rootResourcePath: getFullPath(mainTyp),
+      label: 'Typst',
+    }
+  }
+
+  // 2. Scan for \documentclass — the file that contains it is the LaTeX root.
+  //    Prefer root-level files, then pick the first match.
+  const texFiles = onlyFiles.filter(
+    (f: any) => typeof f.name === 'string' && f.name.toLowerCase().endsWith('.tex')
+  )
+  const hasDocumentClass = (f: any) =>
+    typeof f.content === 'string' && /\\documentclass[\s{[]/m.test(f.content)
+  const rootLevelDocClass = texFiles.find((f: any) => isRootLevel(f) && hasDocumentClass(f))
+  const anyDocClass = rootLevelDocClass || texFiles.find(hasDocumentClass)
+  if (anyDocClass) {
+    return {
+      compiler: latexCompiler || 'pdflatex',
+      rootResourcePath: getFullPath(anyDocClass),
+      label: 'LaTeX',
+    }
+  }
+
+  // 3. Any .typ file at root level — Typst project
+  const rootTyp = onlyFiles.find(
+    (f: any) => typeof f.name === 'string' && f.name.toLowerCase().endsWith('.typ') && isRootLevel(f)
+  )
+  if (rootTyp) {
+    return {
+      compiler: 'typst',
+      rootResourcePath: getFullPath(rootTyp),
+      label: 'Typst',
+    }
+  }
+
+  return null
+}
+
 export async function fetchPdf(
   projectId: string,
   files: EditorFiles | EditorFiles[] | undefined | null,
@@ -188,38 +257,13 @@ export async function fetchPdf(
   if (!files) {
     throw new Error('No files provided. Please ensure you have files in your project.')
   }
-  
+
   // Ensure files is an array
   const filesArray = Array.isArray(files) ? files : Object.values(files)
-  
+
   if (!Array.isArray(filesArray) || filesArray.length === 0) {
     throw new Error('Files array is empty or invalid. Please add files to your project.')
   }
-  
-  const hasMainTex = filesArray.some((file: any) => file?.name === 'main.tex')
-  const hasMainTyp = filesArray.some((file: any) => file?.name === 'main.typ')
-
-  if (!hasMainTex && !hasMainTyp) {
-    const errorData = {
-      error: 'Missing File',
-      message: 'No main.tex or main.typ file found',
-      details: 'A main.tex (LaTeX) or main.typ (Typst) file is required for compilation.',
-    }
-    console.error('Error fetching PDF:', errorData)
-    throw new Error(`${errorData.error}: ${errorData.message}\n\nDetails: ${errorData.details}`)
-  }
-
-  const compileTarget = hasMainTex
-    ? {
-        compiler: (options.latexCompiler || 'pdflatex') as string,
-        rootResourcePath: 'main.tex',
-        label: 'LaTeX',
-      }
-    : {
-        compiler: 'typst' as string,
-        rootResourcePath: 'main.typ',
-        label: 'Typst',
-      }
 
   // Create a map for quick lookups by ID
   const fileMap = new Map<string, any>()
@@ -236,6 +280,18 @@ export async function fetchPdf(
     return parts.join('/')
   }
 
+  // Detect root file (Overleaf-style: \documentclass detection, not just main.tex)
+  const compileTarget = detectRootFile(filesArray, getFullPath, options.latexCompiler)
+  if (!compileTarget) {
+    throw new Error(
+      'No compilable document found.\n\n' +
+      'Could not find a root .tex file (containing \\documentclass) or a .typ file.\n' +
+      'Add a .tex file with \\documentclass{...} or a .typ file to compile.'
+    )
+  }
+
+  console.log('[CLSI] Detected root file:', compileTarget.rootResourcePath, `(${compileTarget.label})`)
+
   // Transform files into CLSI resource format with async map
   const resources = await Promise.all(filesArray
     .filter((file: any) => file.type === 'file')
@@ -244,54 +300,37 @@ export async function fetchPdf(
       let content = file.content || ''
       let encoding: 'utf-8' | 'base64' = 'utf-8'
       
-      // If content is empty but we have an uploaded file, fetch it
+      // For uploaded binary files, resolve a download URL and pass it to
+      // the CLSI so the *server* fetches it (avoids browser CORS issues
+      // and huge base64 JSON payloads).
       if (!content && (file.storagePath || file.url)) {
-        try {
-          // Always get a fresh signed download URL to avoid expiration issues.
-          // Fall back to the stored (possibly stale) URL for legacy files
-          // that don't have storagePath yet.
-          let downloadUrl = file.url
-          if (file.storagePath) {
-            try {
-              downloadUrl = await db.storage.getDownloadUrl(file.storagePath)
-            } catch (urlError) {
-              console.warn(
-                `[CLSI] Failed to refresh download URL for "${file.name}", falling back to stored URL`,
-                urlError
-              )
-            }
-          }
+        let downloadUrl = ''
 
-          if (!downloadUrl) {
-            throw new Error('No download URL available for this file')
+        // Prefer a fresh signed URL from storagePath
+        if (file.storagePath) {
+          try {
+            const freshUrl = await db.storage.getDownloadUrl(file.storagePath)
+            if (freshUrl) downloadUrl = freshUrl
+          } catch {
+            // fall through to cached url
           }
+        }
 
-          const response = await fetch(downloadUrl)
-          if (!response.ok) {
-            throw new Error(`Storage responded ${response.status} ${response.statusText}`)
-          }
-          const arrayBuffer = await response.arrayBuffer()
-          if (arrayBuffer.byteLength === 0) {
-            throw new Error('Storage returned an empty file')
-          }
+        // Fall back to stored (possibly stale) URL
+        if (!downloadUrl && file.url) {
+          downloadUrl = file.url
+        }
 
-          content = arrayBufferToBase64(arrayBuffer)
-          encoding = 'base64'
-
-          console.log('[CLSI] Loaded uploaded resource', {
-            path,
-            bytes: arrayBuffer.byteLength,
-            signature: getByteSignature(arrayBuffer),
-            contentType: response.headers.get('content-type') || 'unknown',
-          })
-        } catch (e) {
-          const reason = e instanceof Error ? e.message : String(e)
+        if (!downloadUrl) {
           throw new Error(
             `Failed to fetch uploaded file "${file.name}" from storage.\n\n` +
             `This file could not be sent to the compiler.\n` +
-            `Reason: ${reason}`
+            `Reason: No download URL available. Try re-uploading "${file.name}" and compiling again.`
           )
         }
+
+        // Send URL to CLSI — the server downloads it (no CORS restrictions)
+        return { path, url: downloadUrl }
       }
 
       return {
@@ -310,8 +349,8 @@ export async function fetchPdf(
   console.log('[CLSI] Root file:', compileTarget.rootResourcePath)
   console.log('[CLSI] Resources:', resources.map(r => r.path))
   console.log(
-    '[CLSI] Resource encodings:',
-    resources.map((resource) => `${resource.path} (${resource.encoding ?? 'utf-8'})`)
+    '[CLSI] Resource types:',
+    resources.map((r: any) => `${r.path} (${r.url ? 'url' : r.encoding ?? 'utf-8'})`)
   )
   const typstAllowNetwork = compileTarget.compiler === 'typst' ? shouldAllowTypstNetwork(resources) : false
 

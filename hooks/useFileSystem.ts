@@ -202,33 +202,45 @@ export function useFileSystem(projectId: string, actorUserId: string, options?: 
 
   const uploadFile = useCallback(async (file: File, parentId: string | null = null) => {
     assertEditorPermissions()
-    try {
-      const path = `${actorUserId}/projects/${projectId}/${Date.now()}-${file.name}`
-      await db.storage.upload(path, file)
-      const url = await db.storage.getDownloadUrl(path)
-      
-      const newId = id()
-      const baseFileTx = tx.files[newId] as unknown as RuleParamsChunk
-      const fileTx = withShareRuleParams(baseFileTx, shareRuleContext)
+    const path = `${actorUserId}/projects/${projectId}/${Date.now()}-${file.name}`
 
-      await db.transact([
-        fileTx.update({
-          name: file.name,
-          type: 'file',
-          url: url,
-          storagePath: path,
-          projectId,
-          user_id: ownerUserId,
-          parent_id: parentId,
-          created_at: new Date().toISOString(),
-        }),
-        ...buildShareGrantOps(newId),
-      ] as any[])
-      return newId
-    } catch (error) {
-      console.error('Failed to upload file:', error)
-      throw error
+    // Step 1: Upload to storage — this is the critical operation.
+    await db.storage.upload(path, file)
+
+    // Step 2: Best-effort URL resolution. storagePath is the permanent
+    // identifier; the compile flow can always resolve a fresh signed URL
+    // from it later, so we never fail the upload just because this step
+    // doesn't succeed immediately.
+    let url: string | undefined
+    try {
+      const result = await db.storage.getDownloadUrl(path)
+      if (result) url = result
+    } catch {
+      // Will be resolved at compile time via storagePath
     }
+
+    // Step 3: Create file record. Always includes storagePath so the file
+    // is usable even when url is empty.
+    const newId = id()
+    const baseFileTx = tx.files[newId] as unknown as RuleParamsChunk
+    const fileTx = withShareRuleParams(baseFileTx, shareRuleContext)
+
+    const record: Record<string, unknown> = {
+      name: file.name,
+      type: 'file',
+      storagePath: path,
+      projectId,
+      user_id: ownerUserId,
+      parent_id: parentId,
+      created_at: new Date().toISOString(),
+    }
+    if (url) record.url = url
+
+    await db.transact([
+      fileTx.update(record),
+      ...buildShareGrantOps(newId),
+    ] as any[])
+    return newId
   }, [
     actorUserId,
     assertEditorPermissions,
@@ -308,11 +320,29 @@ export function useFileSystem(projectId: string, actorUserId: string, options?: 
       return folderIdMap.get(key)!
     }
 
+    // Infer MIME type from extension for better storage compatibility
+    const guessMimeType = (name: string): string | undefined => {
+      const ext = name.toLowerCase().split('.').pop()
+      const mimeMap: Record<string, string> = {
+        png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg',
+        gif: 'image/gif', webp: 'image/webp', svg: 'image/svg+xml',
+        pdf: 'application/pdf',
+        ttf: 'font/ttf', otf: 'font/otf', woff: 'font/woff', woff2: 'font/woff2',
+      }
+      return ext ? mimeMap[ext] : undefined
+    }
+
+    const failed: string[] = []
+
     for (const { path: relativePath, zipEntry } of entries) {
       if (zipEntry.dir) {
-        // Pre-create explicit directory entries
         onProgress?.(`Creating folder: ${relativePath}`)
-        await ensureFolder(relativePath)
+        try {
+          await ensureFolder(relativePath)
+        } catch (e) {
+          console.error(`[zip] Failed to create folder "${relativePath}":`, e)
+          failed.push(relativePath)
+        }
         continue
       }
 
@@ -320,21 +350,40 @@ export function useFileSystem(projectId: string, actorUserId: string, options?: 
       const slashIdx = relativePath.lastIndexOf('/')
       const fileName = slashIdx === -1 ? relativePath : relativePath.slice(slashIdx + 1)
       const folderPath = slashIdx === -1 ? null : relativePath.slice(0, slashIdx)
-      const parentId = folderPath ? await ensureFolder(folderPath) : rootParentId
+
+      let parentId: string | null = rootParentId
+      if (folderPath) {
+        try {
+          parentId = await ensureFolder(folderPath)
+        } catch (e) {
+          console.error(`[zip] Failed to create parent folder for "${relativePath}":`, e)
+          failed.push(relativePath)
+          continue
+        }
+      }
 
       onProgress?.(`Extracting: ${relativePath}`)
 
-      if (isTextFile(fileName)) {
-        // Store UTF-8 text inline
-        const content = await zipEntry.async('string')
-        await createFile(fileName, content, parentId)
-      } else {
-        // Upload binary to InstantDB Storage
-        const arrayBuffer = await zipEntry.async('arraybuffer')
-        const blob = new Blob([arrayBuffer])
-        const file = new File([blob], fileName)
-        await uploadFile(file, parentId)
+      try {
+        if (isTextFile(fileName)) {
+          const content = await zipEntry.async('string')
+          await createFile(fileName, content, parentId)
+        } else {
+          const arrayBuffer = await zipEntry.async('arraybuffer')
+          const mime = guessMimeType(fileName)
+          const blob = new Blob([arrayBuffer], mime ? { type: mime } : undefined)
+          const file = new File([blob], fileName, mime ? { type: mime } : undefined)
+          await uploadFile(file, parentId)
+        }
+      } catch (e) {
+        console.error(`[zip] Failed to extract "${relativePath}":`, e)
+        failed.push(relativePath)
       }
+    }
+
+    if (failed.length > 0) {
+      onProgress?.(`Completed with ${failed.length} failed file(s): ${failed.join(', ')}`)
+      console.warn('[zip] Extraction completed with failures:', failed)
     }
   }, [
     assertEditorPermissions,
