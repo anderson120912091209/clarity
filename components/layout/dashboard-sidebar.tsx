@@ -4,7 +4,7 @@ import React from 'react'
 import Link from 'next/link'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { TooltipProvider } from '@/components/ui/tooltip'
-import { User, ChevronDown, SquarePen, Loader2, Settings, Trash2, Users } from 'lucide-react'
+import { User, ChevronDown, SquarePen, Loader2, Settings, Trash2, Users, BookOpen } from 'lucide-react'
 import { db } from '@/lib/constants'
 import { useRouter, usePathname } from 'next/navigation'
 import { useState } from 'react'
@@ -242,10 +242,25 @@ export default function DashboardSidebar() {
           </Link>
         </nav>
 
-        <div className={`border-t border-white/[0.06] py-3 ${isCollapsed ? 'px-4' : 'px-3'}`}>
+        <div className={`border-t border-white/[0.06] py-3 space-y-1 ${isCollapsed ? 'px-4' : 'px-3'}`}>
+          <Link
+            href="/docs"
+            className={`group flex items-center text-[12px] font-medium
+            rounded-md outline-none focus-visible:ring-2 focus-visible:ring-white/20 transition-colors
+            ${isCollapsed ? 'justify-center py-1.5' : 'gap-2 px-2 py-1.5'}
+            text-[#E3E4E5] hover:bg-[#151619]`}
+            onClick={() => setIsMobileMenuOpen(false)}
+            title={isCollapsed ? 'Documentation' : undefined}
+            target="_blank"
+          >
+            <BookOpen
+              className="h-4 w-4 shrink-0 transition-opacity opacity-70 group-hover:opacity-100"
+            />
+            {!isCollapsed && <span>Documentation</span>}
+          </Link>
           <Link
             href="/settings"
-            className={`group flex items-center text-[12px] font-medium 
+            className={`group flex items-center text-[12px] font-medium
             rounded-md outline-none focus-visible:ring-2 focus-visible:ring-white/20 transition-colors
             ${isCollapsed ? 'justify-center py-1.5' : 'gap-2 px-2 py-1.5'}
             ${isSettingsActive

@@ -1,5 +1,7 @@
 import { notFound } from 'next/navigation'
 import { docsContent, getAllDocSlugs } from '@/lib/docs/content'
+import { getLocale } from '@/lib/i18n/get-locale'
+import { getDocsLocaleData } from '@/lib/docs/get-localized-content'
 import { DocsContent } from '@/components/docs/docs-content'
 import type { Metadata } from 'next'
 
@@ -15,12 +17,16 @@ function resolveSlug(slugArr?: string[]): string {
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug: slugArr } = await params
   const slug = resolveSlug(slugArr)
-  const page = docsContent[slug]
 
-  if (!page) return { title: 'Not Found — Clarity Docs' }
+  const locale = await getLocale()
+  const localeData = await getDocsLocaleData(locale)
+
+  const page = localeData?.pages?.[slug] ?? docsContent[slug]
+
+  if (!page) return { title: 'Not Found \u2014 Clarity Docs' }
 
   return {
-    title: `${page.title} — Clarity Docs`,
+    title: `${page.title} \u2014 Clarity Docs`,
     description: page.description,
   }
 }
@@ -28,7 +34,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 export function generateStaticParams() {
   const slugs = getAllDocSlugs()
   return [
-    { slug: [] }, // /docs → introduction
+    { slug: [] }, // /docs -> introduction
     ...slugs.map((s) => ({ slug: s.split('/') })),
   ]
 }
@@ -36,7 +42,11 @@ export function generateStaticParams() {
 export default async function DocsPage({ params }: Props) {
   const { slug: slugArr } = await params
   const slug = resolveSlug(slugArr)
-  const page = docsContent[slug]
+
+  const locale = await getLocale()
+  const localeData = await getDocsLocaleData(locale)
+
+  const page = localeData?.pages?.[slug] ?? docsContent[slug]
 
   if (!page) notFound()
 

@@ -1,10 +1,12 @@
 'use client'
 
 import Link from 'next/link'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import { ChevronLeft, ChevronRight, Hash, ThumbsUp, ThumbsDown, Info, Lightbulb, AlertTriangle } from 'lucide-react'
-import { type DocPage, getAdjacentPages } from '@/lib/docs/content'
+import { type DocPage } from '@/lib/docs/content'
+import { useDocsLocale } from '@/lib/docs/docs-locale-provider'
 import { cn } from '@/lib/utils'
+import { McpSetupWizard } from '@/components/docs/mcp-setup-wizard'
 
 /* ------------------------------------------------------------------ */
 /*  Extract headings for the "On this page" TOC                        */
@@ -38,6 +40,7 @@ function extractHeadings(raw: string): TocItem[] {
 
 function TableOfContents({ headings }: { headings: TocItem[] }) {
   const [activeId, setActiveId] = useState('')
+  const { ui } = useDocsLocale()
 
   useEffect(() => {
     const observer = new IntersectionObserver(
@@ -65,7 +68,7 @@ function TableOfContents({ headings }: { headings: TocItem[] }) {
     <nav className="hidden xl:block w-56 shrink-0">
       <div className="sticky top-20">
         <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-zinc-500 mb-3">
-          On this page
+          {ui.onThisPage}
         </p>
         <ul className="space-y-0.5 border-l border-white/[0.06]">
           {headings.map((h) => (
@@ -91,7 +94,7 @@ function TableOfContents({ headings }: { headings: TocItem[] }) {
 }
 
 /* ------------------------------------------------------------------ */
-/*  Markdown → JSX renderer (rich version)                             */
+/*  Markdown -> JSX renderer (rich version)                             */
 /* ------------------------------------------------------------------ */
 
 function renderMarkdown(raw: string) {
@@ -205,13 +208,13 @@ function renderMarkdown(raw: string) {
 
       let variant: 'info' | 'tip' | 'warning' = 'info'
       let cleanContent = content
-      if (content.startsWith('**Tip:**') || content.startsWith('**💡')) {
+      if (content.startsWith('**Tip:**') || content.startsWith('**\u{1F4A1}')) {
         variant = 'tip'
         cleanContent = content.replace(/^\*\*(Tip:|💡.*?)\*\*\s*/, '')
-      } else if (content.startsWith('**Warning:**') || content.startsWith('**⚠')) {
+      } else if (content.startsWith('**Warning:**') || content.startsWith('**\u26A0')) {
         variant = 'warning'
         cleanContent = content.replace(/^\*\*(Warning:|⚠.*?)\*\*\s*/, '')
-      } else if (content.startsWith('**Info:**') || content.startsWith('**ℹ')) {
+      } else if (content.startsWith('**Info:**') || content.startsWith('**\u2139')) {
         cleanContent = content.replace(/^\*\*(Info:|ℹ.*?)\*\*\s*/, '')
       }
 
@@ -395,6 +398,57 @@ function renderMarkdown(raw: string) {
       continue
     }
 
+    // Custom component: {{mcp-setup-wizard}}
+    if (line.trim() === '{{mcp-setup-wizard}}') {
+      elements.push(<McpSetupWizard key={key++} />)
+      i++
+      continue
+    }
+
+    // Action button: {{button:Label|href}}
+    const buttonMatch = line.trim().match(/^\{\{button:([^|]+)\|([^}]+)\}\}$/)
+    if (buttonMatch) {
+      const label = buttonMatch[1].trim()
+      const href = buttonMatch[2].trim()
+      elements.push(
+        <div key={key++} className="my-5">
+          <Link
+            href={href}
+            className="inline-flex items-center gap-2 rounded-lg bg-purple-500/15 border border-purple-500/20 px-4 py-2.5 text-[13px] font-medium text-purple-300 transition-all hover:bg-purple-500/25 hover:border-purple-500/30 hover:text-purple-200"
+          >
+            {label}
+            <ChevronRight className="h-3.5 w-3.5 opacity-50" />
+          </Link>
+        </div>
+      )
+      i++
+      continue
+    }
+
+    // Image ![alt](src)
+    const imgMatch = line.trim().match(/^!\[([^\]]*)\]\(([^)]+)\)$/)
+    if (imgMatch) {
+      const alt = imgMatch[1]
+      const src = imgMatch[2]
+      elements.push(
+        <figure key={key++} className="my-8">
+          <img
+            src={src}
+            alt={alt}
+            className="w-full rounded-xl border border-white/[0.08] bg-[#0c0c10]"
+            loading="lazy"
+          />
+          {alt && (
+            <figcaption className="mt-2 text-center text-[12px] text-zinc-600">
+              {alt}
+            </figcaption>
+          )}
+        </figure>
+      )
+      i++
+      continue
+    }
+
     // Paragraph
     const paraLines: string[] = []
     while (
@@ -406,7 +460,9 @@ function renderMarkdown(raw: string) {
       !lines[i].trim().startsWith('>') &&
       !lines[i].match(/^\s*[-*]\s+/) &&
       !lines[i].match(/^\s*\d+\.\s+/) &&
-      !lines[i].match(/^---+$/)
+      !lines[i].match(/^---+$/) &&
+      !lines[i].trim().startsWith('{{') &&
+      !lines[i].trim().match(/^!\[/)
     ) {
       paraLines.push(lines[i])
       i++
@@ -429,10 +485,11 @@ function renderMarkdown(raw: string) {
 
 function WasThisHelpful() {
   const [feedback, setFeedback] = useState<'yes' | 'no' | null>(null)
+  const { ui } = useDocsLocale()
 
   return (
     <div className="mt-12 flex items-center gap-4 rounded-lg border border-white/[0.06] bg-white/[0.02] px-5 py-3.5">
-      <span className="text-[13px] text-zinc-500">Was this helpful?</span>
+      <span className="text-[13px] text-zinc-500">{ui.wasThisHelpful}</span>
       <div className="flex gap-2">
         <button
           onClick={() => setFeedback('yes')}
@@ -461,7 +518,7 @@ function WasThisHelpful() {
       </div>
       {feedback && (
         <span className="text-[12px] text-zinc-500 animate-in fade-in">
-          {feedback === 'yes' ? 'Thanks for your feedback!' : 'We\'ll work on improving this.'}
+          {feedback === 'yes' ? ui.thanksFeedback : ui.willImprove}
         </span>
       )}
     </div>
@@ -473,8 +530,20 @@ function WasThisHelpful() {
 /* ------------------------------------------------------------------ */
 
 export function DocsContent({ slug, page }: { slug: string; page: DocPage }) {
-  const { prev, next } = getAdjacentPages(slug)
+  const { content, ui } = useDocsLocale()
   const headings = extractHeadings(page.content)
+
+  const { prev, next } = useMemo(() => {
+    const slugs = Object.keys(content)
+    const idx = slugs.indexOf(slug)
+    return {
+      prev: idx > 0 ? { slug: slugs[idx - 1], title: content[slugs[idx - 1]].title } : null,
+      next:
+        idx < slugs.length - 1
+          ? { slug: slugs[idx + 1], title: content[slugs[idx + 1]].title }
+          : null,
+    }
+  }, [content, slug])
 
   return (
     <div className="flex gap-10">
@@ -483,7 +552,7 @@ export function DocsContent({ slug, page }: { slug: string; page: DocPage }) {
         {/* Breadcrumb */}
         <nav className="mb-8 flex items-center gap-2 text-[12px] text-zinc-500">
           <Link href="/docs" className="hover:text-zinc-300 transition-colors">
-            Docs
+            {ui.docs}
           </Link>
           {slug.includes('/') && (
             <>
@@ -530,7 +599,7 @@ export function DocsContent({ slug, page }: { slug: string; page: DocPage }) {
               className="group flex flex-col items-start rounded-xl border border-white/[0.08] bg-white/[0.02] px-5 py-4 transition-all hover:border-white/[0.15] hover:bg-white/[0.04] hover:shadow-lg hover:shadow-black/10"
             >
               <span className="text-[11px] font-semibold uppercase tracking-wider text-zinc-500 mb-1.5 flex items-center gap-1">
-                <ChevronLeft className="h-3 w-3" /> Previous
+                <ChevronLeft className="h-3 w-3" /> {ui.previous}
               </span>
               <span className="text-[14px] font-medium text-zinc-300 group-hover:text-white transition-colors">
                 {prev.title}
@@ -545,7 +614,7 @@ export function DocsContent({ slug, page }: { slug: string; page: DocPage }) {
               className="group flex flex-col items-end rounded-xl border border-white/[0.08] bg-white/[0.02] px-5 py-4 transition-all hover:border-white/[0.15] hover:bg-white/[0.04] hover:shadow-lg hover:shadow-black/10"
             >
               <span className="text-[11px] font-semibold uppercase tracking-wider text-zinc-500 mb-1.5 flex items-center gap-1">
-                Next <ChevronRight className="h-3 w-3" />
+                {ui.next} <ChevronRight className="h-3 w-3" />
               </span>
               <span className="text-[14px] font-medium text-zinc-300 group-hover:text-white transition-colors">
                 {next.title}

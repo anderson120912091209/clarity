@@ -2,16 +2,19 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { useState } from 'react'
-import { ChevronRight, Search } from 'lucide-react'
-import { docsNav, docsContent, type DocNavItem } from '@/lib/docs/content'
+import { useState, useMemo, useRef, useEffect } from 'react'
+import { ChevronRight, Search, Globe, Check } from 'lucide-react'
+import { type DocNavItem } from '@/lib/docs/content'
+import { useDocsLocale } from '@/lib/docs/docs-locale-provider'
+import { SUPPORTED_LOCALES, LOCALE_NAMES, LOCALE_COOKIE } from '@/lib/i18n/config'
+import type { Locale } from '@/lib/i18n/config'
 import { cn } from '@/lib/utils'
 
 function slugToHref(slug: string) {
   return `/docs/${slug}`
 }
 
-/* ── Child nav link (nested under a parent) ──────────────────────── */
+/* -- Child nav link (nested under a parent) ----------------------------- */
 
 function ChildLink({ item }: { item: DocNavItem }) {
   const pathname = usePathname()
@@ -34,7 +37,7 @@ function ChildLink({ item }: { item: DocNavItem }) {
   )
 }
 
-/* ── Parent section (has icon + optional children) ────────────────── */
+/* -- Parent section (has icon + optional children) ---------------------- */
 
 function SectionItem({ item }: { item: DocNavItem }) {
   const pathname = usePathname()
@@ -68,6 +71,11 @@ function SectionItem({ item }: { item: DocNavItem }) {
             </span>
           )}
           {item.title}
+          {item.badge && (
+            <span className="ml-auto rounded-full bg-purple-500/15 border border-purple-500/20 px-1.5 py-[1px] text-[10px] font-semibold leading-tight text-purple-400">
+              {item.badge}
+            </span>
+          )}
         </Link>
         {hasChildren && (
           <button
@@ -92,51 +100,104 @@ function SectionItem({ item }: { item: DocNavItem }) {
   )
 }
 
-/* ── Simple search ────────────────────────────────────────────────── */
+/* -- Language switcher --------------------------------------------------- */
 
-function useSearch(query: string) {
-  if (!query.trim()) return null
-  const q = query.toLowerCase()
-  const results: { slug: string; title: string }[] = []
-  for (const [slug, page] of Object.entries(docsContent)) {
-    if (page.title.toLowerCase().includes(q) || page.description.toLowerCase().includes(q)) {
-      results.push({ slug, title: page.title })
+function LanguageSwitcher() {
+  const { locale } = useDocsLocale()
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    function onClickOutside(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
     }
+    if (open) document.addEventListener('mousedown', onClickOutside)
+    return () => document.removeEventListener('mousedown', onClickOutside)
+  }, [open])
+
+  function switchLocale(next: Locale) {
+    document.cookie = `${LOCALE_COOKIE}=${next};path=/;max-age=${60 * 60 * 24 * 365}`
+    setOpen(false)
+    window.location.reload()
   }
-  return results
-}
-
-/* ── Grouping ─────────────────────────────────────────────────────── */
-
-const gettingStarted = docsNav.filter((i) =>
-  ['introduction', 'getting-started'].includes(i.slug)
-)
-const features = docsNav.filter((i) =>
-  ['editor', 'ai-assistant', 'collaboration', 'projects'].includes(i.slug)
-)
-const more = docsNav.filter((i) =>
-  ['settings', 'billing', 'faq'].includes(i.slug)
-)
-
-/* ── Main sidebar component ───────────────────────────────────────── */
-
-export function DocsSidebar({ onNavigate }: { onNavigate?: () => void }) {
-  const [query, setQuery] = useState('')
-  const searchResults = useSearch(query)
 
   return (
-    <nav className="flex flex-col h-full" onClick={onNavigate}>
+    <div className="relative" ref={ref}>
+      <button
+        onClick={() => setOpen(!open)}
+        className={cn(
+          'flex items-center gap-1.5 rounded-md px-2 py-1 text-[11.5px] transition-colors',
+          open
+            ? 'text-zinc-300 bg-white/[0.06]'
+            : 'text-zinc-500 hover:text-zinc-300 hover:bg-white/[0.04]'
+        )}
+      >
+        <Globe className="h-3 w-3" />
+        <span>{LOCALE_NAMES[locale as Locale] ?? locale}</span>
+      </button>
+
+      {open && (
+        <div className="absolute bottom-full right-0 mb-1.5 w-[160px] rounded-lg border border-white/[0.08] bg-[#131318] shadow-xl shadow-black/40 py-1 z-50">
+          {SUPPORTED_LOCALES.map((loc) => (
+            <button
+              key={loc}
+              onClick={() => switchLocale(loc)}
+              className={cn(
+                'flex w-full items-center gap-2 px-3 py-[6px] text-[12px] transition-colors text-left',
+                loc === locale
+                  ? 'text-purple-400'
+                  : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.04]'
+              )}
+            >
+              {loc === locale && <Check className="h-3 w-3 shrink-0" />}
+              <span className={loc === locale ? '' : 'pl-5'}>{LOCALE_NAMES[loc]}</span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+/* -- Main sidebar component --------------------------------------------- */
+
+export function DocsSidebar({ onNavigate }: { onNavigate?: () => void }) {
+  const { nav, content, ui } = useDocsLocale()
+  const [query, setQuery] = useState('')
+
+  const searchResults = useMemo(() => {
+    if (!query.trim()) return null
+    const q = query.toLowerCase()
+    const results: { slug: string; title: string }[] = []
+    for (const [slug, page] of Object.entries(content)) {
+      if (page.title.toLowerCase().includes(q) || page.description.toLowerCase().includes(q)) {
+        results.push({ slug, title: page.title })
+      }
+    }
+    return results
+  }, [query, content])
+
+  const gettingStarted = nav.filter((i) =>
+    ['introduction', 'getting-started'].includes(i.slug)
+  )
+  const features = nav.filter((i) =>
+    ['editor', 'ai-assistant', 'collaboration', 'projects', 'mcp'].includes(i.slug)
+  )
+  const more = nav.filter((i) =>
+    ['settings', 'billing', 'faq'].includes(i.slug)
+  )
+
+  return (
+    <nav className="flex flex-col h-full overflow-x-hidden" onClick={onNavigate}>
       {/* Header */}
-      <div className="px-4 pt-1 pb-4 flex items-center gap-2.5">
-        <Link href="/" className="flex items-center gap-2">
+      <div className="px-4 pt-1 pb-4">
+        <Link href="/" className="inline-flex">
           <img
             src="/landing/claritylogopurple.png"
             alt="Clarity"
             className="h-[22px] w-auto"
           />
         </Link>
-        <span className="text-[12px] text-zinc-600 font-medium">/</span>
-        <span className="text-[13px] text-zinc-300 font-medium">Docs</span>
       </div>
 
       {/* Search */}
@@ -147,7 +208,7 @@ export function DocsSidebar({ onNavigate }: { onNavigate?: () => void }) {
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search..."
+            placeholder={ui.search}
             className="w-full rounded-lg bg-white/[0.03] border border-white/[0.06] pl-8 pr-8 py-[7px] text-[12.5px] text-zinc-300 placeholder:text-zinc-600 outline-none focus:border-purple-500/30 focus:bg-white/[0.05] transition-colors"
           />
           <kbd className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] text-zinc-600 border border-white/[0.06] rounded px-1 py-0.5 font-mono leading-none">
@@ -162,11 +223,11 @@ export function DocsSidebar({ onNavigate }: { onNavigate?: () => void }) {
           /* Search results */
           <div className="space-y-0.5">
             <p className="px-2 pb-2 text-[11px] font-medium uppercase tracking-wider text-zinc-600">
-              Results
+              {ui.results}
             </p>
             {searchResults.length === 0 ? (
               <p className="px-2 py-6 text-[12.5px] text-zinc-600 text-center">
-                No results found.
+                {ui.noResults}
               </p>
             ) : (
               searchResults.map((r) => (
@@ -192,7 +253,7 @@ export function DocsSidebar({ onNavigate }: { onNavigate?: () => void }) {
             {/* Features */}
             <div>
               <p className="px-2 pb-2 text-[11px] font-medium uppercase tracking-[0.08em] text-zinc-600">
-                Features
+                {ui.features}
               </p>
               <div className="space-y-[2px]">
                 {features.map((item) => (
@@ -204,7 +265,7 @@ export function DocsSidebar({ onNavigate }: { onNavigate?: () => void }) {
             {/* More */}
             <div>
               <p className="px-2 pb-2 text-[11px] font-medium uppercase tracking-[0.08em] text-zinc-600">
-                More
+                {ui.more}
               </p>
               <div className="space-y-[2px]">
                 {more.map((item) => (
@@ -217,23 +278,26 @@ export function DocsSidebar({ onNavigate }: { onNavigate?: () => void }) {
       </div>
 
       {/* Footer */}
-      <div className="border-t border-white/[0.04] px-4 py-3 flex items-center gap-3 text-[11.5px] text-zinc-600">
-        <a
-          href="https://discord.gg/JHQhC8VstM"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="hover:text-zinc-400 transition-colors"
-        >
-          Discord
-        </a>
-        <span className="h-0.5 w-0.5 rounded-full bg-zinc-800" />
-        <Link href="/blogs" className="hover:text-zinc-400 transition-colors">
-          Blog
-        </Link>
-        <span className="h-0.5 w-0.5 rounded-full bg-zinc-800" />
-        <Link href="/" className="hover:text-zinc-400 transition-colors">
-          Home
-        </Link>
+      <div className="border-t border-white/[0.04] px-3 py-2.5 flex items-center justify-between">
+        <div className="flex items-center gap-3 text-[11.5px] text-zinc-600">
+          <a
+            href="https://discord.gg/JHQhC8VstM"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="hover:text-zinc-400 transition-colors"
+          >
+            Discord
+          </a>
+          <span className="h-0.5 w-0.5 rounded-full bg-zinc-800" />
+          <Link href="/blogs" className="hover:text-zinc-400 transition-colors">
+            {ui.blog}
+          </Link>
+          <span className="h-0.5 w-0.5 rounded-full bg-zinc-800" />
+          <Link href="/" className="hover:text-zinc-400 transition-colors">
+            {ui.home}
+          </Link>
+        </div>
+        <LanguageSwitcher />
       </div>
     </nav>
   )

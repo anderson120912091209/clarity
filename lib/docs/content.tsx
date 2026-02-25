@@ -14,6 +14,7 @@ import {
   PenTool,
   Monitor,
   MessageSquare,
+  Plug,
   Share2,
   Shield,
   Keyboard,
@@ -28,6 +29,7 @@ export interface DocNavItem {
   title: string
   slug: string
   icon?: React.ComponentType<{ className?: string }>
+  badge?: string
   children?: DocNavItem[]
 }
 
@@ -82,6 +84,17 @@ export const docsNav: DocNavItem[] = [
     children: [
       { title: 'Dashboard', slug: 'projects/dashboard' },
       { title: 'Templates', slug: 'projects/templates' },
+    ],
+  },
+  {
+    title: 'MCP Integration',
+    slug: 'mcp',
+    icon: Plug,
+    badge: 'New',
+    children: [
+      { title: 'Setup Guide', slug: 'mcp/setup' },
+      { title: 'Tools Reference', slug: 'mcp/tools' },
+      { title: 'API Keys & Security', slug: 'mcp/security' },
     ],
   },
   {
@@ -799,6 +812,419 @@ You can effectively create your own templates by:
 
 1. Setting up a project with your preferred structure
 2. Using it as a starting point for future projects
+    `,
+  },
+
+  /* ── MCP Integration ──────────────────────────────────────────── */
+  mcp: {
+    title: 'MCP Integration',
+    description: 'Connect AI assistants directly to your Clarity workspace with the Model Context Protocol.',
+    content: `
+The **Model Context Protocol (MCP)** is an open standard developed by Anthropic that lets AI assistants interact with external tools and services through a unified interface. Clarity implements an MCP server that gives AI clients direct access to your workspace — no copy-pasting, no context switching.
+
+## Supported clients
+
+Clarity works with any MCP-compatible client, including:
+
+- **Claude Desktop** — Anthropic's desktop app for Claude
+- **Cursor** — AI-first code editor
+- **Windsurf** — Codeium's AI editor
+- **Claude Code** — Anthropic's CLI agent
+- Any client that supports the MCP \`stdio\` transport
+
+## What can MCP do?
+
+With MCP enabled, your AI assistant can:
+
+- **Browse your workspace** — list all projects and explore file trees
+- **Read files** — view the content of any file in a project
+- **Write files** — update existing files with new content
+- **Create files** — add new \`.tex\`, \`.typ\`, \`.bib\`, \`.sty\`, and other files
+- **Delete files** — remove files with built-in safety checks (cannot delete main files or non-empty folders)
+- **Compile documents** — build LaTeX and Typst projects and get the result
+- **Debug errors** — get structured error analysis with suggested fixes when compilation fails
+- **Search Typst docs** — look up syntax, functions, and patterns from the built-in Typst documentation library
+- **Read Typst docs** — read full documentation pages for detailed reference
+- **Generate TikZ illustrations** — create professional diagrams, flowcharts, and figures
+
+All from a single chat conversation. Ask your AI to *"fix the compilation error in chapter 3"* and it will read the file, diagnose the issue, apply the fix, and recompile — automatically.
+
+## What MCP cannot do
+
+MCP access is scoped to file-level operations within your existing projects:
+
+- Cannot create or delete entire projects
+- Cannot rename or move files between folders
+- Cannot upload binary files (images, PDFs, fonts)
+- Cannot access other users' projects or data
+- Cannot modify your account settings, billing, or profile
+- Cannot share or publish projects
+- Cannot manage collaborators or permissions
+
+## How it works
+
+Clarity exposes an **MCP server** with **11 tools** that communicates with AI clients via the standard \`stdio\` transport:
+
+1. You generate an **API key** in Clarity Settings → MCP / API
+2. You add Clarity as an MCP server in your AI client's config
+3. The AI client launches the Clarity MCP server as a local subprocess
+4. The server authenticates with your API key and proxies requests to the Clarity API
+5. Your AI assistant calls tools like \`read_file\`, \`write_file\`, and \`compile\` as needed
+
+> **Info:** The MCP server is a lightweight Node.js process — it uses no resources when idle and starts in under a second. Your API key is read from the environment at startup and never stored on disk by the server.
+
+## Architecture
+
+![MCP architecture — AI Client connects via stdio to the local MCP server, which connects via HTTPS to the Clarity API](/docs/mcp-architecture.svg)
+
+Every request is authenticated with your API key, and every operation verifies that you own the requested resource. See the security docs for details on how keys are hashed and stored.
+
+## Get started
+
+- **Setup Guide** — step-by-step instructions for Claude Desktop, Cursor, and other clients
+- **Tools Reference** — detailed documentation for all 11 MCP tools
+- **API Keys & Security** — how keys work, safety practices, and what's protected
+    `,
+  },
+
+  'mcp/setup': {
+    title: 'Setup Guide',
+    description: 'Get Clarity MCP running in Claude Desktop, Cursor, or any MCP-compatible client in under 2 minutes.',
+    content: `
+## Prerequisites
+
+- A Clarity account with at least one project
+- Node.js 18+ installed on your machine
+- An MCP-compatible AI client (Claude Desktop, Cursor, Windsurf, etc.)
+
+> **Info:** The setup wizard below will generate a ready-to-paste config snippet for your client. Just paste your API key and copy the config.
+
+{{mcp-setup-wizard}}
+
+---
+
+## Troubleshooting
+
+| Problem | Solution |
+|---------|----------|
+| "CLARITY_API_KEY is required" | Make sure the \`env\` block includes your key |
+| "API 401: Invalid API key" | Regenerate the key in Settings → MCP / API |
+| Server doesn't start | Ensure Node.js 18+ is installed (\`node --version\`) |
+| Tools not showing up | Restart your AI client after editing the config |
+
+> **Tip:** You can test the connection by asking your AI: *"List my Clarity projects."* If it returns your workspace, everything is working.
+    `,
+  },
+
+  'mcp/tools': {
+    title: 'Tools Reference',
+    description: 'Complete reference for all 11 MCP tools exposed by the Clarity server.',
+    content: `
+The Clarity MCP server exposes **11 tools** organized into four categories. Here's every tool, its parameters, and when to use it.
+
+---
+
+## Project & File Tools
+
+### list_projects
+
+**List all projects in your Clarity workspace.** Returns metadata for every non-trashed project.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| *(none)* | — | — | No parameters |
+
+**When to use:** Start here to get the \`project_id\` needed by other tools.
+
+---
+
+### list_files
+
+**List all files in a project.** Returns names, types, paths, and the main-file flag.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| \`project_id\` | string | Yes | The project ID |
+
+**When to use:** Explore a project's file tree and get \`file_id\` values for other tools.
+
+---
+
+### read_file
+
+**Read the full content of a file.**
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| \`file_id\` | string | Yes | The file ID to read |
+
+**When to use:** Before editing, diagnosing errors, or answering questions about a file.
+
+---
+
+### write_file
+
+**Update the content of an existing file.** Replaces the entire file.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| \`file_id\` | string | Yes | The file ID to update |
+| \`content\` | string | Yes | The new file content |
+
+> **Warning:** This overwrites the entire file. Always read the file first, then send the complete updated content.
+
+---
+
+### create_file
+
+**Create a new file in a project.** Use this when the user needs a new \`.tex\`, \`.typ\`, \`.bib\`, \`.sty\`, or any other file.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| \`project_id\` | string | Yes | The project to create the file in |
+| \`name\` | string | Yes | File name with extension (e.g. \`chapter2.tex\`, \`refs.bib\`) |
+| \`content\` | string | No | Initial file content (defaults to empty) |
+| \`parent_id\` | string | No | Parent folder ID. Omit for project root. |
+
+**Safety features:**
+- Validates file names (no slashes, max 255 chars)
+- Prevents duplicate names in the same folder
+- Verifies parent folder exists
+
+**When to use:** When the user asks to create a new chapter, bibliography, style file, figure file, or any new document.
+
+---
+
+### delete_file
+
+**Delete a file from a project.** This action is permanent.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| \`file_id\` | string | Yes | The file ID to delete |
+
+**Safety features:**
+- **Cannot delete the main entry file** — set a different main file first
+- **Cannot delete non-empty folders** — delete contents first
+- Verifies ownership before deleting
+
+> **Warning:** Deletion is permanent. Use with caution.
+
+---
+
+## Compilation & Debugging
+
+### compile
+
+**Compile a project and return the result.** Automatically detects LaTeX vs Typst and the correct engine.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| \`project_id\` | string | Yes | The project ID to compile |
+
+Returns: status, PDF flag, diagnostics (errors with line numbers), and truncated compile log.
+
+---
+
+### debug_compile
+
+**Compile and return a structured error analysis.** Use this when compilation fails — it provides categorized errors, suggested fixes, and a step-by-step debugging workflow.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| \`project_id\` | string | Yes | The project ID to debug |
+
+**What it does beyond \`compile\`:**
+- Categorizes errors (undefined commands, missing files, syntax issues)
+- Suggests specific fix actions for each error type
+- Extracts the most relevant log lines
+- Returns a debugging workflow: read → fix → write → compile again
+
+**When to use:** When a previous \`compile\` failed, or when the user says "my document won't compile."
+
+---
+
+## Typst Documentation
+
+### typst_docs_search
+
+**Search the built-in Typst documentation library.** Covers Typst language features and the Touying presentation framework.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| \`query\` | string | Yes | Search query (e.g. "table", "slide animation", "bibliography") |
+
+Returns: matched docs with titles, paths, relevance scores, and content snippets.
+
+> **Tip:** Use this BEFORE writing Typst code to ensure you're using the correct syntax and patterns.
+
+**When to use:** When writing or editing Typst files and you need to look up functions, syntax, or patterns.
+
+---
+
+### typst_docs_read
+
+**Read a specific Typst documentation file.** Use after \`typst_docs_search\` to get the full content.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| \`path\` | string | Yes | The \`relativePath\` from a search result |
+
+**When to use:** When a search result looks relevant and you need the complete documentation.
+
+---
+
+## TikZ Illustration
+
+### tikz_illustrate
+
+**Generate professional TikZ illustrations.** Creates a new file and provides structured guidance for producing high-quality diagrams.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| \`project_id\` | string | Yes | The project ID |
+| \`description\` | string | Yes | What to illustrate (e.g. "flowchart of ML pipeline") |
+| \`file_name\` | string | No | File name for the figure (e.g. \`figures/pipeline.tex\`) |
+
+**Capabilities:**
+- Flowcharts and process diagrams
+- Neural network architectures
+- Mathematical plots (via pgfplots)
+- Commutative diagrams (via tikz-cd)
+- Feynman diagrams (via tikz-feynman)
+- Tree structures and hierarchies
+- General scientific illustrations
+
+**When to use:** When the user asks for a diagram, figure, illustration, or visual in their LaTeX document.
+
+---
+
+## Typical workflows
+
+### Edit and compile
+
+1. \`list_projects\` → find the project
+2. \`list_files\` → explore the structure
+3. \`read_file\` → read the target file
+4. \`write_file\` → apply changes
+5. \`compile\` → verify it compiles
+
+### Create a new file
+
+1. \`list_projects\` → find the project
+2. \`create_file\` → create the new file with initial content
+3. \`read_file\` on the main file → add an \`\\input{}\` or \`#include\` reference
+4. \`write_file\` → update the main file
+5. \`compile\` → verify everything works
+
+### Debug a failing build
+
+1. \`debug_compile\` → get structured error analysis
+2. \`read_file\` → read the file with errors
+3. \`write_file\` → fix the issues
+4. \`compile\` → confirm the fix
+
+### Write Typst with confidence
+
+1. \`typst_docs_search\` → look up the syntax you need
+2. \`typst_docs_read\` → read the full documentation
+3. \`write_file\` or \`create_file\` → write correct Typst code
+4. \`compile\` → verify it renders properly
+
+> **Tip:** You can do all of this in a single prompt: *"Create a new chapter file called methodology.tex, add a TikZ flowchart, include it in main.tex, and compile."*
+    `,
+  },
+
+  'mcp/security': {
+    title: 'API Keys & Security',
+    description: 'How Clarity protects your projects and data when using MCP.',
+    content: `
+## How API keys work
+
+When you create an API key in **Settings → MCP / API**, Clarity:
+
+1. Generates **32 cryptographically random bytes** using Node.js \`crypto.randomBytes\`
+2. Encodes them as a base64url string with the prefix \`sk_clarity_\`
+3. Computes a **SHA-256 hash** of the full key
+4. Stores **only the hash** in the database
+5. Returns the plaintext key to you **exactly once**
+
+The plaintext key is never stored, logged, or transmitted after creation. If you lose it, you must generate a new one.
+
+## Authentication flow
+
+Every MCP API request follows this path:
+
+1. Your AI client sends the plaintext key in the \`Authorization: Bearer\` header
+2. The Clarity API hashes the incoming key with SHA-256
+3. It compares the hash against all active key hashes using **timing-safe comparison** (\`crypto.timingSafeEqual\`)
+4. On match, it extracts the associated \`user_id\` and proceeds
+5. Every subsequent operation verifies the user owns the requested resource
+
+> **Info:** Timing-safe comparison prevents attackers from learning anything about your key by measuring response times. Every comparison takes the same amount of time regardless of how many characters match.
+
+## Ownership verification
+
+API key authentication is only the first layer. Every endpoint also checks **resource ownership**:
+
+| Endpoint | Ownership check |
+|----------|-----------------|
+| List projects | Filters to projects where \`user_id\` matches |
+| List / create files | Verifies the project belongs to the user |
+| Read / write / delete file | Verifies the file belongs to the user |
+| Compile / debug | Verifies the project belongs to the user |
+
+This means even if two users somehow had the same API key hash (impossible due to uniqueness constraints), they could never access each other's data.
+
+## Key management best practices
+
+- **Use descriptive labels** — name keys after the client ("Claude Desktop", "Cursor laptop") so you know what to revoke if compromised
+- **One key per client** — don't reuse the same key across multiple machines or tools
+- **Disable before deleting** — if you suspect a key is compromised, toggle it off immediately via the switch in Settings, then investigate
+- **Rotate periodically** — generate a new key and revoke the old one every few months
+- **Never commit keys** — add your MCP config to \`.gitignore\` if it contains plaintext keys
+
+## Key limits
+
+| Feature | Limit |
+|---------|-------|
+| Keys per user | 5 |
+| Key length | 48 characters (32 random bytes + prefix) |
+| Revocation | Immediate — takes effect on the next API request |
+
+## What MCP can and cannot do
+
+**MCP can:**
+
+- List all your projects and browse file trees
+- Read, write, create, and delete files within projects
+- Compile LaTeX and Typst documents
+- Debug compilation errors with structured analysis
+- Search built-in Typst documentation (language features + Touying framework)
+- Read full Typst documentation pages
+- Generate TikZ illustrations and diagrams
+
+**MCP cannot:**
+
+- Create or delete entire projects (only files within them)
+- Delete the main entry file of a project
+- Delete non-empty folders (contents must be removed first)
+- Rename or move files between folders
+- Upload binary files (images, PDFs, fonts)
+- Access other users' data or projects
+- Modify account settings, profile, or preferences
+- Access billing, payment, or subscription information
+- Share or publish projects
+- Manage collaborators or permissions
+- Bypass ownership verification
+
+## Audit trail
+
+Every time your API key is used, Clarity updates the **Last used** timestamp visible in Settings → MCP / API. This helps you:
+
+- Confirm your MCP connection is active
+- Identify stale keys that haven't been used recently
+- Detect unexpected usage patterns
     `,
   },
 

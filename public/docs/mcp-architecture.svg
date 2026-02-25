@@ -1,0 +1,58 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 880 200" fill="none">
+  <defs>
+    <linearGradient id="grad-purple" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#6D78E7" stop-opacity="0.15"/>
+      <stop offset="100%" stop-color="#6D78E7" stop-opacity="0.05"/>
+    </linearGradient>
+    <linearGradient id="grad-blue" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#7cacf8" stop-opacity="0.12"/>
+      <stop offset="100%" stop-color="#7cacf8" stop-opacity="0.04"/>
+    </linearGradient>
+    <linearGradient id="grad-green" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#4ade80" stop-opacity="0.12"/>
+      <stop offset="100%" stop-color="#4ade80" stop-opacity="0.04"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Box 1: AI Client -->
+  <rect x="20" y="30" width="220" height="140" rx="12" fill="url(#grad-purple)" stroke="#6D78E7" stroke-opacity="0.3" stroke-width="1"/>
+  <text x="130" y="80" text-anchor="middle" fill="#c4c9f5" font-family="ui-sans-serif, system-ui, sans-serif" font-size="15" font-weight="600">AI Client</text>
+  <text x="130" y="108" text-anchor="middle" fill="#8b8fa8" font-family="ui-sans-serif, system-ui, sans-serif" font-size="12">Claude Desktop</text>
+  <text x="130" y="126" text-anchor="middle" fill="#8b8fa8" font-family="ui-sans-serif, system-ui, sans-serif" font-size="12">Cursor / Windsurf</text>
+  <!-- Icon badge -->
+  <rect x="36" y="46" width="28" height="28" rx="6" fill="#6D78E7" fill-opacity="0.15" stroke="#6D78E7" stroke-opacity="0.25" stroke-width="0.75"/>
+  <text x="50" y="65" text-anchor="middle" fill="#6D78E7" font-family="ui-sans-serif, system-ui, sans-serif" font-size="14">AI</text>
+
+  <!-- Arrow 1: stdio -->
+  <line x1="250" y1="100" x2="320" y2="100" stroke="#6D78E7" stroke-opacity="0.5" stroke-width="1.5" stroke-dasharray="6 3"/>
+  <polygon points="318,95 328,100 318,105" fill="#6D78E7" fill-opacity="0.6"/>
+  <polygon points="252,95 242,100 252,105" fill="#6D78E7" fill-opacity="0.6"/>
+  <rect x="258" y="68" width="54" height="22" rx="6" fill="#1a1a2e"/>
+  <text x="285" y="83" text-anchor="middle" fill="#8b8fa8" font-family="ui-monospace, monospace" font-size="11">stdio</text>
+
+  <!-- Box 2: MCP Server -->
+  <rect x="330" y="30" width="220" height="140" rx="12" fill="url(#grad-blue)" stroke="#7cacf8" stroke-opacity="0.3" stroke-width="1"/>
+  <text x="440" y="80" text-anchor="middle" fill="#b8d4f8" font-family="ui-sans-serif, system-ui, sans-serif" font-size="15" font-weight="600">MCP Server</text>
+  <text x="440" y="108" text-anchor="middle" fill="#8b8fa8" font-family="ui-sans-serif, system-ui, sans-serif" font-size="12">clarity-mcp-server</text>
+  <text x="440" y="126" text-anchor="middle" fill="#64687a" font-family="ui-sans-serif, system-ui, sans-serif" font-size="11">Local process &#xB7; 11 tools</text>
+  <!-- Icon badge: lightning bolt -->
+  <rect x="346" y="46" width="28" height="28" rx="6" fill="#7cacf8" fill-opacity="0.15" stroke="#7cacf8" stroke-opacity="0.25" stroke-width="0.75"/>
+  <path d="M356 55 L362 55 L359 61 L365 61 L355 71 L358 63 L353 63 Z" fill="#7cacf8"/>
+
+  <!-- Arrow 2: HTTPS -->
+  <line x1="560" y1="100" x2="630" y2="100" stroke="#4ade80" stroke-opacity="0.5" stroke-width="1.5" stroke-dasharray="6 3"/>
+  <polygon points="628,95 638,100 628,105" fill="#4ade80" fill-opacity="0.6"/>
+  <polygon points="562,95 552,100 562,105" fill="#4ade80" fill-opacity="0.6"/>
+  <rect x="562" y="68" width="60" height="22" rx="6" fill="#1a1a2e"/>
+  <text x="592" y="83" text-anchor="middle" fill="#8b8fa8" font-family="ui-monospace, monospace" font-size="11">HTTPS</text>
+
+  <!-- Box 3: Clarity API -->
+  <rect x="640" y="30" width="220" height="140" rx="12" fill="url(#grad-green)" stroke="#4ade80" stroke-opacity="0.3" stroke-width="1"/>
+  <text x="750" y="80" text-anchor="middle" fill="#a8f0c4" font-family="ui-sans-serif, system-ui, sans-serif" font-size="15" font-weight="600">Clarity API</text>
+  <text x="750" y="108" text-anchor="middle" fill="#8b8fa8" font-family="ui-sans-serif, system-ui, sans-serif" font-size="12">Your projects &#x26; files</text>
+  <text x="750" y="126" text-anchor="middle" fill="#64687a" font-family="ui-sans-serif, system-ui, sans-serif" font-size="11">Authenticated &#xB7; Encrypted</text>
+  <!-- Icon badge: lock -->
+  <rect x="656" y="46" width="28" height="28" rx="6" fill="#4ade80" fill-opacity="0.15" stroke="#4ade80" stroke-opacity="0.25" stroke-width="0.75"/>
+  <rect x="665" y="57" width="12" height="10" rx="2" fill="none" stroke="#4ade80" stroke-width="1.5"/>
+  <path d="M668 57 L668 53 Q668 49 671 49 Q674 49 674 53 L674 57" fill="none" stroke="#4ade80" stroke-width="1.5" stroke-linecap="round"/>
+</svg>
