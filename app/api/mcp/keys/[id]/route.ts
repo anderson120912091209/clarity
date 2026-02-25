@@ -1,8 +1,11 @@
 import { NextResponse } from 'next/server'
-import { adminDb } from '@/lib/server/instant-admin'
+import { adminDb, verifyUser } from '@/lib/server/instant-admin'
 import { tx } from '@instantdb/admin'
 
-function getUserId(req: Request): string | null {
+async function getUserId(req: Request): Promise<string | null> {
+  const verified = await verifyUser(req)
+  if (verified) return verified.userId
+
   const userId = req.headers.get('x-clarity-user-id')?.trim()
   if (!userId || userId.length > 200) return null
   return userId
@@ -24,7 +27,7 @@ export async function PATCH(
   req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const userId = getUserId(req)
+  const userId = await getUserId(req)
   if (!userId) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
@@ -59,7 +62,7 @@ export async function DELETE(
   req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const userId = getUserId(req)
+  const userId = await getUserId(req)
   if (!userId) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }

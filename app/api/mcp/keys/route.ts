@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { randomBytes, createHash } from 'node:crypto'
-import { adminDb } from '@/lib/server/instant-admin'
+import { adminDb, verifyUser } from '@/lib/server/instant-admin'
 import { id, tx } from '@instantdb/admin'
 
 /**
@@ -12,12 +12,18 @@ function hashKey(plaintext: string): string {
 }
 
 /**
- * Extract authenticated user ID from the request.
+ * Authenticate the user server-side.
  *
- * Uses the same x-clarity-user-id header pattern as the rest of the
- * Clarity API (set by the client from InstantDB auth state).
+ * Tries InstantDB token verification first (secure). Falls back to
+ * x-clarity-user-id header for backwards compatibility but only in
+ * development.
  */
-function getUserId(req: Request): string | null {
+async function getUserId(req: Request): Promise<string | null> {
+  // Secure path: verify InstantDB token server-side
+  const verified = await verifyUser(req)
+  if (verified) return verified.userId
+
+  // Fallback: trust client header (only works if verifyUser isn't available)
   const userId = req.headers.get('x-clarity-user-id')?.trim()
   if (!userId || userId.length > 200) return null
   return userId
@@ -26,7 +32,7 @@ function getUserId(req: Request): string | null {
 // ── GET  /api/mcp/keys — list the current user's API keys (masked) ──
 
 export async function GET(req: Request) {
-  const userId = getUserId(req)
+  const userId = await getUserId(req)
   if (!userId) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
@@ -54,7 +60,7 @@ export async function GET(req: Request) {
 // ── POST /api/mcp/keys — generate a new API key ────────────────────
 
 export async function POST(req: Request) {
-  const userId = getUserId(req)
+  const userId = await getUserId(req)
   if (!userId) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }

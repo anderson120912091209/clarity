@@ -27,6 +27,7 @@ import {
 import { Switch } from '@/components/ui/switch'
 import { Copy, Check, Plus, Trash2, Key, Plug } from 'lucide-react'
 import { readRuntimeUserHeaders } from '@/lib/client/runtime-user-context'
+import { db } from '@/lib/constants'
 
 // ── Client Icons ────────────────────────────────────────────────────
 
@@ -73,12 +74,18 @@ function timeAgo(dateString: string): string {
   return new Date(dateString).toLocaleDateString()
 }
 
-async function apiFetch(path: string, options: RequestInit = {}) {
+async function apiFetch(path: string, options: RequestInit = {}, authToken?: string) {
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    ...readRuntimeUserHeaders(),
+  }
+  if (authToken) {
+    headers['x-clarity-auth-token'] = authToken
+  }
   const res = await fetch(path, {
     ...options,
     headers: {
-      'Content-Type': 'application/json',
-      ...readRuntimeUserHeaders(),
+      ...headers,
       ...options.headers,
     },
   })
@@ -180,6 +187,9 @@ function HighlightedJson({ code }: { code: string }) {
 // ── Page ────────────────────────────────────────────────────────────
 
 export default function McpSettingsPage() {
+  const { user } = db.useAuth()
+  const authToken = (user as any)?.refresh_token as string | undefined
+
   const [keys, setKeys] = useState<ApiKey[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -211,14 +221,14 @@ export default function McpSettingsPage() {
   const fetchKeys = useCallback(async () => {
     try {
       setError(null)
-      const data = await apiFetch('/api/mcp/keys')
+      const data = await apiFetch('/api/mcp/keys', {}, authToken)
       setKeys(data.keys ?? [])
     } catch (err: any) {
       setError(err.message)
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [authToken])
 
   useEffect(() => {
     fetchKeys()
@@ -232,7 +242,7 @@ export default function McpSettingsPage() {
       const data = await apiFetch('/api/mcp/keys', {
         method: 'POST',
         body: JSON.stringify({ label: createLabel }),
-      })
+      }, authToken)
       setRevealedKey(data.key)
       setShowCreate(false)
       setCreateLabel('')
@@ -255,7 +265,7 @@ export default function McpSettingsPage() {
       await apiFetch(`/api/mcp/keys/${key.id}`, {
         method: 'PATCH',
         body: JSON.stringify({ active: !key.active }),
-      })
+      }, authToken)
     } catch {
       setKeys(prev) // rollback
     }
@@ -267,7 +277,7 @@ export default function McpSettingsPage() {
     if (!revokeTarget) return
     setRevoking(true)
     try {
-      await apiFetch(`/api/mcp/keys/${revokeTarget.id}`, { method: 'DELETE' })
+      await apiFetch(`/api/mcp/keys/${revokeTarget.id}`, { method: 'DELETE' }, authToken)
       setKeys((ks) => ks.filter((k) => k.id !== revokeTarget.id))
     } catch (err: any) {
       setError(err.message)

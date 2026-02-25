@@ -726,7 +726,6 @@ Votre clé API authentifie chaque requête. Le serveur ne stocke jamais votre cl
       content: `## Prérequis
 
 - Un compte Clarity avec au moins un projet
-- Node.js 18+ installé sur votre machine
 - Un client IA compatible MCP (Claude Desktop, Cursor, Windsurf, etc.)
 
 > **Info:** L'assistant de configuration ci-dessous générera un extrait de configuration prêt à coller pour votre client. Il vous suffit de coller votre clé API et de copier la configuration.
@@ -741,7 +740,6 @@ Votre clé API authentifie chaque requête. Le serveur ne stocke jamais votre cl
 |---------|----------|
 | "CLARITY_API_KEY is required" | Assurez-vous que le bloc \`env\` contient votre clé |
 | "API 401: Invalid API key" | Régénérez la clé dans Settings → MCP / API |
-| Le serveur ne démarre pas | Vérifiez que Node.js 18+ est installé (\`node --version\`) |
 | Les outils n'apparaissent pas | Redémarrez votre client IA après avoir modifié la configuration |
 
 > **Tip:** Vous pouvez tester la connexion en demandant à votre IA : *« Liste mes projets Clarity. »* Si elle renvoie votre espace de travail, tout fonctionne.`,

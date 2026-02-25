@@ -726,7 +726,6 @@ Clarity 公開一個具有 **11 個工具** 的 **MCP 伺服器**，在您的本
       content: `## 先決條件
 
 - 擁有至少一個專案的 Clarity 帳號
-- 本機電腦已安裝 Node.js 18+
 - 一個 MCP 相容的 AI 客戶端（Claude Desktop、Cursor、Windsurf 等）
 
 > **Info:** 下方的設定精靈會為您的客戶端生成可直接貼上的設定片段。只需貼上您的 API 金鑰並複製設定即可。
@@ -741,7 +740,6 @@ Clarity 公開一個具有 **11 個工具** 的 **MCP 伺服器**，在您的本
 |---------|----------|
 | "CLARITY_API_KEY is required" | 確認 \`env\` 區塊中包含您的金鑰 |
 | "API 401: Invalid API key" | 在 Settings → MCP / API 中重新生成金鑰 |
-| 伺服器無法啟動 | 確認已安裝 Node.js 18+（\`node --version\`） |
 | 工具未顯示 | 編輯設定後重新啟動您的 AI 客戶端 |
 
 > **Tip:** 您可以透過詢問 AI：*「列出我的 Clarity 專案。」* 來測試連線。如果它回傳您的工作區內容，表示一切正常。`,

@@ -726,7 +726,6 @@ Clarity 提供一个包含 **11 个工具** 的 **MCP 服务器**，它在您的
       content: `## 前提条件
 
 - 拥有至少一个项目的 Clarity 账号
-- 本地机器已安装 Node.js 18+
 - 一个兼容 MCP 的 AI 客户端（Claude Desktop、Cursor、Windsurf 等）
 
 > **Info:** 下方的设置向导将为您的客户端生成即可粘贴的配置代码片段。只需粘贴您的 API 密钥并复制配置即可。
@@ -741,7 +740,6 @@ Clarity 提供一个包含 **11 个工具** 的 **MCP 服务器**，它在您的
 |---------|----------|
 | "CLARITY_API_KEY is required" | 确保 \`env\` 块中包含您的密钥 |
 | "API 401: Invalid API key" | 在设置 → MCP / API 中重新生成密钥 |
-| 服务器无法启动 | 确保已安装 Node.js 18+（\`node --version\`） |
 | 工具未显示 | 编辑配置后重启您的 AI 客户端 |
 
 > **Tip:** 您可以通过让 AI 执行以下命令来测试连接：*"列出我的 Clarity 项目。"* 如果返回了您的工作区，说明一切正常。`,

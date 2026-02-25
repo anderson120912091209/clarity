@@ -894,7 +894,6 @@ Every request is authenticated with your API key, and every operation verifies t
 ## Prerequisites
 
 - A Clarity account with at least one project
-- Node.js 18+ installed on your machine
 - An MCP-compatible AI client (Claude Desktop, Cursor, Windsurf, etc.)
 
 > **Info:** The setup wizard below will generate a ready-to-paste config snippet for your client. Just paste your API key and copy the config.
@@ -909,7 +908,6 @@ Every request is authenticated with your API key, and every operation verifies t
 |---------|----------|
 | "CLARITY_API_KEY is required" | Make sure the \`env\` block includes your key |
 | "API 401: Invalid API key" | Regenerate the key in Settings → MCP / API |
-| Server doesn't start | Ensure Node.js 18+ is installed (\`node --version\`) |
 | Tools not showing up | Restart your AI client after editing the config |
 
 > **Tip:** You can test the connection by asking your AI: *"List my Clarity projects."* If it returns your workspace, everything is working.
