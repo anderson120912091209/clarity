@@ -57,16 +57,7 @@ function configForClient(client: Client, apiKey: string) {
   const url = 'https://www.claritynotes.xyz'
 
   if (client === 'ChatGPT') {
-    // ChatGPT uses remote MCP via URL, not local subprocess
-    return JSON.stringify(
-      {
-        name: 'Clarity',
-        url: `${url}/api/mcp/stream`,
-        auth: `Bearer ${key}`,
-      },
-      null,
-      2
-    )
+    return '' // Coming soon — no config needed yet
   }
 
   if (client === 'Other') {
@@ -127,13 +118,7 @@ function steps(client: Client): React.ReactNode[] {
     ]
   }
   if (client === 'ChatGPT') {
-    return [
-      <span key="s1">Open <span className={kbd}>ChatGPT</span> → <span className={kbd}>Settings</span> → <span className={kbd}>Connected apps</span> → <span className={kbd}>Add custom tool</span></span>,
-      <span key="s2">Set <strong className="text-zinc-200 font-medium">Name</strong> to <code className={file}>Clarity</code></span>,
-      <span key="s3">Set <strong className="text-zinc-200 font-medium">MCP Server URL</strong> to the URL shown below</span>,
-      <span key="s4">Set <strong className="text-zinc-200 font-medium">Authentication</strong> to API Key, and paste your API key</span>,
-      <span key="s5">Click <strong className="text-zinc-200 font-medium">Create</strong></span>,
-    ]
+    return [] // Coming soon
   }
   if (client === 'Cursor') {
     return [
@@ -251,60 +236,78 @@ export function McpSetupWizard() {
             })}
           </div>
 
-          {/* Config file path */}
-          {paths && (
-            <div className="flex flex-col gap-1.5 text-[11px] sm:text-[12px]">
-              <span className="text-zinc-500">Config file location:</span>
-              <div className="space-y-1 overflow-hidden">
-                <div className="flex items-start gap-2">
-                  <span className="text-zinc-600 w-10 sm:w-12 shrink-0 pt-0.5">macOS</span>
-                  <code className="rounded bg-[#1a1a2e] border border-white/[0.06] px-2 py-0.5 font-mono text-[10px] sm:text-[11px] text-zinc-400 break-all">{paths.mac}</code>
-                </div>
-                <div className="flex items-start gap-2">
-                  <span className="text-zinc-600 w-10 sm:w-12 shrink-0 pt-0.5">Win</span>
-                  <code className="rounded bg-[#1a1a2e] border border-white/[0.06] px-2 py-0.5 font-mono text-[10px] sm:text-[11px] text-zinc-400 break-all">{paths.win}</code>
-                </div>
+          {client === 'ChatGPT' ? (
+            /* Coming soon placeholder for ChatGPT */
+            <div className="rounded-lg border border-white/[0.06] bg-[#0a0a0e] px-4 sm:px-5 py-6 sm:py-8 text-center space-y-3">
+              <div className="flex justify-center">
+                <ChatGPTIcon className="h-8 w-8 text-zinc-600" />
+              </div>
+              <div>
+                <p className="text-[13px] sm:text-[14px] font-medium text-zinc-300">Coming soon</p>
+                <p className="text-[11.5px] sm:text-[12.5px] text-zinc-500 mt-1">
+                  ChatGPT requires OAuth authentication for MCP servers.<br />
+                  We&apos;re working on adding support — stay tuned.
+                </p>
               </div>
             </div>
+          ) : (
+            <>
+              {/* Config file path */}
+              {paths && (
+                <div className="flex flex-col gap-1.5 text-[11px] sm:text-[12px]">
+                  <span className="text-zinc-500">Config file location:</span>
+                  <div className="space-y-1 overflow-hidden">
+                    <div className="flex items-start gap-2">
+                      <span className="text-zinc-600 w-10 sm:w-12 shrink-0 pt-0.5">macOS</span>
+                      <code className="rounded bg-[#1a1a2e] border border-white/[0.06] px-2 py-0.5 font-mono text-[10px] sm:text-[11px] text-zinc-400 break-all">{paths.mac}</code>
+                    </div>
+                    <div className="flex items-start gap-2">
+                      <span className="text-zinc-600 w-10 sm:w-12 shrink-0 pt-0.5">Win</span>
+                      <code className="rounded bg-[#1a1a2e] border border-white/[0.06] px-2 py-0.5 font-mono text-[10px] sm:text-[11px] text-zinc-400 break-all">{paths.win}</code>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Config snippet */}
+              <div className="relative rounded-lg border border-white/[0.06] bg-[#0a0a0e] overflow-hidden">
+                <div className="flex items-center justify-between border-b border-white/[0.04] bg-white/[0.02] px-3 sm:px-4 py-1.5">
+                  <span className="text-[10px] font-mono uppercase tracking-wider text-zinc-600">json</span>
+                  <button
+                    onClick={handleCopy}
+                    className="flex items-center gap-1.5 rounded-md px-2 py-1 text-[11px] text-zinc-500 transition-colors hover:bg-white/[0.06] hover:text-zinc-300"
+                  >
+                    {copied ? (
+                      <>
+                        <Check className="h-3 w-3 text-green-400" />
+                        <span className="text-green-400">Copied</span>
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="h-3 w-3" />
+                        Copy
+                      </>
+                    )}
+                  </button>
+                </div>
+                <pre className="p-3 sm:p-4 overflow-x-auto text-[11px] sm:text-[12.5px] leading-[1.7]">
+                  <code className="font-mono"><HighlightedJson code={config} /></code>
+                </pre>
+              </div>
+
+              {/* Steps */}
+              <ol className="space-y-2 sm:space-y-1.5">
+                {stepList.map((step, idx) => (
+                  <li key={idx} className="flex gap-2 sm:gap-2.5 text-[12px] sm:text-[13px] text-zinc-400">
+                    <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-white/[0.04] text-[10px] font-semibold text-zinc-500 mt-0.5">
+                      {idx + 1}
+                    </span>
+                    <span className="leading-relaxed">{step}</span>
+                  </li>
+                ))}
+              </ol>
+            </>
           )}
-
-          {/* Config snippet */}
-          <div className="relative rounded-lg border border-white/[0.06] bg-[#0a0a0e] overflow-hidden">
-            <div className="flex items-center justify-between border-b border-white/[0.04] bg-white/[0.02] px-3 sm:px-4 py-1.5">
-              <span className="text-[10px] font-mono uppercase tracking-wider text-zinc-600">json</span>
-              <button
-                onClick={handleCopy}
-                className="flex items-center gap-1.5 rounded-md px-2 py-1 text-[11px] text-zinc-500 transition-colors hover:bg-white/[0.06] hover:text-zinc-300"
-              >
-                {copied ? (
-                  <>
-                    <Check className="h-3 w-3 text-green-400" />
-                    <span className="text-green-400">Copied</span>
-                  </>
-                ) : (
-                  <>
-                    <Copy className="h-3 w-3" />
-                    Copy
-                  </>
-                )}
-              </button>
-            </div>
-            <pre className="p-3 sm:p-4 overflow-x-auto text-[11px] sm:text-[12.5px] leading-[1.7]">
-              <code className="font-mono"><HighlightedJson code={config} /></code>
-            </pre>
-          </div>
-
-          {/* Steps */}
-          <ol className="space-y-2 sm:space-y-1.5">
-            {stepList.map((step, idx) => (
-              <li key={idx} className="flex gap-2 sm:gap-2.5 text-[12px] sm:text-[13px] text-zinc-400">
-                <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-white/[0.04] text-[10px] font-semibold text-zinc-500 mt-0.5">
-                  {idx + 1}
-                </span>
-                <span className="leading-relaxed">{step}</span>
-              </li>
-            ))}
-          </ol>
         </div>
       </div>
 
