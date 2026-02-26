@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { User, Search, Pencil, ChevronDown, ArrowLeft, Settings, ChevronRight, Palette, MousePointer2, SquarePen } from 'lucide-react'
+import { NewProjectDialog } from '@/components/features/projects/new-project-dialog'
 import { db } from '@/lib/constants'
 import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
@@ -207,24 +208,20 @@ export default function EditorSidebar({
           {/* Right Side Actions - Hidden when collapsed */}
           {!isCollapsed && (
             <div className="flex items-center gap-1 shrink-0">
-              <TooltipProvider delayDuration={0}>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Link
-                      href="/new"
-                      className="w-7 h-7 flex items-center justify-center text-white/70 hover:text-white hover:bg-[#151619] rounded-md transition-colors outline-none focus-visible:ring-2 focus-visible:ring-white/20"
-                      aria-label="New document"
-                      onClick={() => setIsMobileMenuOpen(false)}
-                    >
-                      <SquarePen className="w-4 h-4 opacity-70 group-hover:opacity-100" />
-                    </Link>
-                  </TooltipTrigger>
-                  <TooltipContent side="bottom" className="bg-[#1E1F22] text-white border border-white/[0.08] text-[11px] px-2 py-1 flex items-center gap-1.5 align-center shadow-lg">
-                    <span>Create new doc</span>
-                    <kbd className="text-[9px] font-sans text-white/40 bg-white/5 px-1 rounded-[3px] min-w-[16px] h-4 flex items-center justify-center">C</kbd>
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
+              <NewProjectDialog tooltip={
+                <>
+                  <span>Create new doc</span>
+                  <kbd className="text-[9px] font-sans text-white/40 bg-white/5 px-1 rounded-[3px] min-w-[16px] h-4 flex items-center justify-center">C</kbd>
+                </>
+              }>
+                <button
+                  className="w-7 h-7 flex items-center justify-center text-white/70 hover:text-white hover:bg-[#151619] rounded-md transition-colors outline-none focus-visible:ring-2 focus-visible:ring-white/20"
+                  aria-label="New document"
+                  onClick={() => setIsMobileMenuOpen(false)}
+                >
+                  <SquarePen className="w-4 h-4 opacity-70 group-hover:opacity-100" />
+                </button>
+              </NewProjectDialog>
             </div>
           )}
         </div>

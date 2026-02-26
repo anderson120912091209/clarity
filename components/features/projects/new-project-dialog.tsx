@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect, useCallback, useMemo } from 'react'
 import { Dialog, DialogContent, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { Input } from '@/components/ui/input'
@@ -13,9 +13,11 @@ import { tx, id } from '@instantdb/react'
 import { templateContent, typstTemplateContent, latexTemplates, typstTemplates } from '@/lib/constants/templates'
 import { uploadTemplatePlaceholders } from '@/lib/utils/upload-template-placeholders'
 import TemplateCard from '@/components/projects/template-card'
-import { FileText, Loader2, ArrowRight, LayoutTemplate, Command, CheckIcon } from 'lucide-react'
+import { Loader2, Command } from 'lucide-react'
 import { getWorkspaceName, cn } from '@/lib/utils'
 import posthog from 'posthog-js'
+
+type DocFilter = 'all' | 'latex' | 'typst'
 
 interface NewProjectDialogProps {
   children: React.ReactNode
@@ -40,33 +42,47 @@ export function NewProjectDialog({ children, open: controlledOpen, onOpenChange:
   const { settings } = useDashboardSettings()
   const router = useRouter()
   const [title, setTitle] = useState('')
-  const [docType, setDocType] = useState<'latex' | 'typst'>('latex')
-  const [selectedTemplate, setSelectedTemplate] = useState('blank')
-  const [isExpanded, setIsExpanded] = useState(false)
+  const [activeFilter, setActiveFilter] = useState<DocFilter>('all')
+  const [selectedTemplate, setSelectedTemplate] = useState<{ id: string, type: 'latex' | 'typst' }>({ id: 'blank', type: 'latex' })
   const [isCreating, setIsCreating] = useState(false)
 
-  const currentTemplates = docType === 'latex' ? latexTemplates : typstTemplates
+  // Combine and interleave templates based on filter
+  const filteredTemplates = useMemo(() => {
+    const latex = latexTemplates.map(t => ({ ...t, type: 'latex' as const }))
+    const typst = typstTemplates.map(t => ({ ...t, type: 'typst' as const }))
 
-  // Reset template selection when switching doc type if current template invalid
-  useEffect(() => {
-    const templateExists = currentTemplates.find(t => t.id === selectedTemplate)
-    if (!templateExists) {
-      setSelectedTemplate('blank')
+    if (activeFilter === 'latex') return latex
+    if (activeFilter === 'typst') return typst
+
+    // Interleave for "all"
+    const mixed = []
+    const maxLength = Math.max(latex.length, typst.length)
+    for (let i = 0; i < maxLength; i++) {
+      if (i < latex.length) mixed.push(latex[i])
+      if (i < typst.length) mixed.push(typst[i])
     }
-  }, [docType, currentTemplates, selectedTemplate])
+    return mixed
+  }, [activeFilter])
 
-  // Focus title input on open
+  // When filter changes, reset selection if current isn't visible
+  useEffect(() => {
+    if (activeFilter !== 'all' && selectedTemplate.type !== activeFilter) {
+      if (filteredTemplates.length > 0) {
+        setSelectedTemplate({ id: filteredTemplates[0].id, type: filteredTemplates[0].type })
+      }
+    }
+  }, [activeFilter, selectedTemplate.type, filteredTemplates])
+
+  // Focus title input on open; reset state on close
   useEffect(() => {
     if (open) {
       setTimeout(() => {
         document.getElementById('new-project-title')?.focus()
       }, 100)
     } else {
-      // Reset state on close
       setTitle('')
-      setDocType('latex')
-      setSelectedTemplate('blank')
-      setIsExpanded(false)
+      setActiveFilter('all')
+      setSelectedTemplate({ id: 'blank', type: 'latex' })
       setIsCreating(false)
     }
   }, [open])
@@ -78,36 +94,32 @@ export function NewProjectDialog({ children, open: controlledOpen, onOpenChange:
     try {
         const newProjectId = id()
         const mainFileId = id()
-        const extension = docType === 'latex' ? 'tex' : 'typ'
+        const extension = selectedTemplate.type === 'latex' ? 'tex' : 'typ'
         const fileName = `main.${extension}`
-        
+
         let content = ''
-        if (docType === 'latex') {
-          content = templateContent[selectedTemplate as keyof typeof templateContent] || templateContent['blank']
+        if (selectedTemplate.type === 'latex') {
+          content = templateContent[selectedTemplate.id as keyof typeof templateContent] || templateContent['blank']
         } else {
-          content = typstTemplateContent[selectedTemplate as keyof typeof typstTemplateContent] || typstTemplateContent['blank']
+          content = typstTemplateContent[selectedTemplate.id as keyof typeof typstTemplateContent] || typstTemplateContent['blank']
         }
-    
-        const createFileStructure = () => {
-          return [
-            {
-              id: mainFileId,
-              name: fileName,
-              type: 'file',
-              parent_id: null,
-              content: content,
-              isExpanded: null,
-              pathname: fileName,
-              user_id: user.id,
-            },
-          ]
-        }
-    
-        const fileStructure = createFileStructure()
+
+        const fileStructure = [
+          {
+            id: mainFileId,
+            name: fileName,
+            type: 'file',
+            parent_id: null,
+            content: content,
+            isExpanded: null,
+            pathname: fileName,
+            user_id: user.id,
+          },
+        ]
 
         // Upload placeholder images referenced by the template (e.g. fig1.png)
         const placeholderOps = await uploadTemplatePlaceholders(
-          selectedTemplate,
+          selectedTemplate.id,
           user.id,
           newProjectId,
         )
@@ -117,13 +129,13 @@ export function NewProjectDialog({ children, open: controlledOpen, onOpenChange:
             user_id: user.id,
             title: title.trim(),
             project_content: content,
-            template: selectedTemplate,
+            template: selectedTemplate.id,
             last_compiled: new Date(),
             word_count: 0,
             page_count: 0,
-            document_class: 'blank',
+            document_class: selectedTemplate.id,
             created_at: new Date(),
-            type: docType,
+            type: selectedTemplate.type,
             activeFileId: mainFileId,
             pdfBackgroundTheme: settings.defaultPdfBackgroundTheme,
             isPdfCaretNavigationEnabled: settings.defaultPdfCaretNavigation,
@@ -146,11 +158,10 @@ export function NewProjectDialog({ children, open: controlledOpen, onOpenChange:
           ...placeholderOps,
         ])
 
-        // Track quick project creation event
         posthog.capture('project_created', {
           project_id: newProjectId,
-          doc_type: docType,
-          template: selectedTemplate,
+          doc_type: selectedTemplate.type,
+          template: selectedTemplate.id,
           source: 'quick_dialog',
         })
 
@@ -160,7 +171,7 @@ export function NewProjectDialog({ children, open: controlledOpen, onOpenChange:
         console.error("Failed to create project", e)
         setIsCreating(false)
     }
-  }, [docType, router, selectedTemplate, setOpen, settings.defaultPdfBackgroundTheme, settings.defaultPdfCaretNavigation, title, user])
+  }, [router, selectedTemplate, setOpen, settings.defaultPdfBackgroundTheme, settings.defaultPdfCaretNavigation, title, user])
 
   // Handle keyboard shortcuts
   useEffect(() => {
@@ -174,15 +185,6 @@ export function NewProjectDialog({ children, open: controlledOpen, onOpenChange:
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [open, handleCreate])
-
-  const handleBrowseTemplates = () => {
-    setIsExpanded(!isExpanded)
-  }
-
-  const handleRouteToMarketplace = () => {
-    setOpen(false)
-    router.push('/new')
-  }
 
   const triggerContent = (
     <DialogTrigger asChild>
@@ -205,12 +207,9 @@ export function NewProjectDialog({ children, open: controlledOpen, onOpenChange:
       ) : (
         triggerContent
       )}
-      <DialogContent className={cn(
-        "sm:top-[46%] p-0 gap-0 bg-[#1C1D1F] border-[#2C2C2C] shadow-2xl overflow-hidden transition-all duration-200 ease-out",
-        isExpanded ? "sm:max-w-[800px]" : "sm:max-w-[600px]"
-      )}>
+      <DialogContent className="sm:top-[46%] p-0 gap-0 bg-[#1C1D1F] border-[#2C2C2C] shadow-2xl overflow-hidden sm:max-w-[720px]">
         <DialogTitle className="sr-only">Create new project</DialogTitle>
-        
+
         {/* Header / Title Input */}
         <div className="p-6 pb-4 space-y-4">
             <div className="flex items-center justify-between">
@@ -222,118 +221,82 @@ export function NewProjectDialog({ children, open: controlledOpen, onOpenChange:
                     <span>Create Project</span>
                 </div>
             </div>
-            
+
             <Input
                 id="new-project-title"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 placeholder="Project title..."
                 className="text-xl font-medium bg-transparent
-                 border-none p-0 h-auto placeholder:text-zinc-600 
+                 border-none p-0 h-auto placeholder:text-zinc-600
                  focus-visible:ring-0 font-semibold text-white"
                 autoComplete="off"
             />
-
         </div>
 
-        {/* Expanded Templates Section */}
-        {isExpanded && (
-            <div className="px-6 pb-6 pt-2 border-t border-white/5 bg-[#151619]/50 animate-in slide-in-from-top-4 fade-in duration-300">
-                <div className="flex items-center justify-between mb-4">
-                     <span className="text-sm text-zinc-400 font-medium">Select a starting template</span>
-                     <Button 
-                         variant="ghost" 
-                         size="sm"
-                         onClick={handleRouteToMarketplace}
-                         className="text-zinc-400 hover:text-white hover:bg-white/5 gap-2 h-7 text-xs font-medium px-2 rounded-md transition-colors"
-                     >
-                         Templates Marketplace <ArrowRight className="w-3.5 h-3.5" />
-                     </Button>
-                </div>
-                
-                <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-5 gap-4 max-h-[360px] overflow-y-auto pr-2 custom-scrollbar">
-                    {currentTemplates.map((template) => (
-                        <TemplateCard 
-                            key={template.id}
-                            template={template}
-                            isSelected={selectedTemplate === template.id}
-                            onClick={() => setSelectedTemplate(template.id)}
-                            imageClassName="aspect-[1/1.414]"
-                        />
+        {/* Templates Section */}
+        <div className="px-6 pb-4 pt-2 border-t border-white/5 bg-[#151619]/50">
+            <div className="flex items-center justify-between mb-4">
+                <span className="text-sm text-zinc-400 font-medium">Choose a template</span>
+                <div className="flex items-center p-0.5 rounded-md border border-white/5">
+                    {(['all', 'latex', 'typst'] as const).map((filter) => (
+                        <button
+                            key={filter}
+                            onClick={() => setActiveFilter(filter)}
+                            className={`px-2.5 py-1 rounded-sm text-[11px] font-medium transition-all ${
+                                activeFilter === filter
+                                    ? 'bg-[#33353E] text-white shadow-sm'
+                                    : 'text-zinc-400 hover:text-zinc-300 hover:bg-white/5'
+                            }`}
+                        >
+                            {filter === 'all' ? 'All' : filter === 'latex' ? 'LaTeX' : 'Typst'}
+                        </button>
                     ))}
                 </div>
             </div>
-        )}
+
+            <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-5 gap-4 max-h-[340px] overflow-y-auto pr-1 custom-scrollbar">
+                {filteredTemplates.map((template) => (
+                    <TemplateCard
+                        key={`${template.type}-${template.id}`}
+                        template={template}
+                        isSelected={selectedTemplate.id === template.id && selectedTemplate.type === template.type}
+                        onClick={() => setSelectedTemplate({ id: template.id, type: template.type })}
+                        showTypeBadge={activeFilter === 'all'}
+                        imageClassName="aspect-[1/1.414]"
+                    />
+                ))}
+            </div>
+        </div>
 
         {/* Footer Actions */}
         <div className="px-6 py-3 flex items-center justify-between border-t border-white/5">
-            <div className="flex items-center gap-3">
-                <div className="flex shadow-y shadow-md items-center p-0.5 rounded-md
-                 border border-white/5">
-                    <button
-                        onClick={() => setDocType('latex')}
-                        className={`px-3 py-1 rounded-sm text-xs font-medium transition-all ${
-                            docType === 'latex' 
-                                ? 'bg-[#33353E] text-white shadow-sm' 
-                                : 'text-zinc-400 hover:text-zinc-300 hover:bg-white/5'
-                        }`}
-                    >
-                        LaTeX
-                    </button>
-                    <button
-                        onClick={() => setDocType('typst')}
-                        className={`px-3 py-1 rounded-sm text-xs font-medium transition-all ${
-                            docType === 'typst' 
-                                ? 'bg-[#33353E] text-white shadow-sm ' 
-                                : 'text-zinc-400 hover:text-zinc-300 hover:bg-white/5'
-                        }`}
-                    >
-                        Typst
-                    </button>
-                </div>
+            <span className="text-xs text-zinc-500">
+                {filteredTemplates.length} templates
+            </span>
 
-                <Button 
-                    variant="ghost" 
-                    size="sm"
-                    onClick={handleBrowseTemplates}
-                    className={cn(
-                        "gap-2 h-7 text-xs font-medium px-2 rounded-md transition-colors",
-                        isExpanded 
-                            ? "bg-[#2C2C2C] text-white" 
-                            : "text-zinc-400 hover:text-zinc-200 hover:bg-[#151619]/60"
-                    )}
-                >
-                    <LayoutTemplate className="w-3.5 h-3.5" />
-                    Browse Templates
-                </Button>
-            </div>
-
-            <div className="flex items-center gap-3">
-                 
-                
-                <Button
-                    onClick={handleCreate}
-                    disabled={!title.trim() || isCreating}
-                    className="h-8 bg-[#5E6AD3] hover:bg-[#6D78E7]
-                    text-white transition-all gap-2 text-xs font-medium px-3 pr-1.5
-                     rounded-[6px] shadow-md shadow-y border border-white/20 hover:shadow-md active:scale-95"
-                >
-                    {isCreating ? (
-                        <>
-                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                            Creating...
-                        </>
-                    ) : (
-                        <>
-                            <span>Create Project</span>
-                            <div className="flex items-center gap-0.5 bg-white/10 rounded px-1.5 py-0.5 ml-1 border border-white/5">
-                                <Command className="w-2.5 h-2.5 text-white/90" />
-                                <span className="font-sans text-[10px] font-medium text-white/90">↵</span>
-                            </div>
-                        </>
-                    )}
-                </Button>
-            </div>
+            <Button
+                onClick={handleCreate}
+                disabled={!title.trim() || isCreating}
+                className="h-8 bg-[#5E6AD3] hover:bg-[#6D78E7]
+                text-white transition-all gap-2 text-xs font-medium px-3 pr-1.5
+                 rounded-[6px] shadow-md shadow-y border border-white/20 hover:shadow-md active:scale-95"
+            >
+                {isCreating ? (
+                    <>
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        Creating...
+                    </>
+                ) : (
+                    <>
+                        <span>Create Project</span>
+                        <div className="flex items-center gap-0.5 bg-white/10 rounded px-1.5 py-0.5 ml-1 border border-white/5">
+                            <Command className="w-2.5 h-2.5 text-white/90" />
+                            <span className="font-sans text-[10px] font-medium text-white/90">↵</span>
+                        </div>
+                    </>
+                )}
+            </Button>
         </div>
       </DialogContent>
     </Dialog>

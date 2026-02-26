@@ -4,7 +4,6 @@ import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { SearchIcon, PlusIcon } from 'lucide-react'
-import Link from 'next/link'
 import ProjectCard from '@/components/projects/project-card'
 import NewProjectCard from '@/components/projects/new-project-card'
 import FolderCard from '@/components/projects/folder-card'
@@ -12,7 +11,7 @@ import { useFrontend } from '@/contexts/FrontendContext'
 import { getAllProjects, getAllFolders, createFolder, addProjectsToFolder, removeProjectsFromFolder } from '@/hooks/data'
 import { ViewToggle } from '@/components/projects/view-toggle'
 import ProjectListItem from '@/components/projects/project-list-item'
-import { startNavJourney } from '@/lib/perf/nav-trace'
+import { NewProjectDialog } from '@/components/features/projects/new-project-dialog'
 import { useDashboardSettings } from '@/contexts/DashboardSettingsContext'
 import { DragSelect } from '@/components/projects/drag-select'
 import { SelectionToolbar } from '@/components/projects/selection-toolbar'
@@ -253,21 +252,15 @@ export default function ProjectsPage() {
             Sort: {sortOrder === 'date' ? 'Date' : 'Name'}
           </Button>
 
-          <Button
-            className="h-8 px-3 text-white font-medium tracking-wide rounded-md transition-all shadow-sm ml-auto md:ml-0 text-[12px]"
-            style={{ backgroundColor: '#6D78E7' }}
-            asChild
-          >
-            <Link
-              href="/new"
-              onClick={() =>
-                startNavJourney('new_doc_open', { source: 'projects_header_button' })
-              }
+          <NewProjectDialog>
+            <Button
+              className="h-8 px-3 text-white font-medium tracking-wide rounded-md transition-all shadow-sm ml-auto md:ml-0 text-[12px]"
+              style={{ backgroundColor: '#6D78E7' }}
             >
               <PlusIcon className="mr-1.5 h-3.5 w-3.5" />
               New Project
-            </Link>
-          </Button>
+            </Button>
+          </NewProjectDialog>
         </div>
       </div>
 
