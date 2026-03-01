@@ -2,9 +2,14 @@
 
 import Link from 'next/link'
 import { useLocale } from '@/contexts/LocaleContext'
+import { addLocalePrefix } from '@/lib/i18n/pathname'
 
 export function FooterContent() {
-  const { t } = useLocale()
+  const { t, locale } = useLocale()
+  const homeHref = addLocalePrefix('/', locale)
+  const docsHref = addLocalePrefix('/docs', locale)
+  const blogsHref = addLocalePrefix('/blogs', locale)
+  const loginHref = addLocalePrefix('/login', locale)
 
   return (
     <div className="w-full flex flex-col gap-0">
@@ -12,7 +17,7 @@ export function FooterContent() {
       <div className="flex flex-col md:flex-row justify-between items-center md:items-start gap-6 mb-8">
         {/* Left: Logo & tagline */}
         <div className="flex flex-col items-center md:items-start gap-2">
-          <Link href="/" className="flex items-center gap-2.5">
+          <Link href={homeHref} className="flex items-center gap-2.5">
             <img
               src="/landing/claritylogopurple.png"
               alt="Clarity"
@@ -27,13 +32,13 @@ export function FooterContent() {
         {/* Right: Nav columns */}
         <div className="flex items-center gap-8">
           <Link
-            href="/docs"
+            href={docsHref}
             className="text-sm text-zinc-500 hover:text-zinc-300 transition-colors"
           >
             {t('nav.docs')}
           </Link>
           <Link
-            href="/blogs"
+            href={blogsHref}
             className="text-sm text-zinc-500 hover:text-zinc-300 transition-colors"
           >
             {t('nav.blogs')}
@@ -47,7 +52,7 @@ export function FooterContent() {
             Discord
           </a>
           <Link
-            href="/login"
+            href={loginHref}
             className="text-sm text-zinc-500 hover:text-zinc-300 transition-colors"
           >
             {t('nav.signin')}

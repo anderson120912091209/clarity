@@ -3,10 +3,12 @@
 import { Button } from '@/components/ui/button'
 import Link from 'next/link'
 import { useLocale } from '@/contexts/LocaleContext'
+import { addLocalePrefix } from '@/lib/i18n/pathname'
 import { motion } from 'framer-motion'
 
 export function Hero() {
-  const { t } = useLocale()
+  const { t, locale } = useLocale()
+  const signupHref = addLocalePrefix('/signup', locale)
   const productHuntLaunchUrl =
     'https://www.producthunt.com/products/clarity-21?embed=true&utm_source=badge-featured&utm_medium=badge&utm_campaign=badge-clarity-89170959-d8de-41bc-a06f-3686aed72d5b'
   const productHuntBadgeSrc =
@@ -48,7 +50,7 @@ export function Hero() {
             className="h-12 px-8 bg-white text-black hover:bg-zinc-200
              text-sm font-semibold shadow-lg rounded-full transition-colors cursor-crosshair"
           >
-            <Link href="/login" className="flex h-full items-center justify-center cursor-crosshair">
+            <Link href={signupHref} className="flex h-full items-center justify-center cursor-crosshair">
               {t('hero.cta')}
             </Link>
           </Button>

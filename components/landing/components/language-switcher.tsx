@@ -1,12 +1,17 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { Globe } from 'lucide-react'
 import { useLocale } from '@/contexts/LocaleContext'
 import { SUPPORTED_LOCALES, LOCALE_NAMES } from '@/lib/i18n/config'
+import { addLocalePrefix } from '@/lib/i18n/pathname'
 
 export function LanguageSwitcher() {
   const { locale, setLocale } = useLocale()
+  const router = useRouter()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
 
@@ -38,6 +43,9 @@ export function LanguageSwitcher() {
               key={loc}
               onClick={() => {
                 setLocale(loc)
+                const nextPath = addLocalePrefix(pathname || '/', loc)
+                const nextQuery = searchParams.toString()
+                router.push(nextQuery ? `${nextPath}?${nextQuery}` : nextPath)
                 setOpen(false)
               }}
               className={`w-full text-left px-4 py-2 text-sm transition-colors ${

@@ -4,15 +4,19 @@ import Link from 'next/link'
 import { AuthButton } from '@/components/landing/components/auth-button'
 import { LanguageSwitcher } from '@/components/landing/components/language-switcher'
 import { useLocale } from '@/contexts/LocaleContext'
+import { addLocalePrefix } from '@/lib/i18n/pathname'
 
 export function Navbar({ minimal = false }: { minimal?: boolean }) {
-  const { t } = useLocale()
+  const { t, locale } = useLocale()
+  const homeHref = addLocalePrefix('/', locale)
+  const docsHref = addLocalePrefix('/docs', locale)
+  const blogsHref = addLocalePrefix('/blogs', locale)
 
   return (
     <header className="fixed top-0 w-full z-50 px-4 md:px-6 py-4 bg-zinc-950/70 backdrop-blur-md
      border-b border-xs border-zinc-300/5">
       <div className="max-w-5xl mx-auto flex items-center justify-between relative">
-        <Link href="/" className="flex items-center gap-2.5">
+        <Link href={homeHref} className="flex items-center gap-2.5">
            <img
               src="/landing/claritylogopurple.png"
               alt="Clarity"
@@ -25,13 +29,13 @@ export function Navbar({ minimal = false }: { minimal?: boolean }) {
             {/* Center — Blog + Docs links */}
             <nav className="absolute left-1/2 -translate-x-1/2 hidden md:flex items-center gap-6">
               <Link
-                href="/docs"
+                href={docsHref}
                 className="text-sm font-medium text-zinc-400 transition-colors hover:text-white"
               >
                 {t('nav.docs')}
               </Link>
               <Link
-                href="/blogs"
+                href={blogsHref}
                 className="text-sm font-medium text-zinc-400 transition-colors hover:text-white"
               >
                 {t('nav.blogs')}
@@ -41,13 +45,13 @@ export function Navbar({ minimal = false }: { minimal?: boolean }) {
             {/* Right — Discord, Language, Auth */}
             <div className="flex items-center gap-4">
               <Link
-                href="/docs"
+                href={docsHref}
                 className="text-sm font-medium text-zinc-400 transition-colors hover:text-white md:hidden"
               >
                 {t('nav.docs')}
               </Link>
               <Link
-                href="/blogs"
+                href={blogsHref}
                 className="text-sm font-medium text-zinc-400 transition-colors hover:text-white md:hidden"
               >
                 {t('nav.blogs')}

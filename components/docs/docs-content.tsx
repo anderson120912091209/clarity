@@ -5,6 +5,8 @@ import { useEffect, useState, useMemo } from 'react'
 import { ChevronLeft, ChevronRight, Hash, ThumbsUp, ThumbsDown, Info, Lightbulb, AlertTriangle } from 'lucide-react'
 import { type DocPage } from '@/lib/docs/content'
 import { useDocsLocale } from '@/lib/docs/docs-locale-provider'
+import { addLocalePrefix } from '@/lib/i18n/pathname'
+import type { Locale } from '@/lib/i18n/config'
 import { cn } from '@/lib/utils'
 import { McpSetupWizard } from '@/components/docs/mcp-setup-wizard'
 
@@ -530,8 +532,9 @@ function WasThisHelpful() {
 /* ------------------------------------------------------------------ */
 
 export function DocsContent({ slug, page }: { slug: string; page: DocPage }) {
-  const { content, ui } = useDocsLocale()
+  const { content, ui, locale } = useDocsLocale()
   const headings = extractHeadings(page.content)
+  const localePrefix = locale as Locale
 
   const { prev, next } = useMemo(() => {
     const slugs = Object.keys(content)
@@ -551,14 +554,14 @@ export function DocsContent({ slug, page }: { slug: string; page: DocPage }) {
       <article className="flex-1 min-w-0 max-w-3xl">
         {/* Breadcrumb */}
         <nav className="mb-5 sm:mb-8 flex items-center gap-1.5 sm:gap-2 text-[11px] sm:text-[12px] text-zinc-500 overflow-x-auto">
-          <Link href="/docs" className="hover:text-zinc-300 transition-colors">
+          <Link href={addLocalePrefix('/docs', localePrefix)} className="hover:text-zinc-300 transition-colors">
             {ui.docs}
           </Link>
           {slug.includes('/') && (
             <>
               <ChevronRight className="h-3 w-3 text-zinc-600" />
               <Link
-                href={`/docs/${slug.split('/')[0]}`}
+                href={addLocalePrefix(`/docs/${slug.split('/')[0]}`, localePrefix)}
                 className="hover:text-zinc-300 transition-colors capitalize"
               >
                 {slug.split('/')[0].replace(/-/g, ' ')}
@@ -595,7 +598,7 @@ export function DocsContent({ slug, page }: { slug: string; page: DocPage }) {
         <div className="mt-8 sm:mt-10 grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 border-t border-white/[0.06] pt-6 sm:pt-8 pb-6 sm:pb-8">
           {prev ? (
             <Link
-              href={`/docs/${prev.slug}`}
+              href={addLocalePrefix(`/docs/${prev.slug}`, localePrefix)}
               className="group flex flex-col items-start rounded-xl border border-white/[0.08] bg-white/[0.02] px-5 py-4 transition-all hover:border-white/[0.15] hover:bg-white/[0.04] hover:shadow-lg hover:shadow-black/10"
             >
               <span className="text-[11px] font-semibold uppercase tracking-wider text-zinc-500 mb-1.5 flex items-center gap-1">
@@ -610,7 +613,7 @@ export function DocsContent({ slug, page }: { slug: string; page: DocPage }) {
           )}
           {next ? (
             <Link
-              href={`/docs/${next.slug}`}
+              href={addLocalePrefix(`/docs/${next.slug}`, localePrefix)}
               className="group flex flex-col items-end rounded-xl border border-white/[0.08] bg-white/[0.02] px-5 py-4 transition-all hover:border-white/[0.15] hover:bg-white/[0.04] hover:shadow-lg hover:shadow-black/10"
             >
               <span className="text-[11px] font-semibold uppercase tracking-wider text-zinc-500 mb-1.5 flex items-center gap-1">

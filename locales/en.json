@@ -60,6 +60,17 @@
   "cta.button": "Get Started Free",
   "cta.discord": "Join Discord",
 
+  "auth.welcome": "Welcome to clarity.",
+  "auth.subtitle": "Collaborative AI-powered research editor",
+  "auth.continue_google": "Continue with Google",
+  "auth.continue_github": "Continue with GitHub",
+  "auth.loading": "Loading...",
+  "auth.error_title": "Error",
+  "auth.terms_intro": "By continuing, you agree to our",
+  "auth.terms_of_service": "Terms of Service",
+  "auth.privacy_policy": "Privacy Policy",
+  "auth.and": "and",
+
   "footer.copyright": "\u00a9 2026 Clarity Research. All rights reserved.",
 
   "meta.title": "{clarity}",

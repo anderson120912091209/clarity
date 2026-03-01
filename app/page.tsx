@@ -6,18 +6,25 @@ import { CtaSection } from '@/components/landing/cta-section'
 import { FooterContent } from '@/components/landing/footer-content'
 import { getLocale } from '@/lib/i18n/get-locale'
 import { getDictionary } from '@/lib/i18n/dictionaries'
+import { addLocalePrefix, buildLocaleAlternates } from '@/lib/i18n/pathname'
 
 export async function generateMetadata(): Promise<Metadata> {
   const locale = await getLocale()
   const dict = await getDictionary(locale)
+  const canonicalPath = addLocalePrefix('/', locale)
 
   return {
     title: dict['meta.title'] ?? '{clarity}',
     description: dict['meta.description'] ?? 'AI Powered Overleaf Alternative, Supports LaTeX, Typst...',
+    alternates: {
+      canonical: canonicalPath,
+      languages: buildLocaleAlternates('/'),
+    },
     openGraph: {
       title: dict['meta.title'] ?? '{clarity}',
       description: dict['meta.description'] ?? 'AI Powered Overleaf Alternative, Supports LaTeX, Typst...',
       images: ['/meta.png'],
+      url: canonicalPath,
     },
     twitter: {
       card: 'summary_large_image',

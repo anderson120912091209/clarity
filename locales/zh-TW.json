@@ -60,6 +60,17 @@
   "cta.button": "免費開始",
   "cta.discord": "加入 Discord",
 
+  "auth.welcome": "歡迎來到 Clarity。",
+  "auth.subtitle": "協作式 AI 研究寫作編輯器",
+  "auth.continue_google": "使用 Google 繼續",
+  "auth.continue_github": "使用 GitHub 繼續",
+  "auth.loading": "載入中...",
+  "auth.error_title": "錯誤",
+  "auth.terms_intro": "繼續即表示你同意我們的",
+  "auth.terms_of_service": "服務條款",
+  "auth.privacy_policy": "隱私政策",
+  "auth.and": "與",
+
   "footer.copyright": "\u00a9 2026 Clarity Research. 保留所有權利。",
 
   "meta.title": "{clarity}",

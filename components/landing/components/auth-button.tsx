@@ -4,10 +4,13 @@ import { db } from '@/lib/constants'
 import { Button } from '@/components/ui/button'
 import Link from 'next/link'
 import { useLocale } from '@/contexts/LocaleContext'
+import { addLocalePrefix } from '@/lib/i18n/pathname'
 
 export function AuthButton() {
   const { user } = db.useAuth()
-  const { t } = useLocale()
+  const { t, locale } = useLocale()
+  const loginHref = addLocalePrefix('/login', locale)
+  const signupHref = addLocalePrefix('/signup', locale)
 
   if (user) {
     return (
@@ -22,7 +25,7 @@ export function AuthButton() {
   return (
     <div className="flex items-center gap-3">
       <Link
-        href="/login"
+        href={loginHref}
         className="text-sm font-medium text-zinc-400 hover:text-white transition-colors"
       >
         {t('nav.signin')}
@@ -32,7 +35,7 @@ export function AuthButton() {
         className="h-8 px-4 bg-white text-black hover:bg-zinc-200
          font-medium text-sm rounded-full transition-colors"
       >
-        <Link href="/login">
+        <Link href={signupHref}>
           {t('nav.signup')}
         </Link>
       </Button>

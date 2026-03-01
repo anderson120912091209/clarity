@@ -5,6 +5,8 @@ import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { Navbar } from '@/components/landing/navbar'
 import { getAllBlogPosts, getBlogPostBySlug } from '@/lib/blog/posts'
+import { getLocale } from '@/lib/i18n/get-locale'
+import { addLocalePrefix, buildLocaleAlternates } from '@/lib/i18n/pathname'
 
 type BlogPostPageProps = {
   params: Promise<{
@@ -21,6 +23,7 @@ export async function generateStaticParams() {
 export async function generateMetadata({ params }: BlogPostPageProps): Promise<Metadata> {
   const { slug } = await params
   const post = getBlogPostBySlug(slug)
+  const locale = await getLocale()
 
   if (!post) {
     return {
@@ -29,7 +32,8 @@ export async function generateMetadata({ params }: BlogPostPageProps): Promise<M
     }
   }
 
-  const canonicalPath = `/blogs/${post.slug}`
+  const slugPath = `/blogs/${post.slug}`
+  const canonicalPath = addLocalePrefix(slugPath, locale)
   const title = `${post.title} | Clarity Blog`
 
   return {
@@ -38,6 +42,7 @@ export async function generateMetadata({ params }: BlogPostPageProps): Promise<M
     keywords: post.keywords,
     alternates: {
       canonical: canonicalPath,
+      languages: buildLocaleAlternates(slugPath),
     },
     openGraph: {
       title,
@@ -56,10 +61,14 @@ export async function generateMetadata({ params }: BlogPostPageProps): Promise<M
 export default async function BlogPostPage({ params }: BlogPostPageProps) {
   const { slug } = await params
   const post = getBlogPostBySlug(slug)
+  const locale = await getLocale()
 
   if (!post) {
     notFound()
   }
+
+  const slugPath = `/blogs/${post.slug}`
+  const localizedSlugPath = addLocalePrefix(slugPath, locale)
 
   const articleJsonLd = {
     '@context': 'https://schema.org',
@@ -75,7 +84,7 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
     keywords: post.keywords.join(', '),
     mainEntityOfPage: {
       '@type': 'WebPage',
-      '@id': `/blogs/${post.slug}`,
+      '@id': localizedSlugPath,
     },
   }
 
@@ -97,7 +106,7 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
 
         <div className="mx-auto max-w-3xl mb-12 sm:mb-16">
           <Link
-            href="/blogs"
+            href={addLocalePrefix('/blogs', locale)}
             className="group inline-flex items-center gap-2 text-sm font-medium text-zinc-500 transition-colors hover:text-zinc-300"
           >
             <span className="transition-transform group-hover:-translate-x-1">←</span>

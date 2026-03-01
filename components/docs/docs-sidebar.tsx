@@ -1,29 +1,30 @@
 'use client'
 
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { useState, useMemo, useRef, useEffect } from 'react'
 import { ChevronRight, Search, Globe, Check } from 'lucide-react'
 import { type DocNavItem } from '@/lib/docs/content'
 import { useDocsLocale } from '@/lib/docs/docs-locale-provider'
 import { SUPPORTED_LOCALES, LOCALE_NAMES, LOCALE_COOKIE } from '@/lib/i18n/config'
 import type { Locale } from '@/lib/i18n/config'
+import { addLocalePrefix, stripLocaleFromPathname } from '@/lib/i18n/pathname'
 import { cn } from '@/lib/utils'
 
-function slugToHref(slug: string) {
-  return `/docs/${slug}`
+function slugToHref(slug: string, locale: Locale) {
+  return addLocalePrefix(`/docs/${slug}`, locale)
 }
 
 /* -- Child nav link (nested under a parent) ----------------------------- */
 
-function ChildLink({ item }: { item: DocNavItem }) {
-  const pathname = usePathname()
-  const isActive = pathname === slugToHref(item.slug)
+function ChildLink({ item, locale }: { item: DocNavItem; locale: Locale }) {
+  const pathname = stripLocaleFromPathname(usePathname())
+  const isActive = pathname === stripLocaleFromPathname(slugToHref(item.slug, locale))
 
   return (
     <li>
       <Link
-        href={slugToHref(item.slug)}
+        href={slugToHref(item.slug, locale)}
         className={cn(
           'block py-[5px] pl-4 text-[13px] transition-colors border-l',
           isActive
@@ -39,10 +40,11 @@ function ChildLink({ item }: { item: DocNavItem }) {
 
 /* -- Parent section (has icon + optional children) ---------------------- */
 
-function SectionItem({ item }: { item: DocNavItem }) {
-  const pathname = usePathname()
-  const isActive = pathname === slugToHref(item.slug)
-  const isParentActive = pathname.startsWith(slugToHref(item.slug) + '/')
+function SectionItem({ item, locale }: { item: DocNavItem; locale: Locale }) {
+  const pathname = stripLocaleFromPathname(usePathname())
+  const currentSlugHref = stripLocaleFromPathname(slugToHref(item.slug, locale))
+  const isActive = pathname === currentSlugHref
+  const isParentActive = pathname.startsWith(`${currentSlugHref}/`)
   const [open, setOpen] = useState(isActive || isParentActive)
 
   const hasChildren = item.children && item.children.length > 0
@@ -52,7 +54,7 @@ function SectionItem({ item }: { item: DocNavItem }) {
     <div>
       <div className="flex items-center gap-1">
         <Link
-          href={slugToHref(item.slug)}
+          href={slugToHref(item.slug, locale)}
           className={cn(
             'flex flex-1 items-center gap-2.5 rounded-md px-2 py-[6px] text-[13px] transition-colors',
             isActive || isParentActive
@@ -92,7 +94,7 @@ function SectionItem({ item }: { item: DocNavItem }) {
       {hasChildren && open && (
         <ul className="ml-[19px] mt-1 space-y-[1px] mb-1">
           {item.children!.map((child) => (
-            <ChildLink key={child.slug} item={child} />
+            <ChildLink key={child.slug} item={child} locale={locale} />
           ))}
         </ul>
       )}
@@ -104,6 +106,9 @@ function SectionItem({ item }: { item: DocNavItem }) {
 
 function LanguageSwitcher() {
   const { locale } = useDocsLocale()
+  const router = useRouter()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
 
@@ -117,8 +122,10 @@ function LanguageSwitcher() {
 
   function switchLocale(next: Locale) {
     document.cookie = `${LOCALE_COOKIE}=${next};path=/;max-age=${60 * 60 * 24 * 365}`
+    const nextPath = addLocalePrefix(pathname || '/', next)
+    const query = searchParams.toString()
+    router.push(query ? `${nextPath}?${query}` : nextPath)
     setOpen(false)
-    window.location.reload()
   }
 
   return (
@@ -162,7 +169,8 @@ function LanguageSwitcher() {
 /* -- Main sidebar component --------------------------------------------- */
 
 export function DocsSidebar({ onNavigate }: { onNavigate?: () => void }) {
-  const { nav, content, ui } = useDocsLocale()
+  const { nav, content, ui, locale: docsLocale } = useDocsLocale()
+  const locale = docsLocale as Locale
   const [query, setQuery] = useState('')
 
   const searchResults = useMemo(() => {
@@ -191,7 +199,7 @@ export function DocsSidebar({ onNavigate }: { onNavigate?: () => void }) {
     <nav className="flex flex-col h-full overflow-x-hidden" onClick={onNavigate}>
       {/* Header */}
       <div className="px-4 pt-1 pb-4">
-        <Link href="/" className="inline-flex">
+        <Link href={addLocalePrefix('/', locale)} className="inline-flex">
           <img
             src="/landing/claritylogopurple.png"
             alt="Clarity"
@@ -233,7 +241,7 @@ export function DocsSidebar({ onNavigate }: { onNavigate?: () => void }) {
               searchResults.map((r) => (
                 <Link
                   key={r.slug}
-                  href={`/docs/${r.slug}`}
+                  href={addLocalePrefix(`/docs/${r.slug}`, locale)}
                   className="block rounded-md px-2 py-[6px] text-[13px] text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.04] transition-colors"
                 >
                   {r.title}
@@ -246,7 +254,7 @@ export function DocsSidebar({ onNavigate }: { onNavigate?: () => void }) {
             {/* Getting started */}
             <div className="space-y-[2px]">
               {gettingStarted.map((item) => (
-                <SectionItem key={item.slug} item={item} />
+                <SectionItem key={item.slug} item={item} locale={locale} />
               ))}
             </div>
 
@@ -257,7 +265,7 @@ export function DocsSidebar({ onNavigate }: { onNavigate?: () => void }) {
               </p>
               <div className="space-y-[2px]">
                 {features.map((item) => (
-                  <SectionItem key={item.slug} item={item} />
+                  <SectionItem key={item.slug} item={item} locale={locale} />
                 ))}
               </div>
             </div>
@@ -269,7 +277,7 @@ export function DocsSidebar({ onNavigate }: { onNavigate?: () => void }) {
               </p>
               <div className="space-y-[2px]">
                 {more.map((item) => (
-                  <SectionItem key={item.slug} item={item} />
+                  <SectionItem key={item.slug} item={item} locale={locale} />
                 ))}
               </div>
             </div>
@@ -289,11 +297,11 @@ export function DocsSidebar({ onNavigate }: { onNavigate?: () => void }) {
             Discord
           </a>
           <span className="h-0.5 w-0.5 rounded-full bg-zinc-800" />
-          <Link href="/blogs" className="hover:text-zinc-400 transition-colors">
+          <Link href={addLocalePrefix('/blogs', locale)} className="hover:text-zinc-400 transition-colors">
             {ui.blog}
           </Link>
           <span className="h-0.5 w-0.5 rounded-full bg-zinc-800" />
-          <Link href="/" className="hover:text-zinc-400 transition-colors">
+          <Link href={addLocalePrefix('/', locale)} className="hover:text-zinc-400 transition-colors">
             {ui.home}
           </Link>
         </div>

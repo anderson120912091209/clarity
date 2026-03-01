@@ -7,9 +7,11 @@ import { Button } from '@/components/ui/button'
 import { startStripeCheckout } from '@/lib/stripe/checkout'
 import posthog from 'posthog-js'
 import { useLocale } from '@/contexts/LocaleContext'
+import { addLocalePrefix } from '@/lib/i18n/pathname'
 
 export function Pricing() {
-  const { t } = useLocale()
+  const { t, locale } = useLocale()
+  const signupHref = addLocalePrefix('/signup', locale)
   const [isUpgrading, setIsUpgrading] = useState(false)
 
   const handleUpgrade = async () => {
@@ -70,7 +72,7 @@ export function Pricing() {
             </ul>
 
             <Button asChild className="w-full h-8 md:h-10 text-[11px] md:text-sm bg-zinc-100 text-black hover:bg-zinc-200">
-              <Link href="/login">{t('pricing.free_cta')}</Link>
+              <Link href={signupHref}>{t('pricing.free_cta')}</Link>
             </Button>
           </div>
 

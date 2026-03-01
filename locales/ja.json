@@ -60,6 +60,17 @@
   "cta.button": "無料で始める",
   "cta.discord": "Discordに参加",
 
+  "auth.welcome": "Clarityへようこそ。",
+  "auth.subtitle": "共同編集できるAI研究エディター",
+  "auth.continue_google": "Googleで続行",
+  "auth.continue_github": "GitHubで続行",
+  "auth.loading": "読み込み中...",
+  "auth.error_title": "エラー",
+  "auth.terms_intro": "続行すると、",
+  "auth.terms_of_service": "利用規約",
+  "auth.privacy_policy": "プライバシーポリシー",
+  "auth.and": "と",
+
   "footer.copyright": "\u00a9 2026 Clarity Research. All rights reserved.",
 
   "meta.title": "{clarity}",

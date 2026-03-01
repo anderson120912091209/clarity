@@ -3,11 +3,13 @@
 import { Button } from '@/components/ui/button'
 import Link from 'next/link'
 import { useLocale } from '@/contexts/LocaleContext'
+import { addLocalePrefix } from '@/lib/i18n/pathname'
 import { motion } from 'framer-motion'
 import { ArrowRight } from 'lucide-react'
 
 export function CtaSection() {
-  const { t } = useLocale()
+  const { t, locale } = useLocale()
+  const signupHref = addLocalePrefix('/signup', locale)
 
   return (
     <section className="py-24 md:py-32 px-6 bg-[#0c0c0e]">
@@ -32,7 +34,7 @@ export function CtaSection() {
                 className="h-12 px-8 bg-white text-black hover:bg-zinc-200
                  text-sm font-semibold shadow-lg rounded-full transition-colors cursor-crosshair"
               >
-                <Link href="/login" className="flex h-full items-center justify-center gap-2 cursor-crosshair">
+                <Link href={signupHref} className="flex h-full items-center justify-center gap-2 cursor-crosshair">
                   {t('cta.button') ?? 'Get Started Free'}
                   <ArrowRight className="w-4 h-4" />
                 </Link>

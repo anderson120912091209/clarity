@@ -16,6 +16,7 @@ import {
   writeRuntimeUserContext,
   CLARITY_RUNTIME_USER_PLAN_KEY,
 } from '@/lib/client/runtime-user-context'
+import { addLocalePrefix, extractLocaleFromPathname, stripLocaleFromPathname } from '@/lib/i18n/pathname'
 
 type FrontendAuthState = ReturnType<(typeof db)['useAuth']>
 type FrontendUser = FrontendAuthState['user']
@@ -43,8 +44,17 @@ export function FrontendProvider({ children }: { children: ReactNode }) {
   const { user, isLoading } = db.useAuth()
   const router = useRouter()
   const pathname = usePathname()
+  const routeLocale = extractLocaleFromPathname(pathname || '/')?.locale
+  const normalizedPathname = stripLocaleFromPathname(pathname || '/')
+  const localizedLoginPath = routeLocale ? addLocalePrefix('/login', routeLocale) : '/login'
   const isPublicRoute =
-    pathname === '/' || pathname === '/login' || pathname === '/blogs' || pathname.startsWith('/blogs/') || pathname === '/docs' || pathname.startsWith('/docs/')
+    normalizedPathname === '/' ||
+    normalizedPathname === '/login' ||
+    normalizedPathname === '/signup' ||
+    normalizedPathname === '/blogs' ||
+    normalizedPathname.startsWith('/blogs/') ||
+    normalizedPathname === '/docs' ||
+    normalizedPathname.startsWith('/docs/')
   const accountPlanQuery = db.useQuery(
     user
       ? {
@@ -89,9 +99,9 @@ export function FrontendProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!isLoading && !user && !isPublicRoute) {
-      router.push('/login')
+      router.push(localizedLoginPath)
     }
-  }, [isLoading, user, router, isPublicRoute])
+  }, [isLoading, user, router, isPublicRoute, localizedLoginPath])
 
   useEffect(() => {
     if (isLoading) return

@@ -4,6 +4,7 @@ import { getLocale } from '@/lib/i18n/get-locale'
 import { getDocsLocaleData } from '@/lib/docs/get-localized-content'
 import { DocsContent } from '@/components/docs/docs-content'
 import type { Metadata } from 'next'
+import { addLocalePrefix, buildLocaleAlternates } from '@/lib/i18n/pathname'
 
 interface Props {
   params: Promise<{ slug?: string[] }>
@@ -17,6 +18,7 @@ function resolveSlug(slugArr?: string[]): string {
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug: slugArr } = await params
   const slug = resolveSlug(slugArr)
+  const slugPath = slug === 'introduction' ? '/docs' : `/docs/${slug}`
 
   const locale = await getLocale()
   const localeData = await getDocsLocaleData(locale)
@@ -28,6 +30,10 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   return {
     title: `${page.title} \u2014 Clarity Docs`,
     description: page.description,
+    alternates: {
+      canonical: addLocalePrefix(slugPath, locale),
+      languages: buildLocaleAlternates(slugPath),
+    },
   }
 }
 

@@ -1,13 +1,27 @@
 import type { Metadata } from 'next'
 import { Navbar } from '@/components/landing/navbar'
+import { getLocale } from '@/lib/i18n/get-locale'
+import { addLocalePrefix, buildLocaleAlternates } from '@/lib/i18n/pathname'
 
-export const metadata: Metadata = {
-  title: 'Clarity Blog | Coming Soon',
-  description:
-    'Guides for researchers on scientific writing, LaTeX, Typst, and better academic collaboration.',
-  alternates: {
-    canonical: '/blogs',
-  },
+export async function generateMetadata(): Promise<Metadata> {
+  const locale = await getLocale()
+  const canonicalPath = addLocalePrefix('/blogs', locale)
+
+  return {
+    title: 'Clarity Blog | Coming Soon',
+    description:
+      'Guides for researchers on scientific writing, LaTeX, Typst, and better academic collaboration.',
+    alternates: {
+      canonical: canonicalPath,
+      languages: buildLocaleAlternates('/blogs'),
+    },
+    openGraph: {
+      title: 'Clarity Blog | Coming Soon',
+      description:
+        'Guides for researchers on scientific writing, LaTeX, Typst, and better academic collaboration.',
+      url: canonicalPath,
+    },
+  }
 }
 
 export default function BlogsPage() {
