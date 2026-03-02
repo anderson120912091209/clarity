@@ -79,6 +79,14 @@ interface CompileResultPayload {
   message?: string
 }
 
+interface MissingResourceDebugReport {
+  missingReference: string
+  caseMismatchPath: string | null
+  extensionCandidates: string[]
+  basenameCandidates: string[]
+  totalResources: number
+}
+
 function getUserFacingCompileMessage(
   compileResult: CompileResultPayload,
   compileLabel: string
@@ -171,6 +179,102 @@ function getByteSignature(buffer: ArrayBuffer, maxBytes = 8): string {
   return Array.from(bytes)
     .map((byte) => byte.toString(16).padStart(2, '0'))
     .join(' ')
+}
+
+function normalizeCompilerPath(value: string): string {
+  return value
+    .replace(/\\/g, '/')
+    .replace(/^\/+/, '')
+    .replace(/^\.\//, '')
+    .trim()
+}
+
+function removeFileExtension(value: string): string {
+  const extensionIndex = value.lastIndexOf('.')
+  if (extensionIndex <= 0) return value
+  return value.slice(0, extensionIndex)
+}
+
+function analyzeMissingLatexResource(
+  logs: string | null,
+  resourcePaths: string[]
+): MissingResourceDebugReport | null {
+  if (!logs) return null
+
+  const missingMatch = logs.match(/! LaTeX Error: File `([^']+)' not found\./m)
+  if (!missingMatch) return null
+
+  const missingReference = normalizeCompilerPath(missingMatch[1])
+  if (!missingReference) return null
+
+  const normalizedPaths = Array.from(
+    new Set(resourcePaths.map((path) => normalizeCompilerPath(path)).filter(Boolean))
+  )
+
+  const missingLower = missingReference.toLowerCase()
+  const missingBasenameLower = missingReference.split('/').pop()?.toLowerCase() ?? missingLower
+  const missingWithoutExt = removeFileExtension(missingReference).toLowerCase()
+  const missingBaseWithoutExt = removeFileExtension(missingBasenameLower)
+  const missingHasExt = missingReference.includes('.')
+
+  const caseMismatchPath =
+    normalizedPaths.find((candidate) => candidate.toLowerCase() === missingLower) ?? null
+
+  const extensionCandidates = normalizedPaths.filter((candidate) => {
+    const candidateWithoutExt = removeFileExtension(candidate).toLowerCase()
+    const candidateBasenameLower = candidate.split('/').pop()?.toLowerCase() ?? candidate.toLowerCase()
+    const candidateBaseWithoutExt = removeFileExtension(candidateBasenameLower)
+    return (
+      candidateWithoutExt === missingWithoutExt ||
+      candidateBaseWithoutExt === missingBaseWithoutExt
+    )
+  })
+
+  const basenameCandidates = normalizedPaths.filter((candidate) => {
+    const candidateBasenameLower = candidate.split('/').pop()?.toLowerCase() ?? candidate.toLowerCase()
+    return candidateBasenameLower === missingBasenameLower
+  })
+
+  return {
+    missingReference,
+    caseMismatchPath:
+      caseMismatchPath && caseMismatchPath !== missingReference ? caseMismatchPath : null,
+    extensionCandidates:
+      missingHasExt ? [] : extensionCandidates.slice(0, 6),
+    basenameCandidates: basenameCandidates.slice(0, 6),
+    totalResources: normalizedPaths.length,
+  }
+}
+
+function buildMissingResourceSummary(report: MissingResourceDebugReport): string {
+  if (report.caseMismatchPath) {
+    return (
+      `Missing file: ${report.missingReference}. ` +
+      `A resource exists with different letter casing (${report.caseMismatchPath}); ` +
+      'Linux path resolution is case-sensitive.'
+    )
+  }
+
+  if (report.extensionCandidates.length > 0) {
+    return (
+      `Missing file: ${report.missingReference}. ` +
+      `Found similarly named resources: ${report.extensionCandidates.join(', ')}. ` +
+      'Check extension/path in \\includegraphics or \\input.'
+    )
+  }
+
+  if (report.basenameCandidates.length > 0) {
+    return (
+      `Missing file: ${report.missingReference}. ` +
+      `Found matching basename at different paths: ${report.basenameCandidates.join(', ')}. ` +
+      'Check the relative path from the root TeX file.'
+    )
+  }
+
+  return (
+    `Missing file: ${report.missingReference}. ` +
+    `No matching path found among ${report.totalResources} resource(s) sent to compiler.`
+  )
 }
 
 /**
@@ -451,9 +555,35 @@ export async function fetchPdf(
 
   const logFile = compileResult.outputFiles?.find((f: any) => f.path === 'output.log')
   const logs = await fetchLog(logFile)
+  const missingResourceReport =
+    compileTarget.compiler === 'typst'
+      ? null
+      : analyzeMissingLatexResource(
+          logs,
+          resources.map((resource) => resource.path)
+        )
+
+  if (missingResourceReport) {
+    console.groupCollapsed(
+      `[CLSI][debug] Missing resource triage: ${missingResourceReport.missingReference}`
+    )
+    console.log('Missing reference:', missingResourceReport.missingReference)
+    console.log('Case mismatch candidate:', missingResourceReport.caseMismatchPath)
+    console.log('Extension candidates:', missingResourceReport.extensionCandidates)
+    console.log('Basename candidates:', missingResourceReport.basenameCandidates)
+    console.log('Total resources sent:', missingResourceReport.totalResources)
+    console.groupEnd()
+  }
 
   // Handle compilation errors
   if (compileResult.status !== 'success') {
+    if (missingResourceReport) {
+      compileResult.diagnostics = {
+        ...compileResult.diagnostics,
+        summary: buildMissingResourceSummary(missingResourceReport),
+      }
+    }
+
     throw createCompileError(compileResult, compileTarget.label, logs)
   }
 
