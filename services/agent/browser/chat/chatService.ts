@@ -81,6 +81,9 @@ export interface GenerateOptions {
   model?: string
   context?: AgentChatContext
   planningMode?: boolean
+  // BYOK: user-provided provider and API key
+  provider?: string
+  apiKey?: string
 }
 
 export interface GenerateResult {
@@ -626,6 +629,7 @@ class DataStreamChatService implements IChatService {
           model: opts.model,
           context: opts.context,
           planningMode: opts.planningMode ?? false,
+          ...(opts.provider && opts.apiKey ? { provider: opts.provider, apiKey: opts.apiKey } : {}),
         }),
         signal: controller.signal,
       })

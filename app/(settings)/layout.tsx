@@ -1,6 +1,7 @@
 import { SettingsSidebar } from '@/components/layout/settings-sidebar'
 import { DashboardSettingsProvider } from '@/contexts/DashboardSettingsContext'
 import { SidebarProvider } from '@/contexts/SidebarContext'
+import { AIProviderSettingsWrapper } from '@/components/settings/ai-provider-wrapper'
 
 export default function SettingsLayout({
   children,
@@ -10,6 +11,7 @@ export default function SettingsLayout({
   return (
     <SidebarProvider>
       <DashboardSettingsProvider>
+        <AIProviderSettingsWrapper>
         <div className="h-screen bg-[#090909] text-white flex font-sans selection:bg-white/20">
             {/* Settings Sidebar */}
             <SettingsSidebar />
@@ -29,6 +31,7 @@ export default function SettingsLayout({
                 </div>
             </main>
         </div>
+      </AIProviderSettingsWrapper>
       </DashboardSettingsProvider>
     </SidebarProvider>
   )

@@ -1,6 +1,7 @@
 import { createGoogleGenerativeAI } from '@ai-sdk/google'
 import { streamText, type CoreMessage } from 'ai'
 import { GEMINI_DEFAULT_MODEL, resolveGeminiModel } from '@/lib/constants/gemini-models'
+import { createProviderFromRequest } from '@/lib/server/ai-provider-factory'
 import type { AgentChatContext } from '@/features/agent/types/chat-context'
 import {
   normalizeContext,
@@ -28,6 +29,9 @@ interface ChatRequestBody {
   model?: string
   context?: AgentChatContext
   planningMode?: boolean
+  // BYOK: user-provided API key (transient, never stored)
+  provider?: string
+  apiKey?: string
 }
 
 function normalizeConversationMessages(
@@ -74,25 +78,32 @@ export async function POST(req: Request) {
   if (authError) return authError
 
   const userCtx = await resolveUserContext(req)
-  const tokenBudget = await checkTokenBudget(userCtx.userId, userCtx.entitlements.aiTokenLimit)
-  if (!tokenBudget.allowed) {
-    return new Response(
-      JSON.stringify({
-        error: 'AI token quota exceeded for this billing period.',
-        used: tokenBudget.used,
-        limit: tokenBudget.limit,
-        period: tokenBudget.period,
-        plan: userCtx.plan,
-      }),
-      { status: 429, headers: { 'Content-Type': 'application/json' } }
-    )
-  }
 
-  const isAiChatEnabled =
-    process.env.ENABLE_AI_CHAT === 'true' ||
-    process.env.NEXT_PUBLIC_ENABLE_AI_CHAT === 'true'
-  if (!isAiChatEnabled) {
-    return new Response('AI chat is disabled.', { status: 403 })
+  // BYOK users skip server-managed quota (they pay their own API costs)
+  const payload = (await req.json()) as ChatRequestBody
+  const isByok = Boolean(payload.apiKey && payload.provider)
+
+  if (!isByok) {
+    const tokenBudget = await checkTokenBudget(userCtx.userId, userCtx.entitlements.aiTokenLimit)
+    if (!tokenBudget.allowed) {
+      return new Response(
+        JSON.stringify({
+          error: 'AI token quota exceeded for this billing period.',
+          used: tokenBudget.used,
+          limit: tokenBudget.limit,
+          period: tokenBudget.period,
+          plan: userCtx.plan,
+        }),
+        { status: 429, headers: { 'Content-Type': 'application/json' } }
+      )
+    }
+
+    const isAiChatEnabled =
+      process.env.ENABLE_AI_CHAT === 'true' ||
+      process.env.NEXT_PUBLIC_ENABLE_AI_CHAT === 'true'
+    if (!isAiChatEnabled) {
+      return new Response('AI chat is disabled.', { status: 403 })
+    }
   }
 
   // ── Parse & Validate ──
@@ -101,7 +112,6 @@ export async function POST(req: Request) {
       ? crypto.randomUUID()
       : `req-${Date.now()}`
 
-  const payload = (await req.json()) as ChatRequestBody
   const { messages } = payload
 
   if (!Array.isArray(messages) || messages.length === 0) {
@@ -159,23 +169,49 @@ export async function POST(req: Request) {
       })
 
   // ── API Key & Model ──
-  const apiKey = process.env.GOOGLE_GENERATIVE_AI_API_KEY || process.env.GOOGLE_GENERATION_AI_API_KEY
-  if (!apiKey) {
-    return new Response('Missing Google API Key', { status: 401 })
+  let resolvedModel: string
+  let modelInstance: ReturnType<typeof createGoogleGenerativeAI> | null = null
+
+  if (isByok) {
+    // BYOK: use user-provided key (transient, never stored/logged)
+    try {
+      const providerResult = createProviderFromRequest({
+        provider: payload.provider,
+        apiKey: payload.apiKey,
+        model: payload.model,
+      })
+      resolvedModel = providerResult.resolvedModelId
+      // modelInstance is unused in BYOK path — we use providerResult.model directly below
+      ;(modelInstance as unknown) = providerResult
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Invalid provider configuration'
+      return new Response(JSON.stringify({ error: msg }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    }
+  } else {
+    const apiKey = process.env.GOOGLE_GENERATIVE_AI_API_KEY || process.env.GOOGLE_GENERATION_AI_API_KEY
+    if (!apiKey) {
+      return new Response('Missing Google API Key', { status: 401 })
+    }
+    modelInstance = createGoogleGenerativeAI({ apiKey }) as ReturnType<typeof createGoogleGenerativeAI>
+    resolvedModel = resolveGeminiModel(payload.model)
   }
 
-  const google = createGoogleGenerativeAI({ apiKey })
-  const selectedModel = resolveGeminiModel(payload.model)
+  const selectedModel = resolvedModel
 
   console.info(`[Agent Chat ${requestId}] request`, {
     model: selectedModel,
+    provider: isByok ? payload.provider : 'google',
+    byok: isByok,
     workspaceFiles: context.workspaceFiles.length,
     typstLibraryEnabled,
     forceStructuredEdits,
     planningMode,
   })
 
-  // ── Analytics ──
+  // ── Analytics (NEVER include apiKey) ──
   const posthog = getPostHogClient()
   posthog?.capture({
     distinctId: userCtx.userId !== 'anonymous' ? userCtx.userId : (context.userId ?? requestId),
@@ -184,18 +220,20 @@ export async function POST(req: Request) {
       user_id: userCtx.userId,
       plan: userCtx.plan,
       model: selectedModel,
+      provider: isByok ? payload.provider : 'google',
+      byok: isByok,
       workspace_files_count: context.workspaceFiles.length,
       typst_library_enabled: typstLibraryEnabled,
       force_structured_edits: forceStructuredEdits,
       planning_mode: planningMode,
       has_compile_error: Boolean(context.compileError),
       message_length: latestUserMessage.length,
-      token_budget_used: tokenBudget.used,
-      token_budget_limit: tokenBudget.limit,
     },
   })
 
   // ── Stream Generation ──
+  const byokProviderResult = isByok ? (modelInstance as unknown as { model: import('ai').LanguageModel }) : null
+
   const runWithModel = (modelId: string) => {
     const checkpointManager = new CheckpointManager()
     const virtualWorkspaceContent = new Map<string, string>()
@@ -222,8 +260,13 @@ export async function POST(req: Request) {
       filesDeletedInRun: new Set(),
     }
 
+    // Use BYOK provider model directly, or server-managed Google provider
+    const streamModel = byokProviderResult
+      ? byokProviderResult.model
+      : (modelInstance as ReturnType<typeof createGoogleGenerativeAI>)(modelId)
+
     return streamText({
-      model: google(modelId),
+      model: streamModel,
       system: systemPrompt,
       messages: conversation,
       temperature: 0.05,
@@ -280,30 +323,31 @@ export async function POST(req: Request) {
       }
     }
 
-    // Record token usage asynchronously after the stream completes.
-    // We don't block the response on this — the stream starts immediately.
-    void result.usage.then((usage) => {
-      const totalTokens = (usage.promptTokens ?? 0) + (usage.completionTokens ?? 0)
-      if (totalTokens > 0) {
-        void recordTokenUsage(
-          userCtx.userId,
-          userCtx.entitlements.aiTokenLimit,
-          totalTokens
-        ).then((updated) => {
-          console.info(`[Agent Chat ${requestId}] token usage recorded`, {
-            prompt: usage.promptTokens,
-            completion: usage.completionTokens,
-            total: totalTokens,
-            periodUsed: updated.used,
-            periodLimit: updated.limit,
+    // Record token usage asynchronously (skip for BYOK — users pay their own API costs)
+    if (!isByok) {
+      void result.usage.then((usage) => {
+        const totalTokens = (usage.promptTokens ?? 0) + (usage.completionTokens ?? 0)
+        if (totalTokens > 0) {
+          void recordTokenUsage(
+            userCtx.userId,
+            userCtx.entitlements.aiTokenLimit,
+            totalTokens
+          ).then((updated) => {
+            console.info(`[Agent Chat ${requestId}] token usage recorded`, {
+              prompt: usage.promptTokens,
+              completion: usage.completionTokens,
+              total: totalTokens,
+              periodUsed: updated.used,
+              periodLimit: updated.limit,
+            })
+          }).catch((err) => {
+            console.error(`[Agent Chat ${requestId}] failed to record token usage`, err)
           })
-        }).catch((err) => {
-          console.error(`[Agent Chat ${requestId}] failed to record token usage`, err)
-        })
-      }
-    }).catch((err) => {
-      console.error(`[Agent Chat ${requestId}] failed to read usage`, err)
-    })
+        }
+      }).catch((err) => {
+        console.error(`[Agent Chat ${requestId}] failed to read usage`, err)
+      })
+    }
 
     return result.toDataStreamResponse()
   } catch (error) {

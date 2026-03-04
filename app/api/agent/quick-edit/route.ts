@@ -1,6 +1,7 @@
 import { createGoogleGenerativeAI } from '@ai-sdk/google'
 import { streamText, type CoreMessage } from 'ai'
 import { GEMINI_DEFAULT_MODEL, resolveGeminiModel } from '@/lib/constants/gemini-models'
+import { createProviderFromRequest } from '@/lib/server/ai-provider-factory'
 import { authorizeAgentRequest } from '@/lib/server/agent-auth'
 import { evaluatePromptSecurity } from '@/lib/server/prompt-security'
 import { buildQuickEditSystemPrompt } from '@/lib/server/quick-edit-system-prompt'
@@ -15,6 +16,9 @@ interface QuickEditRequestBody {
     content: string
   }>
   model?: string
+  // BYOK: user-provided API key (transient, never stored)
+  provider?: string
+  apiKey?: string
 }
 
 function sanitizeText(value: unknown): string {
@@ -132,9 +136,19 @@ export async function POST(req: Request) {
 
   const userCtx = await resolveUserContext(req)
   console.info(`[Agent QuickEdit ${requestId}] user=${userCtx.userId} plan=${userCtx.plan} source=${userCtx.planSource}`)
-  const quota = await checkTokenBudget(userCtx.userId, userCtx.entitlements.aiTokenLimit)
 
-  if (!quota.allowed) {
+  let payload: QuickEditRequestBody
+  try {
+    payload = (await req.json()) as QuickEditRequestBody
+  } catch {
+    const emptyQuota = await checkTokenBudget(userCtx.userId, userCtx.entitlements.aiTokenLimit)
+    return createQuotaResponse('Invalid request payload', { status: 400 }, emptyQuota)
+  }
+
+  const quota = await checkTokenBudget(userCtx.userId, userCtx.entitlements.aiTokenLimit)
+  const isByokRequest = Boolean(payload.apiKey && payload.provider)
+
+  if (!isByokRequest && !quota.allowed) {
     return createQuotaResponse(
       JSON.stringify({
         error: 'AI token quota exceeded for this billing period.',
@@ -146,13 +160,6 @@ export async function POST(req: Request) {
       { status: 429, headers: { 'Content-Type': 'application/json' } },
       quota
     )
-  }
-
-  let payload: QuickEditRequestBody
-  try {
-    payload = (await req.json()) as QuickEditRequestBody
-  } catch {
-    return createQuotaResponse('Invalid request payload', { status: 400 }, quota)
   }
 
   if (!Array.isArray(payload.messages) || payload.messages.length === 0) {
@@ -193,18 +200,40 @@ export async function POST(req: Request) {
     )
   }
 
-  const apiKey =
-    process.env.GOOGLE_GENERATIVE_AI_API_KEY || process.env.GOOGLE_GENERATION_AI_API_KEY
-  if (!apiKey) {
-    return createQuotaResponse('Missing Google API Key', { status: 401 }, quota)
-  }
+  const isByok = Boolean(payload.apiKey && payload.provider)
+  let selectedModel: string
+  let byokModel: import('ai').LanguageModel | null = null
 
-  const google = createGoogleGenerativeAI({ apiKey })
-  const selectedModel = resolveGeminiModel(payload.model)
+  if (isByok) {
+    try {
+      const providerResult = createProviderFromRequest({
+        provider: payload.provider,
+        apiKey: payload.apiKey,
+        model: payload.model,
+      })
+      selectedModel = providerResult.resolvedModelId
+      byokModel = providerResult.model
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Invalid provider configuration'
+      return createQuotaResponse(
+        JSON.stringify({ error: msg }),
+        { status: 400, headers: { 'Content-Type': 'application/json' } },
+        quota
+      )
+    }
+  } else {
+    const apiKey =
+      process.env.GOOGLE_GENERATIVE_AI_API_KEY || process.env.GOOGLE_GENERATION_AI_API_KEY
+    if (!apiKey) {
+      return createQuotaResponse('Missing Google API Key', { status: 401 }, quota)
+    }
+    var google = createGoogleGenerativeAI({ apiKey })
+    selectedModel = resolveGeminiModel(payload.model)
+  }
 
   const runWithModel = (modelId: string) =>
     streamText({
-      model: google(modelId),
+      model: byokModel ?? google!(modelId),
       system: buildQuickEditSystemPrompt(),
       messages: conversation,
       temperature: 0,
@@ -226,29 +255,31 @@ export async function POST(req: Request) {
       result = await runWithModel(GEMINI_DEFAULT_MODEL)
     }
 
-    // Record token usage asynchronously after stream completes
-    void result.usage.then((usage) => {
-      const totalTokens = (usage.promptTokens ?? 0) + (usage.completionTokens ?? 0)
-      if (totalTokens > 0) {
-        void recordTokenUsage(
-          userCtx.userId,
-          userCtx.entitlements.aiTokenLimit,
-          totalTokens
-        ).then((updated) => {
-          console.info(`[Agent QuickEdit ${requestId}] token usage recorded`, {
-            prompt: usage.promptTokens,
-            completion: usage.completionTokens,
-            total: totalTokens,
-            periodUsed: updated.used,
-            periodLimit: updated.limit,
+    // Record token usage asynchronously (skip for BYOK — users pay their own API costs)
+    if (!isByok) {
+      void result.usage.then((usage) => {
+        const totalTokens = (usage.promptTokens ?? 0) + (usage.completionTokens ?? 0)
+        if (totalTokens > 0) {
+          void recordTokenUsage(
+            userCtx.userId,
+            userCtx.entitlements.aiTokenLimit,
+            totalTokens
+          ).then((updated) => {
+            console.info(`[Agent QuickEdit ${requestId}] token usage recorded`, {
+              prompt: usage.promptTokens,
+              completion: usage.completionTokens,
+              total: totalTokens,
+              periodUsed: updated.used,
+              periodLimit: updated.limit,
+            })
+          }).catch((err) => {
+            console.error(`[Agent QuickEdit ${requestId}] failed to record token usage`, err)
           })
-        }).catch((err) => {
-          console.error(`[Agent QuickEdit ${requestId}] failed to record token usage`, err)
-        })
-      }
-    }).catch((err) => {
-      console.error(`[Agent QuickEdit ${requestId}] failed to read usage`, err)
-    })
+        }
+      }).catch((err) => {
+        console.error(`[Agent QuickEdit ${requestId}] failed to read usage`, err)
+      })
+    }
 
     const streamResponse = result.toTextStreamResponse()
     return createQuotaResponse(

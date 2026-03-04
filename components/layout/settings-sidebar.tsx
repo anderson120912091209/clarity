@@ -3,7 +3,7 @@
 import { type ElementType } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Bot, Building2, ChevronLeft, LayoutGrid, Plug, Settings, Shield, Sparkles, CreditCard } from 'lucide-react'
+import { Bot, Building2, ChevronLeft, Key, LayoutGrid, Plug, Settings, Shield, Sparkles, CreditCard } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 const SECTION_ITEMS: Array<{
@@ -17,6 +17,7 @@ const SECTION_ITEMS: Array<{
   { href: '/settings/dashboard', icon: LayoutGrid, label: 'Dashboard' },
   { href: '/settings/editor', icon: Sparkles, label: 'Editor defaults' },
   { href: '/settings/assistant', icon: Bot, label: 'AI assistant' },
+  { href: '/settings/ai-providers', icon: Key, label: 'AI Providers' },
   { href: '/settings/mcp', icon: Plug, label: 'MCP / API' },
   { href: '/settings/billing', icon: CreditCard, label: 'Billing' },
   { href: '/settings/safety', icon: Shield, label: 'Safety' },

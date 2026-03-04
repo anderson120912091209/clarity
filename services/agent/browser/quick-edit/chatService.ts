@@ -24,6 +24,9 @@ export interface GenerateOptions {
   stream?: boolean
   abortSignal?: AbortSignal
   model?: string
+  // BYOK: user-provided provider and API key
+  provider?: string
+  apiKey?: string
 }
 
 export interface GenerateResult {
@@ -61,6 +64,7 @@ class QuickEditChatService implements IChatService {
         body: JSON.stringify({
           messages: opts.messages,
           model: opts.model,
+          ...(opts.provider && opts.apiKey ? { provider: opts.provider, apiKey: opts.apiKey } : {}),
         }),
         signal: controller.signal,
       })

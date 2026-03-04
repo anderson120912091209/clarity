@@ -9,11 +9,12 @@ import {
   type PdfBackgroundThemeKey,
 } from '@/lib/constants/pdf-background-themes'
 import { GEMINI_ALLOWED_MODELS } from '@/lib/constants/gemini-models'
+import { AI_MODEL_OPTIONS } from '@/lib/constants/ai-providers'
 
 export type DashboardView = 'grid' | 'list'
 export type DashboardSort = 'date' | 'name'
 export type DashboardDensity = 'comfortable' | 'compact'
-export type ChatModelPreference = 'auto' | (typeof GEMINI_ALLOWED_MODELS)[number]
+export type ChatModelPreference = 'auto' | (typeof GEMINI_ALLOWED_MODELS)[number] | string
 
 export interface DashboardSettings {
   defaultView: DashboardView
@@ -72,7 +73,10 @@ const DashboardSettingsContext = createContext<DashboardSettingsContextValue | n
 function isChatModelPreference(value: unknown): value is ChatModelPreference {
   if (value === 'auto') return true
   if (typeof value !== 'string') return false
-  return GEMINI_ALLOWED_MODELS.includes(value as (typeof GEMINI_ALLOWED_MODELS)[number])
+  // Support both legacy Gemini models and new multi-provider models
+  if (GEMINI_ALLOWED_MODELS.includes(value as (typeof GEMINI_ALLOWED_MODELS)[number])) return true
+  if (AI_MODEL_OPTIONS.some((m) => m.id === value)) return true
+  return false
 }
 
 function isEditorSyntaxTheme(value: unknown): value is EditorSyntaxTheme {
