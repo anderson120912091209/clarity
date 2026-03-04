@@ -4,7 +4,7 @@ import React from 'react'
 import Link from 'next/link'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { TooltipProvider } from '@/components/ui/tooltip'
-import { User, ChevronDown, SquarePen, Loader2, Settings, Trash2, Users, BookOpen } from 'lucide-react'
+import { User, ChevronDown, SquarePen, Loader2, Settings, Trash2, Users, BookOpen, Key } from 'lucide-react'
 import { db } from '@/lib/constants'
 import { useRouter, usePathname } from 'next/navigation'
 import { useState } from 'react'
@@ -93,25 +93,35 @@ export default function DashboardSidebar() {
                 <div className="px-3 py-2 border-b border-white/[0.06]">
                   <div className="text-[12px] font-medium text-white truncate">{user?.email || 'User'}</div>
                   <div className="text-[10px] text-white/50">{isPro ? 'Pro Plan' : 'Free Plan'}</div>
-                  <div className="mt-2">
-                    <AiQuotaDisplay
-                      used={quickEditQuota.used}
-                      limit={quickEditQuota.limit}
-                      loading={isQuickEditQuotaLoading}
-                      error={quickEditQuotaError ? 'Failed to load quota status.' : null}
-                      onRefresh={refreshQuickEditQuota}
-                      onUpgrade={() => setShowUpgradeModal(true)}
-                      showLabel={true}
-                      compact={false}
-                    />
-                  </div>
+                  {isPro ? (
+                    <div className="mt-2">
+                      <AiQuotaDisplay
+                        used={quickEditQuota.used}
+                        limit={quickEditQuota.limit}
+                        loading={isQuickEditQuotaLoading}
+                        error={quickEditQuotaError ? 'Failed to load quota status.' : null}
+                        onRefresh={refreshQuickEditQuota}
+                        onUpgrade={() => setShowUpgradeModal(true)}
+                        showLabel={true}
+                        compact={false}
+                      />
+                    </div>
+                  ) : (
+                    <Link
+                      href="/settings/ai-providers"
+                      className="mt-2 flex items-center gap-1.5 text-[11px] text-[#6D78E7] hover:text-[#858FE9] transition-colors"
+                    >
+                      <Key className="h-3 w-3" />
+                      Configure AI provider
+                    </Link>
+                  )}
                 </div>
                 <div className="p-1">
                   <Link
-                    href="/settings/assistant"
+                    href={isPro ? '/settings/assistant' : '/settings/ai-providers'}
                     className="flex items-center justify-between px-2 py-1.5 hover:bg-[#151619] rounded-md text-left w-full transition-colors group mx-0.5 outline-none focus:bg-white/[0.06]"
                   >
-                    <span className="text-[12px] text-white/80 group-hover:text-white">AI quota settings</span>
+                    <span className="text-[12px] text-white/80 group-hover:text-white">{isPro ? 'AI quota settings' : 'AI provider settings'}</span>
                   </Link>
                   <UpgradeModal
                     trigger={

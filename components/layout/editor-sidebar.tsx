@@ -4,7 +4,7 @@ import React from 'react'
 import Link from 'next/link'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
-import { User, Search, Pencil, ChevronDown, ArrowLeft, Settings, ChevronRight, Palette, MousePointer2, SquarePen } from 'lucide-react'
+import { User, Search, Pencil, ChevronDown, ArrowLeft, Settings, ChevronRight, Palette, MousePointer2, SquarePen, Key } from 'lucide-react'
 import { NewProjectDialog } from '@/components/features/projects/new-project-dialog'
 import { db } from '@/lib/constants'
 import { useRouter } from 'next/navigation'
@@ -31,6 +31,7 @@ import {
 import { useAiQuota } from '@/hooks/useAiQuota'
 import { AiQuotaDisplay } from '@/components/ai-quota-display'
 import { UpgradeModal } from '@/components/upgrade-modal'
+import { useFrontend } from '@/contexts/FrontendContext'
 
 interface EditorSidebarProps {
   syntaxTheme: EditorSyntaxTheme
@@ -45,6 +46,7 @@ export default function EditorSidebar({
 }: EditorSidebarProps) {
   const router = useRouter()
   const { user } = db.useAuth()
+  const { isPro } = useFrontend()
   const { settings } = useDashboardSettings()
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
@@ -168,26 +170,36 @@ export default function EditorSidebar({
               <div className="flex flex-col">
                 <div className="px-3 py-2 border-b border-white/[0.06]">
                   <div className="text-[12px] font-medium text-white truncate">{user?.email || 'User'}</div>
-                  <div className="text-[10px] text-white/50">Free Plan</div>
-                  <div className="mt-2">
-                    <AiQuotaDisplay
-                      used={quickEditQuota.used}
-                      limit={quickEditQuota.limit}
-                      loading={isQuickEditQuotaLoading}
-                      error={quickEditQuotaError ? 'Failed to load quota status.' : null}
-                      onRefresh={refreshQuickEditQuota}
-                      onUpgrade={() => setShowUpgradeModal(true)}
-                      showLabel={true}
-                      compact={false}
-                    />
-                  </div>
+                  <div className="text-[10px] text-white/50">{isPro ? 'Pro Plan' : 'Free Plan'}</div>
+                  {isPro ? (
+                    <div className="mt-2">
+                      <AiQuotaDisplay
+                        used={quickEditQuota.used}
+                        limit={quickEditQuota.limit}
+                        loading={isQuickEditQuotaLoading}
+                        error={quickEditQuotaError ? 'Failed to load quota status.' : null}
+                        onRefresh={refreshQuickEditQuota}
+                        onUpgrade={() => setShowUpgradeModal(true)}
+                        showLabel={true}
+                        compact={false}
+                      />
+                    </div>
+                  ) : (
+                    <Link
+                      href="/settings/ai-providers"
+                      className="mt-2 flex items-center gap-1.5 text-[11px] text-[#6D78E7] hover:text-[#858FE9] transition-colors"
+                    >
+                      <Key className="h-3 w-3" />
+                      Configure AI provider
+                    </Link>
+                  )}
                 </div>
                 <div className="p-1">
                   <Link
-                    href="/settings/assistant"
+                    href={isPro ? '/settings/assistant' : '/settings/ai-providers'}
                     className="flex items-center justify-between px-2 py-1.5 hover:bg-[#151619] rounded-md text-left w-full transition-colors group outline-none focus:bg-white/[0.06]"
                   >
-                    <span className="text-[12px] text-white/80 group-hover:text-white">AI quota settings</span>
+                    <span className="text-[12px] text-white/80 group-hover:text-white">{isPro ? 'AI quota settings' : 'AI provider settings'}</span>
                   </Link>
                   <button
                     onClick={handleSignOut}
