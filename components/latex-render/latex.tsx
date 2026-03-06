@@ -549,9 +549,29 @@ function LatexRenderer({
   const [localPdfBackgroundTheme, setLocalPdfBackgroundTheme] = useState<PdfBackgroundThemeKey>(DEFAULT_PDF_BACKGROUND_THEME)
   const pdfBackgroundTheme = resolvePdfBackgroundTheme(localPdfBackgroundTheme)
   const containerRef = useRef<HTMLDivElement>(null);
-  
+
   const [numPages, setNumPages] = useState<number>(0)
   const [loadedPdfUrl, setLoadedPdfUrl] = useState<string | null>(null)
+
+  // Debounced render scale: CSS transform provides instant visual feedback,
+  // while the actual Page re-render only happens after zooming stops.
+  const [renderScale, setRenderScale] = useState(scale)
+  const renderScaleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  useEffect(() => {
+    if (renderScaleTimerRef.current) {
+      clearTimeout(renderScaleTimerRef.current)
+    }
+    renderScaleTimerRef.current = setTimeout(() => {
+      setRenderScale(scale)
+      renderScaleTimerRef.current = null
+    }, 150)
+    return () => {
+      if (renderScaleTimerRef.current) {
+        clearTimeout(renderScaleTimerRef.current)
+      }
+    }
+  }, [scale])
 
   useEffect(() => {
     const projectTheme = data?.pdfBackgroundTheme
@@ -590,7 +610,12 @@ function LatexRenderer({
     }
   }, [projectId])
 
-  // Trackpad zoom support
+  // Trackpad zoom support — use refs to avoid recreating the listener on every scale change
+  const scaleRef = useRef(scale)
+  useEffect(() => { scaleRef.current = scale }, [scale])
+  const onScaleChangeRef = useRef(onScaleChange)
+  useEffect(() => { onScaleChangeRef.current = onScaleChange }, [onScaleChange])
+
   useEffect(() => {
     const container = containerRef.current
     if (!container) return
@@ -598,27 +623,19 @@ function LatexRenderer({
     const handleWheel = (e: WheelEvent) => {
       if (e.ctrlKey) {
         e.preventDefault()
-        
-        // Calculate new scale
-        // Use a smaller step for finer control with trackpad
         const delta = -e.deltaY
-        const factor = 0.01 
-        const newScale = normalizePdfScale(scale + delta * factor, scale)
-        
-        // Simple throttling could be done here if needed, 
-        // but for now we'll rely on React's batching or rapid updates.
-        // We limit the update frequency to avoid flooding
-        onScaleChange(newScale)
+        const factor = 0.01
+        const newScale = normalizePdfScale(scaleRef.current + delta * factor, scaleRef.current)
+        onScaleChangeRef.current(newScale)
       }
     }
 
-    // Add passive: false to allow preventDefault
     container.addEventListener('wheel', handleWheel, { passive: false })
 
     return () => {
       container.removeEventListener('wheel', handleWheel)
     }
-  }, [onScaleChange, scale])
+  }, [])
 
   useEffect(() => {
     setNumPages(0)
@@ -699,6 +716,7 @@ function LatexRenderer({
                 isDocumentReady={isDocumentReady}
                  numPages={numPages}
                  scale={scale}
+                 renderScale={renderScale}
                  scrollRequest={scrollRequest}
                  highlightRequest={highlightRequest}
                  onPdfPointSelect={onPdfPointSelect}

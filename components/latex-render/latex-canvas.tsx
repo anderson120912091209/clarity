@@ -3,7 +3,7 @@
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area"
 import { Document, Page, pdfjs } from 'react-pdf'
 import { Skeleton } from "@/components/ui/skeleton"
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, memo } from 'react'
 import type { SynctexPdfPosition } from '@/lib/utils/synctex-utils'
 import type { MouseEvent } from 'react'
 
@@ -12,6 +12,77 @@ if (typeof window !== 'undefined') {
   pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.mjs`
 }
 
+const MemoizedPage = memo(function MemoizedPage({
+  pageNumber,
+  renderScale,
+  darkMode,
+  isPdfNavigationEnabled,
+  pageContainerRefs,
+  pageDimensionsRef,
+  handlePageClick,
+  resolveHighlightRects,
+  setDocumentError,
+}: {
+  pageNumber: number
+  renderScale: number
+  darkMode: boolean
+  isPdfNavigationEnabled: boolean
+  pageContainerRefs: React.MutableRefObject<Record<number, HTMLDivElement | null>>
+  pageDimensionsRef: React.MutableRefObject<Record<number, { width: number; height: number }>>
+  handlePageClick: (pageNumber: number) => (event: MouseEvent<HTMLDivElement>) => void
+  resolveHighlightRects: (pageNumber: number) => Array<{ id: string; style: Record<string, number> }>
+  setDocumentError: (error: string | null) => void
+}) {
+  const highlightRects = resolveHighlightRects(pageNumber)
+
+  return (
+    <div
+      ref={(node) => {
+        pageContainerRefs.current[pageNumber] = node
+      }}
+      onClick={handlePageClick(pageNumber)}
+      className={`relative mb-4 ${darkMode ? 'shadow-none' : 'shadow-lg'} ${isPdfNavigationEnabled ? 'cursor-pointer' : 'cursor-default'}`}
+      style={{
+        filter: darkMode ? 'invert(0.88) hue-rotate(180deg)' : 'none',
+        transition: 'filter 0.35s ease',
+      }}
+    >
+      <Page
+        pageNumber={pageNumber}
+        scale={renderScale}
+        width={typeof window !== 'undefined' ? Math.min(window.innerWidth - 80, 800) : 800}
+        loading={<Skeleton className="w-full h-[calc(100vh-80px)] mb-4" />}
+        onLoadSuccess={(page) => {
+          const viewport = page.getViewport({ scale: 1 })
+          pageDimensionsRef.current[pageNumber] = {
+            width: viewport.width,
+            height: viewport.height,
+          }
+        }}
+        onRenderError={(error) => {
+          console.error(`Error rendering page ${pageNumber}:`, error)
+          setDocumentError(`Failed to render page ${pageNumber}`)
+        }}
+        onLoadError={(error) => {
+          console.error(`Error loading page ${pageNumber}:`, error)
+          setDocumentError(`Failed to load page ${pageNumber}`)
+        }}
+      />
+      {highlightRects.length > 0 && (
+        <div className="pointer-events-none absolute inset-0">
+          {highlightRects.map((rect) => (
+            <div
+              key={rect.id}
+              className="absolute bg-amber-300/40"
+              style={rect.style}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  )
+})
+
 export default function LatexCanvas({
   pdfUrl,
   onDocumentLoadSuccess,
@@ -19,6 +90,7 @@ export default function LatexCanvas({
   isDocumentReady,
   numPages,
   scale,
+  renderScale,
   scrollRequest,
   highlightRequest,
   onPdfPointSelect,
@@ -32,6 +104,7 @@ export default function LatexCanvas({
   isDocumentReady: boolean;
   numPages: number;
   scale: number;
+  renderScale: number;
   scrollRequest?:
     | {
         mode: 'ratio' | 'synctex'
@@ -206,60 +279,34 @@ export default function LatexCanvas({
         loading={<Skeleton className="w-full h-full max-w-4xl" />}
         options={options}
       >
-        {isDocumentReady && numPages > 0 && !documentError && workerReady &&
-          Array.from(new Array(numPages), (el, index) => {
+        {isDocumentReady && numPages > 0 && !documentError && workerReady && (
+          <div
+            style={{
+              transform: renderScale > 0 ? `scale(${scale / renderScale})` : undefined,
+              transformOrigin: 'top center',
+              transition: scale === renderScale ? 'none' : 'transform 0.05s ease-out',
+            }}
+          >
+          {Array.from(new Array(numPages), (el, index) => {
             const pageNumber = index + 1
-            const highlightRects = resolveHighlightRects(pageNumber)
 
             return (
-              <div
+              <MemoizedPage
                 key={`page_wrapper_${pageNumber}`}
-                ref={(node) => {
-                  pageContainerRefs.current[pageNumber] = node
-                }}
-                onClick={handlePageClick(pageNumber)}
-                className={`relative mb-4 ${darkMode ? 'shadow-none' : 'shadow-lg'} ${isPdfNavigationEnabled ? 'cursor-pointer' : 'cursor-default'}`}
-                style={{
-                  filter: darkMode ? 'invert(0.88) hue-rotate(180deg)' : 'none',
-                  transition: 'filter 0.35s ease',
-                }}
-              >
-                <Page
-                  key={`page_${pageNumber}`}
-                  pageNumber={pageNumber}
-                  scale={scale}
-                  width={typeof window !== 'undefined' ? Math.min(window.innerWidth - 80, 800) : 800}
-                  loading={<Skeleton className="w-full h-[calc(100vh-80px)] mb-4" />}
-                  onLoadSuccess={(page) => {
-                    const viewport = page.getViewport({ scale: 1 })
-                    pageDimensionsRef.current[pageNumber] = {
-                      width: viewport.width,
-                      height: viewport.height,
-                    }
-                  }}
-                  onRenderError={(error) => {
-                    console.error(`Error rendering page ${pageNumber}:`, error)
-                    setDocumentError(`Failed to render page ${pageNumber}`)
-                  }}
-                  onLoadError={(error) => {
-                    console.error(`Error loading page ${pageNumber}:`, error)
-                    setDocumentError(`Failed to load page ${pageNumber}`)
-                  }}
-                />
-                {highlightRects.length > 0 && (
-                  <div className="pointer-events-none absolute inset-0">
-                    {highlightRects.map((rect) => (
-                      <div
-                        key={rect.id}
-                        className="absolute bg-amber-300/40"
-                        style={rect.style}
-                      />
-                    ))}
-                  </div>
-                )}
-              </div>
+                pageNumber={pageNumber}
+                renderScale={renderScale}
+                darkMode={darkMode}
+                isPdfNavigationEnabled={isPdfNavigationEnabled}
+                pageContainerRefs={pageContainerRefs}
+                pageDimensionsRef={pageDimensionsRef}
+                handlePageClick={handlePageClick}
+                resolveHighlightRects={resolveHighlightRects}
+                setDocumentError={setDocumentError}
+              />
             )
           })}
+          </div>
+        )}
         {documentError && (
           <div className="p-4 text-red-500">
             Error loading PDF: {documentError}
